@@ -56,7 +56,7 @@ final class PlayerEngineRouter {
         if enabled && !FFmpegAvailability.isLinked {
             logger.playback.info("Native toggle on but \(FFmpegAvailability.statusMessage)")
         }
-        logger.playback.info("Router: \(diagnosticsLine)")
+        logger.playback.info("Router: \(self.diagnosticsLine)")
         return report
     }
 

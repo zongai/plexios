@@ -243,7 +243,7 @@ final class VideoToolboxDecoder: VideoDecoder {
         }
         try data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else {
-                throw VideoDecoderError.decodeFailed(OSStatus(paramErr))
+                throw VideoDecoderError.decodeFailed(OSStatus(-50)) // paramErr
             }
             let replace = CMBlockBufferReplaceDataBytes(
                 with: base,

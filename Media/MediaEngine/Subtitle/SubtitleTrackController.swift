@@ -44,7 +44,7 @@ final class SubtitleTrackController: @unchecked Sendable {
     /// Load full file data (sidecar).
     func loadFile(data: Data, format: SubtitleFormat) throws {
         let decoder = try SubtitleDecoderFactory.make(format: format)
-        let parsed = try decoder.decode(data: data)
+        let parsed = try decoder.decode(data: data, encoding: .utf8)
         load(parsed)
     }
 

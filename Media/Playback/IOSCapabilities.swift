@@ -213,6 +213,8 @@ struct PlaybackPreferences: Sendable {
     /// Default rate when starting playback (1.0 = normal)
     var defaultPlaybackRate: Float
     var defaultAspectMode: VideoAspectMode
+    /// Experimental native media engine (FFmpeg demux + VT / soft decode).
+    var allowNativeMediaEngine: Bool
 
     static let `default` = PlaybackPreferences(
         maxVideoBitrateKbps: nil,

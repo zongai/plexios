@@ -204,7 +204,6 @@ struct MP4BoxProbe: Sendable {
 
     private func readFourCC(_ data: Data, _ o: Int) -> String {
         guard o + 4 <= data.count else { return "" }
-        let bytes = [data[o], data[o + 1], data[o + 2], data[o + 3]]
-        return String(bytes.map { Character(UnicodeScalar($0)) })
+        return String(data: data.subdata(in: o..<(o + 4)), encoding: .ascii) ?? ""
     }
 }

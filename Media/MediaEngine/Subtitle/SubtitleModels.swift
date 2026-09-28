@@ -28,6 +28,17 @@ struct SubtitleStyle: Sendable, Equatable {
     /// Vertical placement 0 = top, 1 = bottom (default bottom).
     var verticalPosition: CGFloat = 0.92
     var delayMs: Int64 = 0
+
+    static func == (lhs: SubtitleStyle, rhs: SubtitleStyle) -> Bool {
+        lhs.fontSize == rhs.fontSize
+            && lhs.fontName == rhs.fontName
+            && lhs.primaryColor == rhs.primaryColor
+            && lhs.outlineColor == rhs.outlineColor
+            && lhs.outlineWidth == rhs.outlineWidth
+            && lhs.shadowOffset == rhs.shadowOffset
+            && lhs.verticalPosition == rhs.verticalPosition
+            && lhs.delayMs == rhs.delayMs
+    }
 }
 
 struct TimedSubtitle: Sendable, Equatable, Identifiable {

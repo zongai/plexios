@@ -18,6 +18,10 @@ settings:
     CODE_SIGNING_REQUIRED: "NO"
     CODE_SIGNING_ALLOWED: "NO"
 
+packages:
+  PlexFFmpeg:
+    path: Vendor/PlexFFmpeg
+
 targets:
   PlexiOS:
     type: application
@@ -32,6 +36,9 @@ targets:
       - path: Media
       - path: Features
       - path: UI
+    dependencies:
+      - package: PlexFFmpeg
+        product: PlexFFmpeg
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.plexios.app
@@ -48,6 +55,13 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: ""
         DEVELOPMENT_TEAM: ""
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: NATIVE_FFMPEG
+        OTHER_LDFLAGS: "$(inherited) -lbz2 -lz -liconv"
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG NATIVE_FFMPEG
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: NATIVE_FFMPEG
 
   PlexiOSTests:
     type: bundle.unit-test
@@ -63,6 +77,7 @@ targets:
         CODE_SIGNING_ALLOWED: "NO"
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: ""
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: NATIVE_FFMPEG
 
 schemes:
   PlexiOS:

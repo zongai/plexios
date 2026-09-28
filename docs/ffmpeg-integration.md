@@ -1,3 +1,12 @@
+# FFmpeg Integration (enabled)
+
+**Status: NATIVE_FFMPEG is ON** via local package `Vendor/PlexFFmpeg` + binary XCFrameworks from `tylerjonesio/ffmpeg-libav-spm` (release `min.v7.1.3.0`, LGPL).
+
+- C API: `plex_ff_open` / `read` / `seek` / `close` (`PlexFFmpeg.h`)
+- Swift: `FFmpegDemuxer` when `FFmpegAvailability.isLinked`
+- App target defines `SWIFT_ACTIVE_COMPILATION_CONDITIONS=NATIVE_FFMPEG`
+
+
 # FFmpeg Integration (NME Phase 2+)
 
 ## Current state

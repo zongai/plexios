@@ -11,7 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -38,6 +38,10 @@ jobs:
         run: |
           xcodegen generate
           xcodebuild -list -project PlexiOS.xcodeproj
+
+      - name: Resolve Swift packages (FFmpeg XCFrameworks)
+        run: |
+          xcodebuild -resolvePackageDependencies -project PlexiOS.xcodeproj -scheme PlexiOS
 
       - name: Build Release (unsigned)
         run: |

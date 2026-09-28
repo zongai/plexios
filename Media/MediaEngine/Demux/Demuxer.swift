@@ -40,10 +40,9 @@ protocol Demuxer: AnyObject, Sendable {
 /// Factory selects implementation: FFmpeg when linked, otherwise limited built-in probe demux.
 enum DemuxerFactory {
     static func make() -> any Demuxer {
-        #if NATIVE_FFMPEG
-        return FFmpegDemuxer()
-        #else
+        if FFmpegAvailability.isLinked {
+            return FFmpegDemuxer()
+        }
         return BuiltinContainerDemuxer()
-        #endif
     }
 }

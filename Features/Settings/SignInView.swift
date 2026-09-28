@@ -1,8 +1,10 @@
 import SwiftUI
+import UIKit
 
 struct SignInView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var isStarting = false
+    @State private var didCopyCode = false
 
     private var auth: AuthenticationService { environment.authenticationService }
 
@@ -80,14 +82,35 @@ struct SignInView: View {
             Link("plex.tv/link", destination: auth.linkURL)
                 .font(AppTypography.headline)
 
-            Text(code)
-                .font(.system(size: 36, weight: .bold, design: .monospaced))
-                .foregroundStyle(AppColors.primaryText)
+            Button {
+                UIPasteboard.general.string = code
+                didCopyCode = true
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    didCopyCode = false
+                }
+            } label: {
+                VStack(spacing: AppSpacing.xs) {
+                    Text(code)
+                        .font(.system(size: 36, weight: .bold, design: .monospaced))
+                        .foregroundStyle(AppColors.primaryText)
+                        .textSelection(.enabled)
+                    Label(
+                        didCopyCode ? "Copied" : "Tap to copy",
+                        systemImage: didCopyCode ? "checkmark.circle.fill" : "doc.on.doc"
+                    )
+                    .font(AppTypography.caption)
+                    .foregroundStyle(didCopyCode ? AppColors.accent : AppColors.secondaryText)
+                }
                 .padding()
+                .frame(maxWidth: .infinity)
                 .background(AppColors.secondaryBackground)
                 .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md))
-                .accessibilityLabel("Link code \(Array(code).map(String.init).joined(separator: " "))")
-                .accessibilityAddTraits(.updatesFrequently)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Link code \(Array(code).map(String.init).joined(separator: " "))")
+            .accessibilityHint("Copies the code to the clipboard")
+            .accessibilityAddTraits(.isButton)
 
             ProgressView("Waiting for authorization…")
                 .font(AppTypography.caption)
@@ -98,6 +121,9 @@ struct SignInView: View {
             }
             .font(AppTypography.subheadline)
             .foregroundStyle(AppColors.secondaryText)
+        }
+        .onChange(of: code) { _, _ in
+            didCopyCode = false
         }
     }
 }

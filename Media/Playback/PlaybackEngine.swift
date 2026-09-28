@@ -120,16 +120,14 @@ final class PlaybackEngine {
                 partIndex: decision.partIndex
             )
             // Phase 2: best-effort HTTP Range container probe (does not block path choice)
-            if let ctx = self.context ?? Optional(context) {
-                if let enriched = await MediaProbe().probePlexPart(
+            if let enriched = await MediaProbe().probePlexPart(
                     metadata: metadata,
-                    context: ctx,
+                    context: context,
                     mediaIndex: decision.mediaIndex,
                     partIndex: decision.partIndex
                 ) {
                     probe = enriched
                 }
-            }
             lastDiagnostics = PlaybackDiagnostics.from(info: probe, decision: decision, report: report)
             if let line = lastDiagnostics?.displayLines.joined(separator: " · ") {
                 logger.playback.info("Diagnostics: \(line)")

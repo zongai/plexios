@@ -75,10 +75,12 @@ final class PlaybackPipeline: @unchecked Sendable {
 
         do {
             if let videoConfig {
-                let codec = videoConfig.codec
-                let dec = try VideoDecoderFactory.make(codec: codec)
-                try dec.setup(config: videoConfig)
+                let outcome = VideoDecodeFallbackChain.open(codec: videoConfig.codec)
+                let dec = try VideoDecodeFallbackChain.setup(outcome, config: videoConfig)
                 videoDecoder = dec
+                if outcome.stage == .software {
+                    // Soft path — diagnostics
+                }
             }
             if let audioConfig {
                 let hub = AudioEngineHub()

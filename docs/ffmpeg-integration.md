@@ -64,3 +64,18 @@ Use **LGPL** builds and dynamic linking where required; keep GPL flags off unles
 ## CI
 
 Unsigned IPA workflow does **not** build FFmpeg by default (time + binary size). Optional job: `ffmpeg-ios.yml` when Vendor framework is present.
+
+
+## Phase 9 — Video soft decode
+
+When `NATIVE_FFMPEG` is enabled, implement in `FFmpegSupport`:
+
+```c
+void *ffmpeg_video_open(const char *codec, int w, int h, const uint8_t *extradata, int extra_size);
+int ffmpeg_video_decode(void *ctx, const uint8_t *data, int size, int64_t pts,
+                        uint8_t **y, int *y_stride, uint8_t **uv, int *uv_stride, int *out_w, int *out_h);
+void ffmpeg_video_close(void *ctx);
+```
+
+Swift `SoftwareVideoDecoder` maps output to NV12 `CVPixelBuffer` via `makeNV12PixelBuffer`.
+Without the framework, setup throws and PlaybackFallbackPolicy escalates to **Plex Transcode**.

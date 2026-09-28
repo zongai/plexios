@@ -30,12 +30,16 @@ struct VideoFrame: @unchecked Sendable {
 enum VideoCodecID: String, Sendable, Equatable {
     case h264
     case hevc
+    case vp9
+    case av1
     case unknown
 
     static func from(codecName: String?) -> VideoCodecID {
         switch IOSCapabilities.normalizeVideoCodec(codecName) {
         case "h264": return .h264
         case "hevc": return .hevc
+        case "vp9": return .vp9
+        case "av1": return .av1
         default: return .unknown
         }
     }

@@ -96,9 +96,18 @@ struct MetalVideoView: UIViewRepresentable {
     var presenter: MetalVideoRenderer.Presenter?
     var frame: VideoFrame?
 
+    final class Coordinator {
+        var boundPresenter: ObjectIdentifier?
+        var boundSink: ObjectIdentifier?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> MetalVideoUIView {
         let view = MetalVideoUIView(frame: .zero, device: nil)
         view.bind(sink: sink, presenter: presenter)
+        context.coordinator.boundPresenter = presenter.map { ObjectIdentifier($0) }
+        context.coordinator.boundSink = sink.map { ObjectIdentifier($0) }
         view.setAspectMode(aspectMode)
         if let frame {
             view.present(frame)
@@ -107,14 +116,18 @@ struct MetalVideoView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: MetalVideoUIView, context: Context) {
-        uiView.bind(sink: sink, presenter: presenter)
-        uiView.setAspectMode(aspectMode)
-        if let frame {
-            uiView.present(frame)
+        let pID = presenter.map { ObjectIdentifier($0) }
+        let sID = sink.map { ObjectIdentifier($0) }
+        if pID != context.coordinator.boundPresenter || sID != context.coordinator.boundSink {
+            uiView.bind(sink: sink, presenter: presenter)
+            context.coordinator.boundPresenter = pID
+            context.coordinator.boundSink = sID
         }
+        uiView.setAspectMode(aspectMode)
+        // Do not re-present optional frame every update — presenter already owns frames
     }
 
-    static func dismantleUIView(_ uiView: MetalVideoUIView, coordinator: ()) {
+    static func dismantleUIView(_ uiView: MetalVideoUIView, coordinator: Coordinator) {
         uiView.bind(sink: nil, presenter: nil)
         uiView.clearFrame()
     }

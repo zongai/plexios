@@ -57,6 +57,19 @@ actor FFmpegDemuxer: Demuxer {
                 let ptr = raw.bindMemory(to: CChar.self).baseAddress!
                 return String(cString: ptr)
             }
+            var extradata: Data?
+            #if NATIVE_FFMPEG
+            let need = plex_ff_stream_extradata(opened, Int32(i), nil, 0)
+            if need > 0 {
+                var buf = [UInt8](repeating: 0, count: Int(need))
+                let written = buf.withUnsafeMutableBufferPointer { ptr in
+                    plex_ff_stream_extradata(opened, Int32(i), ptr.baseAddress, Int32(need))
+                }
+                if written > 0 {
+                    extradata = Data(buf.prefix(Int(written)))
+                }
+            }
+            #endif
             list.append(DemuxStreamInfo(
                 index: Int(info.index),
                 kind: kind,
@@ -68,7 +81,7 @@ actor FFmpegDemuxer: Demuxer {
                 channels: info.channels > 0 ? Int(info.channels) : nil,
                 language: nil,
                 bitrate: info.bitrate > 0 ? Int(info.bitrate) : nil,
-                extradata: nil
+                extradata: extradata
             ))
         }
         streams = list

@@ -40,6 +40,10 @@ void plex_ff_close(PlexFFContext *ctx);
 int plex_ff_stream_count(PlexFFContext *ctx);
 int plex_ff_stream_info(PlexFFContext *ctx, int index, PlexFFStreamInfo *out);
 
+/// Copies codec extradata (avcC/hvcc/etc). Returns byte count written, or -1.
+/// If buffer is NULL, returns required size.
+int plex_ff_stream_extradata(PlexFFContext *ctx, int index, uint8_t *buffer, int buffer_size);
+
 int64_t plex_ff_duration_ms(PlexFFContext *ctx);
 const char *plex_ff_format_name(PlexFFContext *ctx);
 

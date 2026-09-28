@@ -57,13 +57,17 @@ final class NativeMediaBackend: PlayerEngineBackend {
         let vCodec = VideoCodecID.from(codecName: videoStream?.codec ?? media?.videoCodec)
         let aCodec = AudioCodecID.from(codecName: audioStream?.codec ?? media?.audioCodec)
 
+        let demuxStreams = await demuxer.streams
+        let demuxVideo = demuxStreams.first(where: { $0.kind == .video })
+        let demuxAudio = demuxStreams.first(where: { $0.kind == .audio })
+
         var videoConfig: VideoDecoderConfig?
         if vCodec != .unknown {
             videoConfig = VideoDecoderConfig(
                 codec: vCodec,
-                width: media?.width ?? 1920,
-                height: media?.height ?? 1080,
-                extradata: nil,
+                width: demuxVideo?.width ?? media?.width ?? 1920,
+                height: demuxVideo?.height ?? media?.height ?? 1080,
+                extradata: demuxVideo?.extradata,
                 bitDepth: videoStream?.bitDepth ?? 8
             )
         }
@@ -71,9 +75,9 @@ final class NativeMediaBackend: PlayerEngineBackend {
         if aCodec != .unknown {
             audioConfig = AudioDecoderConfig(
                 codec: aCodec,
-                sampleRate: 48_000,
-                channels: audioStream?.channels ?? 2,
-                extradata: nil,
+                sampleRate: demuxAudio?.sampleRate ?? 48_000,
+                channels: demuxAudio?.channels ?? audioStream?.channels ?? 2,
+                extradata: demuxAudio?.extradata,
                 bitDepth: 16
             )
         }

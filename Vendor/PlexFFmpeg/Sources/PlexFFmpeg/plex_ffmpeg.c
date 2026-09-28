@@ -84,7 +84,11 @@ int plex_ff_stream_info(PlexFFContext *ctx, int index, PlexFFStreamInfo *out) {
     out->width = p->width;
     out->height = p->height;
     out->sample_rate = p->sample_rate;
+    #if LIBAVCODEC_VERSION_MAJOR >= 60
     out->channels = p->ch_layout.nb_channels;
+#else
+    out->channels = p->channels;
+#endif
     out->bitrate = p->bit_rate;
     return 0;
 }
@@ -141,7 +145,18 @@ void plex_ff_packet_free(PlexFFPacket *pkt) {
     pkt->size = 0;
 }
 
+int plex_ff_stream_extradata(PlexFFContext *ctx, int index, uint8_t *buffer, int buffer_size) {
+    if (!ctx || !ctx->fmt || index < 0 || index >= (int)ctx->fmt->nb_streams) return -1;
+    AVCodecParameters *p = ctx->fmt->streams[index]->codecpar;
+    if (!p->extradata || p->extradata_size <= 0) return 0;
+    if (!buffer) return p->extradata_size;
+    if (buffer_size < p->extradata_size) return -1;
+    memcpy(buffer, p->extradata, (size_t)p->extradata_size);
+    return p->extradata_size;
+}
+
 int plex_ff_seek_ms(PlexFFContext *ctx, int64_t ms) {
+
     if (!ctx || !ctx->fmt) return -1;
     int64_t ts = ms * (AV_TIME_BASE / 1000);
     int err = av_seek_frame(ctx->fmt, -1, ts, AVSEEK_FLAG_BACKWARD);

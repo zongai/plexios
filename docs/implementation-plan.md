@@ -22,6 +22,18 @@ Strict phased delivery. **Do not start large-scale UI until Phase 0 docs are acc
 
 ---
 
+## Phase Soft-Decode — App 内软解（规划中，稍后实现）
+
+**策略：** 先试 AVPlayer → 失败再软解 / 服务器转码。
+
+完整任务清单见 **`docs/soft-decode-plan.md`**（SD-0～SD-6）。
+
+- 默认关闭软解，不改变现网 VP9→transcode 行为  
+- 开启后：试播超时/失败 → Local Soft Decode → 再失败则 Transcode  
+- 实现前需完成 FFmpeg vs VLCKit 选型与授权确认  
+
+---
+
 ## Phase 1 — Foundation
 
 **Goals**

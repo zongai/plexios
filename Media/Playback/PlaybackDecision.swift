@@ -108,6 +108,7 @@ struct PlaybackDecisionEngine: Sendable {
             return preferences.maxVideoBitrateKbps
         }()
 
+        let normalizedVideo = IOSCapabilities.normalizeVideoCodec(videoCodec)
         let videoOK = capabilities.supportsVideoCodec(videoCodec)
         let audioOK = capabilities.supportsAudioCodec(audioCodec)
         let containerOK = capabilities.supportsContainer(container)
@@ -117,12 +118,20 @@ struct PlaybackDecisionEngine: Sendable {
         if let sid = subtitleId, !canNativeSub(subtitleStreams, id: sid) {
             needBurnIn = true
         }
+        // External soft-subs cannot be attached on pure Direct Play file URLs — remux/HLS
+        let externalSoftSub: Bool = {
+            guard let sid = subtitleId,
+                  let stream = subtitleStreams.first(where: { $0.id == sid }),
+                  stream.isExternal, !needBurnIn
+            else { return false }
+            return true
+        }()
 
-        // Direct Play
-        if containerOK && videoOK && audioOK && !needBurnIn {
+        // Direct Play (native container + codecs, no burn-in, no external-only sub dependency)
+        if containerOK && videoOK && audioOK && !needBurnIn && !externalSoftSub {
             return PlaybackDecision(
                 mode: .directPlay,
-                reason: "Container, video (\(videoCodec ?? "?")), and audio (\(audioCodec ?? "?")) supported natively",
+                reason: "Container, video (\(normalizedVideo ?? videoCodec ?? "?")), and audio (\(audioCodec ?? "?")) supported natively",
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,
@@ -132,11 +141,14 @@ struct PlaybackDecisionEngine: Sendable {
             )
         }
 
-        // Direct Stream — video+audio OK, container remap or soft sub issues only
+        // Direct Stream — video+audio OK, container remap / external soft-sub via HLS
         if videoOK && audioOK && !needBurnIn {
             var reasons: [String] = []
             if !containerOK {
                 reasons.append("container \(container ?? "?") remux required")
+            }
+            if externalSoftSub {
+                reasons.append("external subtitle packaged in stream")
             }
             if reasons.isEmpty { reasons.append("direct stream remux") }
             return PlaybackDecision(

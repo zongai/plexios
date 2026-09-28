@@ -22,6 +22,10 @@ final class PlaybackEngine {
     private(set) var subtitleStreams: [PlexStream] = []
     private(set) var selectedAudioId: Int?
     private(set) var selectedSubtitleId: Int?
+    /// Playback rate (1.0 = normal). Applied to AVPlayer when playing.
+    private(set) var playbackRate: Float = 1.0
+    /// How video is scaled inside the player layer.
+    private(set) var aspectMode: VideoAspectMode = .fit
 
     var isPlaying: Bool { sessionState == .playing }
 
@@ -88,9 +92,14 @@ final class PlaybackEngine {
         self.errorMessage = nil
         sessionState = .loading
 
+        // Always use persisted user defaults for decision + start rate/aspect
+        let effectivePrefs = PlaybackSettingsStore.shared.preferences
+        playbackRate = effectivePrefs.defaultPlaybackRate
+        aspectMode = effectivePrefs.defaultAspectMode
+
         let engine = PlaybackDecisionEngine(
             capabilities: .current,
-            preferences: preferences
+            preferences: effectivePrefs
         )
         let decision = engine.decide(
             metadata: metadata,
@@ -185,11 +194,32 @@ final class PlaybackEngine {
         }
 
         avPlayer.play()
+        applyRateToPlayer()
         sessionState = .playing
         await newSession.updateState(.playing)
         await reportTimeline(force: true)
         startPeriodicReporting()
         publishNowPlaying()
+    }
+
+    func setPlaybackRate(_ rate: Float) {
+        playbackRate = rate
+        applyRateToPlayer()
+        logger.playback.info("Playback rate \(rate)x")
+    }
+
+    func setAspectMode(_ mode: VideoAspectMode) {
+        aspectMode = mode
+    }
+
+    private func applyRateToPlayer() {
+        guard let player else { return }
+        if sessionState == .playing || player.timeControlStatus == .playing {
+            player.rate = playbackRate
+        } else if playbackRate > 0 {
+            // Keep preferred rate for next resume
+            player.rate = 0
+        }
     }
 
     func pause() {
@@ -204,6 +234,7 @@ final class PlaybackEngine {
 
     func resume() {
         player?.play()
+        applyRateToPlayer()
         sessionState = .playing
         nowPlaying.updateProgress(positionMs: positionMs, durationMs: durationMs, isPlaying: true)
         Task {
@@ -415,6 +446,14 @@ final class PlaybackEngine {
                     if self.sessionState == .loading {
                         self.sessionState = .playing
                     }
+                    // Apply preferred audio/subtitle once tracks are available
+                    Task {
+                        _ = await self.applyAVMediaSelection(
+                            audioStreamId: self.selectedAudioId,
+                            subtitleStreamId: self.selectedSubtitleId
+                        )
+                        self.applyRateToPlayer()
+                    }
                 case .failed:
                     self.fail(item.error?.localizedDescription ?? "Player item failed")
                 default:
@@ -486,7 +525,7 @@ final class PlaybackEngine {
     }
 
     private func tryAutoplayNextEpisode() async {
-        guard PlaybackPreferences.default.autoPlayNextEpisode else { return }
+        guard PlaybackSettingsStore.shared.preferences.autoPlayNextEpisode else { return }
         guard let context, let item = currentItem, item.type == .episode else { return }
 
         do {

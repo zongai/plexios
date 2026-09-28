@@ -24,7 +24,7 @@ struct PlayerView: View {
             Color.black.ignoresSafeArea()
 
             if let player = engine.player {
-                PlayerLayerView(player: player) { active in
+                PlayerLayerView(player: player, aspectMode: engine.aspectMode) { active in
                     isPiPActive = active
                     if active {
                         showControls = false
@@ -228,9 +228,48 @@ struct PlayerView: View {
                             .foregroundStyle(.white)
                     }
 
+                    // Playback speed
+                    Menu {
+                        ForEach(PlaybackPreferences.rateOptions, id: \.self) { rate in
+                            Button {
+                                engine.setPlaybackRate(rate)
+                                bumpControls()
+                            } label: {
+                                HStack {
+                                    Text(rateLabel(rate))
+                                    if abs(engine.playbackRate - rate) < 0.01 {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label(rateLabel(engine.playbackRate), systemImage: "gauge.with.dots.needle.33percent")
+                            .foregroundStyle(.white)
+                    }
+
+                    // Aspect ratio
+                    Menu {
+                        ForEach(VideoAspectMode.allCases) { mode in
+                            Button {
+                                engine.setAspectMode(mode)
+                                bumpControls()
+                            } label: {
+                                HStack {
+                                    Text(mode.title)
+                                    if engine.aspectMode == mode {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Aspect", systemImage: engine.aspectMode == .fit ? "rectangle" : "rectangle.arrowtriangle.2.outward")
+                            .foregroundStyle(.white)
+                    }
+
                     Spacer()
 
-                    // Hint: system PiP from AVPlayerViewController (swipe to home / PiP button on supported devices)
                     Image(systemName: "pip.enter")
                         .foregroundStyle(.white.opacity(0.6))
                         .accessibilityLabel("Picture in Picture available via system controls")
@@ -323,5 +362,13 @@ struct PlayerView: View {
             return String(format: "%d:%02d:%02d", h, m, s)
         }
         return String(format: "%d:%02d", m, s)
+    }
+
+    private func rateLabel(_ rate: Float) -> String {
+        if abs(rate - 1.0) < 0.01 { return "1x" }
+        if rate == Float(Int(rate)) {
+            return "\(Int(rate))x"
+        }
+        return String(format: "%.2gx", rate)
     }
 }

@@ -2,9 +2,10 @@ import AVFoundation
 import AVKit
 import SwiftUI
 
-/// AVPlayerLayer host that supports Picture in Picture.
+/// AVPlayerLayer host that supports Picture in Picture and aspect modes.
 struct PlayerLayerView: UIViewControllerRepresentable {
     let player: AVPlayer
+    var aspectMode: VideoAspectMode = .fit
     var onPiPActiveChange: ((Bool) -> Void)?
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
@@ -12,10 +13,12 @@ struct PlayerLayerView: UIViewControllerRepresentable {
         controller.player = player
         controller.allowsPictureInPicturePlayback = true
         controller.canStartPictureInPictureAutomaticallyFromInline = true
-        controller.updatesNowPlayingInfoCenter = false // we manage Now Playing ourselves
+        controller.updatesNowPlayingInfoCenter = false
         controller.delegate = context.coordinator
-        // Show transport only when we want system chrome; we use custom controls primarily.
         controller.showsPlaybackControls = false
+        // Ensure closed captions / subtitle layers are shown when selected
+        controller.allowsVideoFrameAnalysis = false
+        applyGravity(controller, mode: aspectMode)
         return controller
     }
 
@@ -23,7 +26,19 @@ struct PlayerLayerView: UIViewControllerRepresentable {
         if controller.player !== player {
             controller.player = player
         }
+        applyGravity(controller, mode: aspectMode)
         context.coordinator.onPiPActiveChange = onPiPActiveChange
+    }
+
+    private func applyGravity(_ controller: AVPlayerViewController, mode: VideoAspectMode) {
+        switch mode {
+        case .fit:
+            controller.videoGravity = .resizeAspect
+        case .fill:
+            controller.videoGravity = .resizeAspectFill
+        case .stretch:
+            controller.videoGravity = .resize
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -49,7 +64,6 @@ struct PlayerLayerView: UIViewControllerRepresentable {
             _ playerViewController: AVPlayerViewController,
             restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
         ) {
-            // Host view is still in hierarchy when using fullScreenCover; allow restore.
             completionHandler(true)
         }
     }

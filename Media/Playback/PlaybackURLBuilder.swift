@@ -38,6 +38,7 @@ struct PlaybackURLBuilder: Sendable {
         let directPlay = decision.mode == .directPlay ? "1" : "0"
         let directStream = (decision.mode == .directPlay || decision.mode == .directStream) ? "1" : "0"
 
+        let caps = IOSCapabilities.current
         var items: [URLQueryItem] = [
             URLQueryItem(name: "path", value: metadataKey),
             URLQueryItem(name: "mediaIndex", value: "\(decision.mediaIndex)"),
@@ -47,6 +48,10 @@ struct PlaybackURLBuilder: Sendable {
             URLQueryItem(name: "directPlay", value: directPlay),
             URLQueryItem(name: "directStream", value: directStream),
             URLQueryItem(name: "directStreamAudio", value: "1"),
+            // Advertise device decode support so PMS keeps HEVC/VP9/AV1 when possible
+            URLQueryItem(name: "videoCodecs", value: caps.videoCodecsQueryValue),
+            URLQueryItem(name: "audioCodecs", value: caps.audioCodecsQueryValue),
+            URLQueryItem(name: "subtitleCodecs", value: caps.subtitleCodecsQueryValue),
             URLQueryItem(name: "session", value: sessionId),
             URLQueryItem(name: "offset", value: "\(offsetMs)"),
             URLQueryItem(name: "copyts", value: "1"),

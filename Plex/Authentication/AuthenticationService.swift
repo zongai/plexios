@@ -73,8 +73,14 @@ final class AuthenticationService {
     }
 
     /// Link URL for the user (or open in browser / ASWebAuthenticationSession).
+    /// User enters the 4-character code at this page (matches plex-for-kodi flow).
     var linkURL: URL {
-        URL(string: "https://plex.tv/link")!
+        if case .signingIn(let code, _) = state {
+            var components = URLComponents(string: "https://plex.tv/link")!
+            components.queryItems = [URLQueryItem(name: "pin", value: code)]
+            return components.url ?? URL(string: "https://plex.tv/link")!
+        }
+        return URL(string: "https://plex.tv/link")!
     }
 
     func cancelSignIn() {

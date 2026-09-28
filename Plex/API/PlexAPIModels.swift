@@ -240,7 +240,7 @@ struct APIStream: Decodable {
     let title: String?
     let forced: Bool?
     let selected: Bool?
-    let `default`: Bool?
+    let isDefault: Bool?
     let external: Bool?
     let bitrate: Int?
     let channels: Int?

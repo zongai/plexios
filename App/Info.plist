@@ -52,6 +52,13 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Plex iOS discovers and connects to your Plex Media Server on the local network.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<false/>
+	</dict>
 	<key>UIRequiresFullScreen</key>
 	<false/>
 </dict>

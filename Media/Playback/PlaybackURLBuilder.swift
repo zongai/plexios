@@ -31,7 +31,7 @@ struct PlaybackURLBuilder: Sendable {
         network: NetworkClass
     ) -> URL? {
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("video/:/transcode/universal/start.m3u8"),
+            url: PlexURL.join(baseURL, path: "video/:/transcode/universal/start.m3u8") ?? baseURL,
             resolvingAgainstBaseURL: false
         )
 

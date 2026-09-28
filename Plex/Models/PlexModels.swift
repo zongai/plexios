@@ -52,11 +52,17 @@ struct PlexConnection: Identifiable, Hashable, Sendable {
     var baseURL: URL? { URL(string: uri) }
 
     /// Ranking score: lower is better.
+    /// Local plain HTTP is preferred over local HTTPS-to-IP (self-signed / ATS issues).
     var rankScore: Int {
         var score = 0
         if relay { score += 1000 }
         if !local { score += 100 }
-        if protocolName != "https" { score += 10 }
+        // Prefer local http over local https-to-IP; still prefer remote https over remote http
+        if local {
+            if protocolName == "https" { score += 5 }
+        } else if protocolName != "https" {
+            score += 10
+        }
         if ipv6 { score += 1 }
         return score
     }

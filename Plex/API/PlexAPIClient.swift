@@ -78,7 +78,9 @@ actor PlexAPIClient {
     // MARK: - PMS endpoints
 
     func fetchLibrarySections(baseURL: URL, token: String) async throws -> [PlexLibrary] {
-        let url = baseURL.appendingPathComponent("library/sections")
+        guard let url = PlexURL.join(baseURL, path: "library/sections") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         applyPMSHeaders(to: &request, token: token)
 
@@ -87,8 +89,11 @@ actor PlexAPIClient {
         return (container.mediaContainer.directory ?? []).compactMap(PlexAPIMapper.library(from:))
     }
 
+    /// Home feed — matches plex-for-kodi (`/hubs`), not `/hubs/home`.
     func fetchHomeHubs(baseURL: URL, token: String) async throws -> [PlexHub] {
-        let url = baseURL.appendingPathComponent("hubs/home")
+        guard let url = PlexURL.join(baseURL, path: "hubs") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         applyPMSHeaders(to: &request, token: token)
 
@@ -117,7 +122,9 @@ actor PlexAPIClient {
     }
 
     func fetchChildren(ratingKey: String, baseURL: URL, token: String) async throws -> [PlexMetadata] {
-        let url = baseURL.appendingPathComponent("library/metadata/\(ratingKey)/children")
+        guard let url = PlexURL.join(baseURL, path: "library/metadata/\(ratingKey)/children") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         applyPMSHeaders(to: &request, token: token)
 
@@ -176,7 +183,9 @@ actor PlexAPIClient {
 
     /// Fallback: per-section collections when global path is empty.
     func fetchSectionCollections(sectionKey: String, baseURL: URL, token: String) async throws -> [PlexMetadata] {
-        let url = baseURL.appendingPathComponent("library/sections/\(sectionKey)/collections")
+        guard let url = PlexURL.join(baseURL, path: "library/sections/\(sectionKey)/collections") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         applyPMSHeaders(to: &request, token: token)
         let response = try await perform(request)
@@ -185,7 +194,9 @@ actor PlexAPIClient {
     }
 
     func fetchPlaylists(baseURL: URL, token: String) async throws -> [PlexMetadata] {
-        let url = baseURL.appendingPathComponent("playlists")
+        guard let url = PlexURL.join(baseURL, path: "playlists") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         applyPMSHeaders(to: &request, token: token)
         let response = try await perform(request)
@@ -194,7 +205,9 @@ actor PlexAPIClient {
     }
 
     func fetchPlaylistItems(ratingKey: String, baseURL: URL, token: String) async throws -> [PlexMetadata] {
-        let url = baseURL.appendingPathComponent("playlists/\(ratingKey)/items")
+        guard let url = PlexURL.join(baseURL, path: "playlists/\(ratingKey)/items") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         applyPMSHeaders(to: &request, token: token)
         let response = try await perform(request)
@@ -219,7 +232,9 @@ actor PlexAPIClient {
     }
 
     func fetchRelated(ratingKey: String, baseURL: URL, token: String) async throws -> [PlexHub] {
-        let url = baseURL.appendingPathComponent("hubs/metadata/\(ratingKey)/related")
+        guard let url = PlexURL.join(baseURL, path: "hubs/metadata/\(ratingKey)/related") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         applyPMSHeaders(to: &request, token: token)
         let response = try await perform(request)
@@ -244,7 +259,9 @@ actor PlexAPIClient {
 
     /// Lightweight reachability + identity check.
     func probeIdentity(baseURL: URL, token: String?) async throws -> (machineIdentifier: String?, version: String?) {
-        let url = baseURL.appendingPathComponent("identity")
+        guard let url = PlexURL.join(baseURL, path: "identity") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         request.timeoutInterval = 3
         applyIdentityHeaders(to: &request)
@@ -273,15 +290,17 @@ actor PlexAPIClient {
 
     // MARK: - Internals
 
-    /// Builds a URLRequest without force-unwrapping URLComponents.
+    /// Builds a URLRequest without percent-encoding path slashes.
     private func makeRequest(
         base: URL,
         path: String,
         query: [URLQueryItem] = [],
         method: String = "GET"
     ) throws -> URLRequest {
-        let pathURL = base.appendingPathComponent(path)
-        guard var components = URLComponents(url: pathURL, resolvingAgainstBaseURL: false) else {
+        guard let joined = PlexURL.join(base, path: path) else {
+            throw PlexError.invalidResponse
+        }
+        guard var components = URLComponents(url: joined, resolvingAgainstBaseURL: false) else {
             throw PlexError.invalidResponse
         }
         if !query.isEmpty {

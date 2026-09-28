@@ -22,7 +22,7 @@ enum PlexAPIMapper {
               !machineId.isEmpty
         else { return nil }
 
-        let connections = (resource.connections ?? []).compactMap(connection(from:))
+        let connections = expandedConnections(from: resource.connections ?? [])
         return PlexServer(
             machineIdentifier: machineId,
             name: resource.name ?? "Plex Server",
@@ -37,19 +37,75 @@ enum PlexAPIMapper {
         )
     }
 
+    /// Map one API connection; also expands local `address:port` candidates when `uri`
+    /// is plex.direct (which often fails without open ports / valid cert).
     static func connection(from dto: APIConnection) -> PlexConnection? {
-        guard let uri = dto.uri, !uri.isEmpty else { return nil }
+        let proto = dto.protocolName ?? "https"
+        let uri = dto.uri
+        guard let primary = uri, !primary.isEmpty else {
+            // Fall back to address:port only
+            guard let address = dto.address, let port = dto.port else { return nil }
+            let built = "\(proto)://\(address):\(port)"
+            return PlexConnection(
+                uri: built,
+                address: address,
+                port: port,
+                protocolName: proto,
+                local: dto.local ?? false,
+                relay: dto.relay ?? false,
+                ipv6: dto.ipv6 ?? false,
+                latencyMs: nil,
+                lastSuccess: nil
+            )
+        }
         return PlexConnection(
-            uri: uri,
+            uri: primary,
             address: dto.address,
             port: dto.port,
-            protocolName: dto.protocolName ?? "https",
+            protocolName: proto,
             local: dto.local ?? false,
             relay: dto.relay ?? false,
             ipv6: dto.ipv6 ?? false,
             latencyMs: nil,
             lastSuccess: nil
         )
+    }
+
+    /// Expand a server's connection list with direct LAN candidates (http/https + IP).
+    static func expandedConnections(from resources: [APIConnection]) -> [PlexConnection] {
+        var result: [PlexConnection] = []
+        var seen = Set<String>()
+        func append(_ c: PlexConnection) {
+            guard !seen.contains(c.uri) else { return }
+            seen.insert(c.uri)
+            result.append(c)
+        }
+
+        for dto in resources {
+            if let c = connection(from: dto) {
+                append(c)
+            }
+            // Local IP direct: prefer plain HTTP (PMS default) and HTTPS with IP
+            if (dto.local ?? false),
+               let address = dto.address, !address.isEmpty,
+               let port = dto.port {
+                for scheme in ["http", "https"] {
+                    let built = "\(scheme)://\(address):\(port)"
+                    append(PlexConnection(
+                        uri: built,
+                        address: address,
+                        port: port,
+                        protocolName: scheme,
+                        local: true,
+                        relay: dto.relay ?? false,
+                        ipv6: dto.ipv6 ?? false,
+                        latencyMs: nil,
+                        lastSuccess: nil
+                    ))
+                }
+            }
+        }
+        return result
     }
 
     // MARK: - Library

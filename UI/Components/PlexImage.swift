@@ -55,7 +55,7 @@ enum PlexImageURL {
         // Use photo transcoder when size requested
         if let width, let height {
             var components = URLComponents(
-                url: baseURL.appendingPathComponent("photo/:/transcode"),
+                url: PlexURL.join(baseURL, path: "photo/:/transcode") ?? baseURL,
                 resolvingAgainstBaseURL: false
             )
             var items: [URLQueryItem] = [

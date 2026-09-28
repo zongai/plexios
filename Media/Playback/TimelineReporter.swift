@@ -24,7 +24,7 @@ actor TimelineReporter {
         let key = await session.metadataKey
 
         var components = URLComponents(
-            url: baseURL.appendingPathComponent(":/timeline"),
+            url: PlexURL.join(baseURL, path: ":/timeline") ?? baseURL,
             resolvingAgainstBaseURL: false
         )
         components?.queryItems = [
@@ -64,7 +64,7 @@ actor TimelineReporter {
     }
 
     private func scrobbleRequest(baseURL: URL, token: String, key: String, path: String) async {
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: PlexURL.join(baseURL, path: path) ?? baseURL, resolvingAgainstBaseURL: false)
         components?.queryItems = [
             URLQueryItem(name: "key", value: key),
             URLQueryItem(name: "identifier", value: "com.plexapp.plugins.library"),

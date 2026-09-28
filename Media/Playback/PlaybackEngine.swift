@@ -628,7 +628,9 @@ final class PlaybackEngine {
     }
 
     private func fetchFullMetadata(ratingKey: String, context: ServerContext) async throws -> PlexMetadata {
-        let url = context.baseURL.appendingPathComponent("library/metadata/\(ratingKey)")
+        guard let url = PlexURL.join(context.baseURL, path: "library/metadata/\(ratingKey)") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         request.setValue(context.token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
@@ -642,7 +644,9 @@ final class PlaybackEngine {
     }
 
     private func fetchRelatedHubs(ratingKey: String, context: ServerContext) async throws -> [PlexHub] {
-        let url = context.baseURL.appendingPathComponent("hubs/metadata/\(ratingKey)/related")
+        guard let url = PlexURL.join(context.baseURL, path: "hubs/metadata/\(ratingKey)/related") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         request.setValue(context.token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
@@ -653,7 +657,9 @@ final class PlaybackEngine {
     }
 
     private func fetchChildrenMetadata(ratingKey: String, context: ServerContext) async throws -> [PlexMetadata] {
-        let url = context.baseURL.appendingPathComponent("library/metadata/\(ratingKey)/children")
+        guard let url = PlexURL.join(context.baseURL, path: "library/metadata/\(ratingKey)/children") else {
+            throw PlexError.invalidResponse
+        }
         var request = URLRequest(url: url)
         request.setValue(context.token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")

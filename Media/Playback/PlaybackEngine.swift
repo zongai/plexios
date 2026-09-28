@@ -51,6 +51,9 @@ final class PlaybackEngine {
     private var networkClass: NetworkClass = .unknown
     private var reportTask: Task<Void, Never>?
     private var artworkURL: URL?
+    /// Phase 1: diagnostics / future native routing (default path unchanged).
+    var playerEngineRouter: PlayerEngineRouter?
+    private(set) var lastDiagnostics: PlaybackDiagnostics?
 
     init(
         decisionEngine: PlaybackDecisionEngine = PlaybackDecisionEngine(),
@@ -109,6 +112,11 @@ final class PlaybackEngine {
         )
         self.decision = decision
         logger.playback.info("Decision: \(decision.mode.rawValue) — \(decision.reason)")
+        if let router = playerEngineRouter {
+            let report = router.resolve(metadata: metadata, decision: decision, network: network)
+            let probe = MediaProbe().probeFromPlexMetadata(metadata, mediaIndex: decision.mediaIndex, partIndex: decision.partIndex)
+            lastDiagnostics = PlaybackDiagnostics.from(info: probe, decision: decision, report: report)
+        }
 
         guard let media = metadata.media[safe: decision.mediaIndex],
               let part = media.parts[safe: decision.partIndex]

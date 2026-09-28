@@ -30,6 +30,7 @@ final class AppEnvironment {
 
     let timelineReporter: TimelineReporter
     let playbackEngine: PlaybackEngine
+    let playerEngineRouter: PlayerEngineRouter
 
     // MARK: - Init
 
@@ -73,6 +74,7 @@ final class AppEnvironment {
 
         let reporter = TimelineReporter(http: http, logger: logger)
         self.timelineReporter = reporter
+        self.playerEngineRouter = PlayerEngineRouter(logger: logger, nativeEngineEnabled: false)
         self.playbackEngine = PlaybackEngine(
             timelineReporter: reporter,
             http: http,
@@ -81,6 +83,7 @@ final class AppEnvironment {
             identityHeaders: identity.plexHeaders
         )
 
+        playbackEngine.playerEngineRouter = playerEngineRouter
         self.networkMonitor.start()
         self.logger.app.info("AppEnvironment initialized (gap-fill)")
     }

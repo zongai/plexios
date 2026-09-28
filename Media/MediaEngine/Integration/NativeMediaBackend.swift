@@ -16,6 +16,10 @@ final class NativeMediaBackend: PlayerEngineBackend {
     private let pipeline = PlaybackPipeline()
     private var positionTimer: Task<Void, Never>?
 
+    /// Decoded frames for Metal surface in PlayerView.
+    var videoFrameSink: VideoFrameSink { pipeline.frameSink }
+    var latestVideoFrame: VideoFrame? { pipeline.frameSink.latestFrame }
+
     init(logger: LogRouter) {
         self.logger = logger
     }

@@ -23,7 +23,16 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let player = engine.player {
+            // Native Media Engine → Metal; otherwise AVPlayer layer
+            if engine.isNativeBackendActive {
+                MetalVideoView(
+                    aspectMode: engine.aspectMode,
+                    sink: engine.nativeVideoFrameSink,
+                    frame: engine.nativeLatestVideoFrame
+                )
+                .ignoresSafeArea()
+                .onTapGesture { toggleControls() }
+            } else if let player = engine.player {
                 PlayerLayerView(player: player, aspectMode: engine.aspectMode) { active in
                     isPiPActive = active
                     if active {
@@ -47,7 +56,7 @@ struct PlayerView: View {
                 .padding()
             }
 
-            if showControls && !isPiPActive && engine.player != nil {
+            if showControls && !isPiPActive && (engine.player != nil || engine.isNativeBackendActive) {
                 controlsOverlay
                     .transition(.opacity)
             }
@@ -95,7 +104,9 @@ struct PlayerView: View {
                     .frame(width: 44, height: 44)
 
                 if let decision = engine.decision {
-                    Text(decision.mode.rawValue)
+                    Text(engine.isNativeBackendActive
+                           ? "native · \(decision.mode.rawValue)"
+                           : decision.mode.rawValue)
                         .font(AppTypography.caption2)
                         .foregroundStyle(.white.opacity(0.7))
                         .padding(.trailing, 8)

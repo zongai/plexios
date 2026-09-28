@@ -55,6 +55,17 @@ final class PlaybackEngine {
     var playerEngineRouter: PlayerEngineRouter?
     private(set) var lastDiagnostics: PlaybackDiagnostics?
     private(set) var activePlaybackBackend: PlaybackBackend = .avPlayer
+
+    var isNativeBackendActive: Bool { activePlaybackBackend == .nativeMediaEngine }
+
+    var nativeVideoFrameSink: VideoFrameSink? {
+        guard isNativeBackendActive else { return nil }
+        return playerEngineRouter?.nativeBackendInstance().videoFrameSink
+    }
+
+    var nativeLatestVideoFrame: VideoFrame? {
+        nativeVideoFrameSink?.latestFrame
+    }
     private var nativeTimelineTask: Task<Void, Never>?
     private(set) var nativeSystemBridge: NativeSystemMediaBridge?
 

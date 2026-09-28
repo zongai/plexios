@@ -4,6 +4,9 @@ import SwiftUI
 /// UIKit host for Metal video output (Native Media Engine).
 final class MetalVideoUIView: MTKView {
     let renderer: MetalVideoRenderer?
+    private var displayLink: CADisplayLink?
+    private weak var boundSink: VideoFrameSink?
+    private var lastFrameCount = -1
 
     override init(frame: CGRect, device: MTLDevice?) {
         let metalDevice = device ?? MTLCreateSystemDefaultDevice()
@@ -11,6 +14,8 @@ final class MetalVideoUIView: MTKView {
         super.init(frame: frame, device: metalDevice)
         isOpaque = true
         backgroundColor = .black
+        enableSetNeedsDisplay = true
+        isPaused = true
         if let renderer {
             renderer.attach(to: self)
         }
@@ -19,6 +24,10 @@ final class MetalVideoUIView: MTKView {
     @available(*, unavailable)
     required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        displayLink?.invalidate()
     }
 
     func present(_ frame: VideoFrame) {
@@ -33,57 +42,52 @@ final class MetalVideoUIView: MTKView {
     func clearFrame() {
         renderer?.clear(on: self)
     }
-}
 
-/// SwiftUI wrapper — use only for Native backend surface (not AVPlayer).
-struct MetalVideoView: UIViewRepresentable {
-    var aspectMode: VideoAspectMode
-    var frame: VideoFrame?
-
-    func makeUIView(context: Context) -> MetalVideoUIView {
-        let view = MetalVideoUIView(frame: .zero, device: nil)
-        view.setAspectMode(aspectMode)
-        return view
-    }
-
-    func updateUIView(_ uiView: MetalVideoUIView, context: Context) {
-        uiView.setAspectMode(aspectMode)
-        if let frame {
-            uiView.present(frame)
-        }
-    }
-}
-
-/// Coordinator that pulls from `VideoFrameSink` on a display link cadence (optional host).
-@MainActor
-final class MetalDisplayLinkPump {
-    private var displayLink: CADisplayLink?
-    private weak var view: MetalVideoUIView?
-    private let sink: VideoFrameSink
-    private var lastCount = 0
-
-    init(sink: VideoFrameSink) {
-        self.sink = sink
-    }
-
-    func start(view: MetalVideoUIView) {
-        self.view = view
-        stop()
+    func bind(sink: VideoFrameSink?) {
+        boundSink = sink
+        lastFrameCount = -1
+        displayLink?.invalidate()
+        guard sink != nil else { return }
         let link = CADisplayLink(target: self, selector: #selector(tick))
         link.add(to: .main, forMode: .common)
         displayLink = link
     }
 
-    func stop() {
-        displayLink?.invalidate()
-        displayLink = nil
-    }
-
     @objc private func tick() {
-        guard let view else { return }
-        if sink.frameCount != lastCount, let frame = sink.latestFrame {
-            lastCount = sink.frameCount
+        guard let sink = boundSink else { return }
+        if sink.frameCount != lastFrameCount, let frame = sink.latestFrame {
+            lastFrameCount = sink.frameCount
+            present(frame)
+        }
+    }
+}
+
+/// SwiftUI wrapper for Native backend — pulls frames from `VideoFrameSink`.
+struct MetalVideoView: UIViewRepresentable {
+    var aspectMode: VideoAspectMode
+    var sink: VideoFrameSink?
+    var frame: VideoFrame?
+
+    func makeUIView(context: Context) -> MetalVideoUIView {
+        let view = MetalVideoUIView(frame: .zero, device: nil)
+        view.setAspectMode(aspectMode)
+        view.bind(sink: sink)
+        if let frame {
             view.present(frame)
         }
+        return view
+    }
+
+    func updateUIView(_ uiView: MetalVideoUIView, context: Context) {
+        uiView.setAspectMode(aspectMode)
+        uiView.bind(sink: sink)
+        if let frame {
+            uiView.present(frame)
+        }
+    }
+
+    static func dismantleUIView(_ uiView: MetalVideoUIView, coordinator: ()) {
+        uiView.bind(sink: nil)
+        uiView.clearFrame()
     }
 }

@@ -33,6 +33,9 @@ final class PlaybackPipeline: @unchecked Sendable {
     private var audioConfig: AudioDecoderConfig?
     let subtitleController = SubtitleTrackController()
     private var subtitleFormat: SubtitleFormat = .unknown
+    private var bitmapFormat: BitmapSubtitleFormat = .unknown
+    private var bitmapDecoder: (any BitmapSubtitleDecoder)?
+    private(set) var bitmapCues: [BitmapSubtitleCue] = []
 
     /// Drop video frame if ahead of clock by more than this (ms).
     var maxVideoLeadMs: Int64 = 40
@@ -45,13 +48,21 @@ final class PlaybackPipeline: @unchecked Sendable {
         video: VideoDecoderConfig?,
         audio: AudioDecoderConfig?,
         presenter: MetalVideoRenderer.Presenter?,
-        subtitleFormat: SubtitleFormat = .unknown
+        subtitleFormat: SubtitleFormat = .unknown,
+        bitmapFormat: BitmapSubtitleFormat = .unknown
     ) {
         lock.lock()
         videoConfig = video
         audioConfig = audio
         metalPresenter = presenter
         self.subtitleFormat = subtitleFormat
+        self.bitmapFormat = bitmapFormat
+        if bitmapFormat != .unknown {
+            bitmapDecoder = try? BitmapSubtitleDecoderFactory.make(format: bitmapFormat)
+        } else {
+            bitmapDecoder = nil
+        }
+        bitmapCues = []
         lock.unlock()
     }
 
@@ -218,16 +229,26 @@ final class PlaybackPipeline: @unchecked Sendable {
         }
         // Audio
         
-        // Subtitle packets → cues
-        if subtitleFormat != .unknown {
-            while let pkt = buffers.popSubtitlePacket() {
+        // Subtitle packets → text or bitmap cues
+        while let pkt = buffers.popSubtitlePacket() {
+            if bitmapFormat != .unknown, let bitmapDecoder {
+                do {
+                    let cues = try bitmapDecoder.push(packet: pkt)
+                    if !cues.isEmpty {
+                        lock.lock()
+                        bitmapCues.append(contentsOf: cues)
+                        lock.unlock()
+                    }
+                } catch {
+                    lastError = error.localizedDescription
+                }
+            } else if subtitleFormat != .unknown {
                 do {
                     let decoder = try SubtitleDecoderFactory.make(format: subtitleFormat)
                     let cues = try decoder.decode(packet: pkt)
                     subtitleController.append(cues)
                 } catch {
                     lastError = error.localizedDescription
-                    break
                 }
             }
         }

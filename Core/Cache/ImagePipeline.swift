@@ -199,13 +199,7 @@ actor ImagePipeline {
     }
 
     private func downsample(data: Data, pointSize: CGSize) -> UIImage? {
-        // Prefer main-screen scale; fall back to 3x when called off the main actor
-        let scale: CGFloat
-        if Thread.isMainThread {
-            scale = UIScreen.main.scale
-        } else {
-            scale = 3.0
-        }
+        let scale: CGFloat = 3.0
         let maxDim = max(pointSize.width, pointSize.height) * scale
         let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
         guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary) else {

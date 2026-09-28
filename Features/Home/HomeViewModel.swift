@@ -4,7 +4,7 @@ import Observation
 @Observable
 @MainActor
 final class HomeViewModel {
-    enum LoadState {
+    enum LoadState: Equatable {
         case idle
         case loading
         case loaded

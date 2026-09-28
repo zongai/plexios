@@ -37,11 +37,11 @@ final class AppEnvironment {
         logger: LogRouter = LogRouter(),
         keychain: KeychainStore = KeychainStore(),
         httpClient: HTTPClient? = nil,
-        networkMonitor: NetworkPathMonitor = NetworkPathMonitor()
+        networkMonitor: NetworkPathMonitor? = nil
     ) {
         self.logger = logger
         self.keychain = keychain
-        self.networkMonitor = networkMonitor
+        self.networkMonitor = networkMonitor ?? NetworkPathMonitor()
 
         let identity = ClientIdentity.resolve(keychain: keychain)
         self.clientIdentity = identity

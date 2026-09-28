@@ -30,7 +30,6 @@ struct MovieDetailView: View {
     private func detailScroll(_ item: PlexMetadata) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Backdrop / poster hero
                 ZStack(alignment: .bottomLeading) {
                     PlexImage(
                         url: PlexImageURL.resolve(
@@ -175,8 +174,7 @@ struct MovieDetailView: View {
                     }
                 }
                 .padding(AppSpacing.lg)
-                    .readableWidth()
-                }
+                .readableWidth()
             }
         }
         .background(AppColors.background)

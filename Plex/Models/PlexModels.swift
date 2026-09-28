@@ -64,7 +64,7 @@ struct PlexConnection: Identifiable, Hashable, Sendable {
 
 // MARK: - Library
 
-enum PlexLibraryType: String, Sendable, Hashable {
+enum PlexLibraryType: String, Sendable, Hashable, Codable {
     case movie
     case show
     case artist
@@ -94,7 +94,7 @@ enum PlexLibraryType: String, Sendable, Hashable {
     }
 }
 
-struct PlexLibrary: Identifiable, Hashable, Sendable {
+struct PlexLibrary: Identifiable, Hashable, Sendable, Codable {
     var id: String { key }
     let key: String
     let uuid: String?
@@ -110,7 +110,7 @@ struct PlexLibrary: Identifiable, Hashable, Sendable {
 
 // MARK: - Hub
 
-struct PlexHub: Identifiable, Hashable, Sendable {
+struct PlexHub: Identifiable, Hashable, Sendable, Codable {
     var id: String { hubIdentifier ?? key }
     let key: String
     let hubIdentifier: String?
@@ -124,7 +124,7 @@ struct PlexHub: Identifiable, Hashable, Sendable {
 
 // MARK: - Metadata
 
-enum PlexMetadataType: String, Sendable, Hashable {
+enum PlexMetadataType: String, Sendable, Hashable, Codable {
     case movie, show, season, episode, artist, album, track
     case collection, playlist, person, clip, photo, trailer
     case unknown
@@ -135,7 +135,7 @@ enum PlexMetadataType: String, Sendable, Hashable {
     }
 }
 
-struct PlexMetadata: Identifiable, Hashable, Sendable {
+struct PlexMetadata: Identifiable, Hashable, Sendable, Codable {
     var id: String { ratingKey }
     let ratingKey: String
     let key: String
@@ -194,7 +194,7 @@ struct PlexMetadata: Identifiable, Hashable, Sendable {
     }
 }
 
-struct PlexRole: Hashable, Sendable {
+struct PlexRole: Hashable, Sendable, Codable {
     let tag: String
     let role: String?
     let thumb: String?
@@ -202,7 +202,7 @@ struct PlexRole: Hashable, Sendable {
 
 // MARK: - Media hierarchy
 
-struct PlexMedia: Identifiable, Hashable, Sendable {
+struct PlexMedia: Identifiable, Hashable, Sendable, Codable {
     let id: Int
     let duration: Int64?
     let bitrate: Int?
@@ -218,7 +218,7 @@ struct PlexMedia: Identifiable, Hashable, Sendable {
     let parts: [PlexPart]
 }
 
-struct PlexPart: Identifiable, Hashable, Sendable {
+struct PlexPart: Identifiable, Hashable, Sendable, Codable {
     let id: Int
     let key: String
     let duration: Int64?
@@ -229,8 +229,8 @@ struct PlexPart: Identifiable, Hashable, Sendable {
     let streams: [PlexStream]
 }
 
-struct PlexStream: Identifiable, Hashable, Sendable {
-    enum StreamType: Int, Sendable {
+struct PlexStream: Identifiable, Hashable, Sendable, Codable {
+    enum StreamType: Int, Sendable, Codable {
         case video = 1
         case audio = 2
         case subtitle = 3

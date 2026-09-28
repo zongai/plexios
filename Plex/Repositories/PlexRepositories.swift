@@ -242,16 +242,3 @@ actor FavoritesRepository {
         try await api.rate(key: key, rating: isFavorite ? 10 : 0, baseURL: context.baseURL, token: context.token)
     }
 }
-
-// MARK: - Codable conformances for cache
-
-extension PlexLibrary: Codable {}
-extension PlexLibraryType: Codable {}
-extension PlexHub: Codable {}
-extension PlexMetadata: Codable {}
-extension PlexMetadataType: Codable {}
-extension PlexRole: Codable {}
-extension PlexMedia: Codable {}
-extension PlexPart: Codable {}
-extension PlexStream: Codable {}
-extension PlexStream.StreamType: Codable {}

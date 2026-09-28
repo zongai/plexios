@@ -4,7 +4,7 @@ import Observation
 @Observable
 @MainActor
 final class LibrariesViewModel {
-    enum LoadState {
+    enum LoadState: Equatable {
         case idle, loading, loaded, empty, failed(String)
     }
 
@@ -43,7 +43,7 @@ final class LibrariesViewModel {
 @Observable
 @MainActor
 final class LibraryGridViewModel {
-    enum LoadState {
+    enum LoadState: Equatable {
         case idle, loading, loaded, empty, failed(String)
     }
 

@@ -676,7 +676,12 @@ final class PlaybackEngine {
 
     private func reportTimeline(force: Bool) async {
         guard let session, let context else { return }
-        let should = force || (await session.shouldReport(force: force))
+        let should: Bool
+        if force {
+            should = true
+        } else {
+            should = await session.shouldReport(force: false)
+        }
         guard should else { return }
         await timelineReporter.report(
             baseURL: context.baseURL,

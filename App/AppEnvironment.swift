@@ -41,7 +41,8 @@ final class AppEnvironment {
     ) {
         self.logger = logger
         self.keychain = keychain
-        self.networkMonitor = networkMonitor ?? NetworkPathMonitor()
+        let monitor = networkMonitor ?? NetworkPathMonitor()
+        self.networkMonitor = monitor
 
         let identity = ClientIdentity.resolve(keychain: keychain)
         self.clientIdentity = identity
@@ -59,7 +60,7 @@ final class AppEnvironment {
         )
         self.connectionManager = ConnectionManager(
             api: api,
-            networkMonitor: networkMonitor,
+            networkMonitor: monitor,
             logger: logger
         )
         self.libraryRepository = LibraryRepository(api: api)

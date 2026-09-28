@@ -238,7 +238,6 @@ struct APIStream: Decodable {
     let displayTitle: String?
     let extendedDisplayTitle: String?
     let title: String?
-    let isDefault: Bool?
     let forced: Bool?
     let selected: Bool?
     let `default`: Bool?

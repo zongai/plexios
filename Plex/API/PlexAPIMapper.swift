@@ -182,7 +182,7 @@ enum PlexAPIMapper {
             displayTitle: dto.displayTitle,
             extendedDisplayTitle: dto.extendedDisplayTitle,
             title: dto.title,
-            isDefault: dto.isDefault ?? dto.default ?? false,
+            isDefault: dto.default ?? false,
             isForced: dto.forced ?? false,
             isSelected: dto.selected ?? false,
             isExternal: dto.external ?? false,

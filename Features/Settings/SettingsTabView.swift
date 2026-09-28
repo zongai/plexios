@@ -7,8 +7,8 @@ struct SettingsTabView: View {
         NavigationStack {
             List {
                 Section("Account") {
-                    if case .signedIn(let user) = environment.authenticationService.state {
-                        LabeledContent("User", value: user.friendlyName ?? user.username ?? user.email ?? user.id)
+                    if case .signedIn = environment.authenticationService.state {
+                        LabeledContent("Status", value: "Signed in")
                     }
                     Button("Sign Out", role: .destructive) {
                         Task {

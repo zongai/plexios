@@ -3,7 +3,7 @@ import SwiftUI
 /// Chooses TabView (iPhone / compact) vs sidebar NavigationSplitView (iPad regular).
 struct AdaptiveRootView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @State private var selectedSection: AppSection = .home
+    @State private var selectedSection: AppSection? = .home
 
     var body: some View {
         Group {
@@ -19,7 +19,10 @@ struct AdaptiveRootView: View {
     // MARK: - iPhone
 
     private var phoneTabView: some View {
-        TabView(selection: $selectedSection) {
+        TabView(selection: Binding(
+            get: { selectedSection ?? .home },
+            set: { selectedSection = $0 }
+        )) {
             HomeView()
                 .tabItem { Label(AppSection.home.title, systemImage: AppSection.home.systemImage) }
                 .tag(AppSection.home)
@@ -48,9 +51,11 @@ struct AdaptiveRootView: View {
 
     private var iPadSplitView: some View {
         NavigationSplitView {
-            List(AppSection.allCases, selection: $selectedSection) { section in
-                Label(section.title, systemImage: section.systemImage)
-                    .tag(section)
+            List(selection: $selectedSection) {
+                ForEach(AppSection.allCases) { section in
+                    Label(section.title, systemImage: section.systemImage)
+                        .tag(Optional(section))
+                }
             }
             .navigationTitle("Plex")
             .listStyle(.sidebar)

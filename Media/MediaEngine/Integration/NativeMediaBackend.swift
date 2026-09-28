@@ -75,23 +75,22 @@ final class NativeMediaBackend: PlayerEngineBackend {
         durationMs = request.metadata.duration ?? part?.duration ?? 0
         rate = Float(request.preferences.defaultPlaybackRate)
 
-        // Without packet demux, pipeline cannot play — fail fast so router falls back.
-        do {
-            _ = try await demuxer.nextPacket()
-        } catch {
-            await demuxer.close()
-            state = .failed
-            throw PlaybackFailure(
-                stage: .demux,
-                reason: "Native demux has no packets (link NATIVE_FFMPEG for full engine). Falling back.",
-                underlying: error.localizedDescription
-            )
-        }
-
+        // Builtin demuxer is probe-only (no packets). Fail fast → AVPlayer fallback.
+        // Do not call nextPacket() first: that would drop the first media packet when FFmpeg is linked.
+        #if !NATIVE_FFMPEG
+        await demuxer.close()
+        state = .failed
+        throw PlaybackFailure(
+            stage: .demux,
+            reason: "Native demux has no packets (link NATIVE_FFMPEG for full engine). Falling back.",
+            underlying: "BuiltinContainerDemuxer is probe-only"
+        )
+        #else
         await pipeline.start(demuxer: demuxer, startMs: request.startPositionMs)
         pipeline.clock.playbackRate = Double(rate)
         state = .playing
         startPositionPolling()
+        #endif
     }
 
     func play() {

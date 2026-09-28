@@ -21,7 +21,7 @@ final class VideoToolboxCapabilities: @unchecked Sendable {
             ok = VTIsHardwareDecodeSupported(kCMVideoCodecType_H264)
         case .hevc:
             ok = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
-        case .unknown:
+        case .vp9, .av1, .unknown:
             ok = false
         }
         cache[codec] = ok

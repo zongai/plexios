@@ -48,7 +48,7 @@ enum VideoCodecID: String, Sendable, Equatable {
         switch self {
         case .h264: return kCMVideoCodecType_H264
         case .hevc: return kCMVideoCodecType_HEVC
-        case .unknown: return nil
+        case .vp9, .av1, .unknown: return nil
         }
     }
 }

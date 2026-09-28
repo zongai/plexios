@@ -133,3 +133,20 @@ final class PlaybackDecisionTests: XCTestCase {
         }
     }
 }
+
+
+    func testAutoSelectsTextSubtitleWhenEnabled() {
+        let sub = PlexStream(
+            id: 3, streamType: .subtitle, codec: "webvtt", format: "webvtt",
+            language: "Turkish", languageCode: "tr", displayTitle: "Turkish (auto-generated)",
+            extendedDisplayTitle: nil, title: nil,
+            isDefault: false, isForced: false, isSelected: false, isExternal: true,
+            bitrate: nil, channels: nil, key: "/library/streams/3", bitDepth: nil
+        )
+        let item = movie(container: "mkv", videoCodec: "h264", audioCodec: "aac", subs: [sub])
+        let decision = PlaybackDecisionEngine().decide(metadata: item, network: .lan)
+        XCTAssertEqual(decision.selectedSubtitleStreamId, 3)
+        XCTAssertFalse(decision.burnInSubtitles)
+        // Soft sub → not pure direct play
+        XCTAssertNotEqual(decision.mode, .directPlay)
+    }

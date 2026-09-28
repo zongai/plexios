@@ -332,8 +332,21 @@ final class PlaybackEngine {
         }
     }
 
-    /// Best-effort AVPlayer media selection for Direct Play; returns true if applied.
+    /// Select audio/subtitle options on the current AVPlayerItem.
+    /// Retries briefly — HLS often exposes legible groups only after the playlist loads.
     private func applyAVMediaSelection(audioStreamId: Int?, subtitleStreamId: Int?) async -> Bool {
+        for attempt in 0..<5 {
+            if attempt > 0 {
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+            if await applyAVMediaSelectionOnce(audioStreamId: audioStreamId, subtitleStreamId: subtitleStreamId) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func applyAVMediaSelectionOnce(audioStreamId: Int?, subtitleStreamId: Int?) async -> Bool {
         guard let item = player?.currentItem else { return false }
         do {
             let asset = item.asset
@@ -343,16 +356,18 @@ final class PlaybackEngine {
             if let audioStreamId,
                characteristics.contains(.audible),
                let group = try await asset.loadMediaSelectionGroup(for: .audible) {
-                // Match by extended language tag / display name heuristics
                 let options = group.options
                 if let stream = audioStreams.first(where: { $0.id == audioStreamId }) {
                     let lang = stream.languageCode ?? stream.language
-                    if let match = options.first(where: { opt in
+                    let title = (stream.displayTitle ?? "").lowercased()
+                    let match = options.first(where: { opt in
                         if let lang, let code = opt.locale?.language.languageCode?.identifier {
-                            return code.lowercased() == lang.lowercased()
+                            if code.lowercased() == lang.lowercased() { return true }
                         }
-                        return opt.displayName.lowercased().contains((stream.displayTitle ?? "").lowercased())
-                    }) {
+                        if !title.isEmpty, opt.displayName.lowercased().contains(title) { return true }
+                        return false
+                    }) ?? options.first
+                    if let match {
                         item.select(match, in: group)
                         applied = true
                     }
@@ -361,28 +376,32 @@ final class PlaybackEngine {
 
             if characteristics.contains(.legible),
                let group = try await asset.loadMediaSelectionGroup(for: .legible) {
-                if let subtitleStreamId,
-                   let stream = subtitleStreams.first(where: { $0.id == subtitleStreamId }) {
-                    let lang = (stream.languageCode ?? stream.language)?.lowercased()
-                    let title = (stream.displayTitle ?? stream.title ?? "").lowercased()
-                    let match = group.options.first(where: { opt in
+                if subtitleStreamId != nil {
+                    let stream = subtitleStreams.first(where: { $0.id == subtitleStreamId })
+                    let lang = (stream?.languageCode ?? stream?.language)?.lowercased()
+                    let title = (stream?.displayTitle ?? stream?.title ?? "").lowercased()
+                    // Skip forced-only / "disabled" options when possible
+                    let candidates = group.options.filter { !$0.displayName.lowercased().contains("disabled") }
+                    let pool = candidates.isEmpty ? group.options : candidates
+                    let match = pool.first(where: { opt in
                         if let lang, let code = opt.locale?.language.languageCode?.identifier {
                             if code.lowercased() == lang { return true }
                         }
-                        if !title.isEmpty, opt.displayName.lowercased().contains(title) {
-                            return true
-                        }
+                        if !title.isEmpty, opt.displayName.lowercased().contains(title) { return true }
                         return false
-                    }) ?? group.options.first
+                    }) ?? pool.first
                     if let match {
                         item.select(match, in: group)
                         applied = true
-                        logger.playback.debug("Selected subtitle: \(match.displayName)")
+                        logger.playback.info("Subtitle legible option: \(match.displayName)")
                     }
-                } else if subtitleStreamId == nil {
+                } else {
                     item.select(nil, in: group)
                     applied = true
                 }
+            } else if subtitleStreamId != nil {
+                // Legible group not ready yet
+                return false
             }
 
             return applied

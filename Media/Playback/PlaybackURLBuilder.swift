@@ -70,10 +70,15 @@ struct PlaybackURLBuilder: Sendable {
             items.append(URLQueryItem(name: "videoQuality", value: "100"))
         }
 
+        // Plex universal subtitle modes (see PMS Transcoder API):
+        // burn | none | sidecar | embedded | segmented | auto
+        // For HLS + AVPlayer, **segmented** yields WebVTT segments AVPlayer can show.
         if decision.burnInSubtitles {
             items.append(URLQueryItem(name: "subtitles", value: "burn"))
+            items.append(URLQueryItem(name: "advancedSubtitles", value: "burn"))
         } else if decision.selectedSubtitleStreamId != nil {
-            items.append(URLQueryItem(name: "subtitles", value: "auto"))
+            items.append(URLQueryItem(name: "subtitles", value: "segmented"))
+            items.append(URLQueryItem(name: "advancedSubtitles", value: "text"))
         } else {
             items.append(URLQueryItem(name: "subtitles", value: "none"))
         }

@@ -127,8 +127,13 @@ struct PlaybackDecisionEngine: Sendable {
             return true
         }()
 
-        // Direct Play (native container + codecs, no burn-in, no external-only sub dependency)
-        if containerOK && videoOK && audioOK && !needBurnIn && !externalSoftSub {
+        // Soft subtitles: prefer HLS packaging (segmented VTT) over pure Direct Play so
+        // AVPlayer always receives a legible media group. Pure file Direct Play often
+        // has no selectable text track for external WEBVTT/SRT.
+        let softSubSelected = subtitleId != nil && !needBurnIn
+
+        // Direct Play (native container + codecs, no burn-in, no soft-sub packaging need)
+        if containerOK && videoOK && audioOK && !needBurnIn && !externalSoftSub && !softSubSelected {
             return PlaybackDecision(
                 mode: .directPlay,
                 reason: "Container, video (\(normalizedVideo ?? videoCodec ?? "?")), and audio (\(audioCodec ?? "?")) supported natively",
@@ -220,6 +225,16 @@ struct PlaybackDecisionEngine: Sendable {
         }
         if let selected = streams.first(where: \.isSelected) {
             return (selected.id, capabilities.requiresBurnIn(selected))
+        }
+        // Prefer a soft (text) track when subtitles are enabled — previously
+        // returned nil unless PMS marked a track selected/forced (WEBVTT/SRT silent).
+        if let text = streams.first(where: {
+            capabilities.supportsSubtitleNatively($0) && !capabilities.requiresBurnIn($0)
+        }) {
+            return (text.id, false)
+        }
+        if let any = streams.first {
+            return (any.id, capabilities.requiresBurnIn(any))
         }
         return (nil, false)
     }

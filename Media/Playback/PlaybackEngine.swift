@@ -363,15 +363,21 @@ final class PlaybackEngine {
                let group = try await asset.loadMediaSelectionGroup(for: .legible) {
                 if let subtitleStreamId,
                    let stream = subtitleStreams.first(where: { $0.id == subtitleStreamId }) {
-                    let lang = stream.languageCode ?? stream.language
-                    if let match = group.options.first(where: { opt in
+                    let lang = (stream.languageCode ?? stream.language)?.lowercased()
+                    let title = (stream.displayTitle ?? stream.title ?? "").lowercased()
+                    let match = group.options.first(where: { opt in
                         if let lang, let code = opt.locale?.language.languageCode?.identifier {
-                            return code.lowercased() == lang.lowercased()
+                            if code.lowercased() == lang { return true }
                         }
-                        return true
-                    }) {
+                        if !title.isEmpty, opt.displayName.lowercased().contains(title) {
+                            return true
+                        }
+                        return false
+                    }) ?? group.options.first
+                    if let match {
                         item.select(match, in: group)
                         applied = true
+                        logger.playback.debug("Selected subtitle: \(match.displayName)")
                     }
                 } else if subtitleStreamId == nil {
                     item.select(nil, in: group)

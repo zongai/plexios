@@ -1,0 +1,1 @@
+App icon derived from pannal/plex-for-kodi icon.png (reference client).

@@ -286,7 +286,11 @@ static PlexFFVideoFrame *frame_to_nv12(PlexFFVideoDecoder *dec, AVFrame *src, in
     out->width = w;
     out->height = h;
     out->pts_ms = pts_ms;
-    out->is_keyframe = src->flags & AV_FRAME_FLAG_KEY ? 1 : 0;
+    #if LIBAVUTIL_VERSION_MAJOR >= 58
+    out->is_keyframe = (src->flags & AV_FRAME_FLAG_KEY) ? 1 : 0;
+#else
+    out->is_keyframe = src->key_frame ? 1 : 0;
+#endif
     out->nv12 = nv12;
     out->nv12_size = nv_size;
     return out;

@@ -75,6 +75,11 @@ struct SettingsTabView: View {
 
                     Toggle("Subtitles on by default", isOn: $prefs.subtitlesEnabled)
                         .onChange(of: prefs.subtitlesEnabled) { _, _ in savePrefs() }
+                    Toggle("Native Media Engine (experimental)", isOn: $prefs.allowNativeMediaEngine)
+                        .onChange(of: prefs.allowNativeMediaEngine) { _, _ in savePrefs() }
+                    Text("When enabled, Direct Play may use the native pipeline (FFmpeg demux required for full support). Failures fall back to AVPlayer / Transcode.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     Toggle("Autoplay next episode", isOn: $prefs.autoPlayNextEpisode)
                         .onChange(of: prefs.autoPlayNextEpisode) { _, _ in savePrefs() }

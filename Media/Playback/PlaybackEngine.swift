@@ -54,6 +54,8 @@ final class PlaybackEngine {
     /// Phase 1: diagnostics / future native routing (default path unchanged).
     var playerEngineRouter: PlayerEngineRouter?
     private(set) var lastDiagnostics: PlaybackDiagnostics?
+    private(set) var activePlaybackBackend: PlaybackBackend = .avPlayer
+    private var nativeTimelineTask: Task<Void, Never>?
 
     init(
         decisionEngine: PlaybackDecisionEngine = PlaybackDecisionEngine(),
@@ -202,6 +204,41 @@ final class PlaybackEngine {
             height: 900
         )
 
+        // Phase 10: optional Native Media Engine for Direct Play
+        if let router = playerEngineRouter,
+           router.lastReport?.preferredBackend == .nativeMediaEngine,
+           decision.mode == .directPlay {
+            let request = PlaybackRequest(
+                metadata: metadata,
+                context: context,
+                network: network,
+                path: .nativeDirectPlay,
+                decision: decision,
+                mediaURL: url,
+                startPositionMs: startMs,
+                preferences: effectivePrefs
+            )
+            do {
+                let native = router.nativeBackendInstance()
+                try await native.prepare(request: request)
+                activePlaybackBackend = .nativeMediaEngine
+                router.markActive(.nativeMediaEngine)
+                await newSession.updateState(.playing)
+                sessionState = .playing
+                startNativeTimelineLoop()
+                logger.playback.info("Playing via Native Media Engine")
+                return
+            } catch {
+                logger.playback.info("Native engine failed, falling back to AVPlayer: \(error.localizedDescription)")
+                activePlaybackBackend = .avPlayer
+                router.markActive(.avPlayer)
+                // Continue to AVPlayer below
+            }
+        } else {
+            activePlaybackBackend = .avPlayer
+            playerEngineRouter?.markActive(.avPlayer)
+        }
+
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
         let avPlayer = AVPlayer(playerItem: item)
@@ -288,6 +325,12 @@ final class PlaybackEngine {
     func stop(report: Bool = true) async {
         reportTask?.cancel()
         reportTask = nil
+        nativeTimelineTask?.cancel()
+        nativeTimelineTask = nil
+        if activePlaybackBackend == .nativeMediaEngine {
+            await playerEngineRouter?.nativeBackendInstance().stop()
+        }
+        activePlaybackBackend = .avPlayer
         removeObservers()
 
         if report, session != nil, context != nil {
@@ -459,6 +502,34 @@ final class PlaybackEngine {
     }
 
     // MARK: - Internals
+
+    
+    private func startNativeTimelineLoop() {
+        nativeTimelineTask?.cancel()
+        nativeTimelineTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { break }
+                let pos: Int64 = await MainActor.run {
+                    let p = self.playerEngineRouter?.nativeBackendInstance().positionMs ?? self.positionMs
+                    self.positionMs = p
+                    return p
+                }
+                if let context = await MainActor.run(body: { self.context }),
+                   let session = await MainActor.run(body: { self.session }) {
+                    await session.updatePosition(pos)
+                    await session.updateState(.playing)
+                    await self.timelineReporter.report(
+                        baseURL: context.baseURL,
+                        token: context.token,
+                        clientIdentifier: self.clientIdentifier,
+                        session: session,
+                        continuing: true
+                    )
+                }
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
+    }
 
     private func fail(_ message: String) {
         errorMessage = message

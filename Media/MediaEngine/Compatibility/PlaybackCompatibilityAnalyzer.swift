@@ -63,19 +63,27 @@ struct PlaybackCompatibilityAnalyzer: Sendable {
             reasons.append("audio \(audioCodec ?? "?") needs transcode or soft decode")
         }
 
-        // Phase 1: native never selected for real playback (flag off / stub backend).
+        // Native candidate: engine enabled + container/video look viable for Direct Play.
         let nativeCandidate = nativeEngineEnabled
+            && decision.mode == .directPlay
             && containerLevel != .unsupported
             && (videoLevel == .hardwareSupported || videoLevel == .softwareSupported)
+            && (audioLevel == .supported || audioLevel == .softwareSupported)
 
-        let preferredBackend: PlaybackBackend = .avPlayer
-        let preferredPath: PlaybackPath = {
+        let preferredBackend: PlaybackBackend
+        let preferredPath: PlaybackPath
+        if nativeCandidate {
+            preferredBackend = .nativeMediaEngine
+            preferredPath = .nativeDirectPlay
+            reasons.append("native candidate for Direct Play")
+        } else {
+            preferredBackend = .avPlayer
             switch decision.mode {
-            case .directPlay: return .avPlayerDirect
-            case .directStream: return .avPlayerHLS
-            case .transcode: return .plexTranscode
+            case .directPlay: preferredPath = .avPlayerDirect
+            case .directStream: preferredPath = .avPlayerHLS
+            case .transcode: preferredPath = .plexTranscode
             }
-        }()
+        }
 
         if decision.mode == .transcode {
             reasons.append("decision engine: \(decision.reason)")

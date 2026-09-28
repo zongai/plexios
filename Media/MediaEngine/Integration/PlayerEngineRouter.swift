@@ -1,9 +1,6 @@
 import Foundation
 import Observation
 
-/// Chooses backend / path using Analyzer + FallbackPolicy.
-/// Phase 1: always executes via existing `PlaybackEngine` AVPlayer path;
-/// reports diagnostics and records preferred native candidacy for later phases.
 @Observable
 @MainActor
 final class PlayerEngineRouter {
@@ -11,16 +8,19 @@ final class PlayerEngineRouter {
     private(set) var lastPath: PlaybackPath = .avPlayerDirect
     private(set) var lastBackend: PlaybackBackend = .avPlayer
     private(set) var diagnosticsLine: String = ""
+    private(set) var activeBackend: PlaybackBackend = .avPlayer
 
-    private let analyzer: PlaybackCompatibilityAnalyzer
+    private var analyzer: PlaybackCompatibilityAnalyzer
     private let fallback: PlaybackFallbackPolicy
     private let logger: LogRouter
     private let nativeBackend: NativeMediaBackend
 
-    /// When true (future Settings), analyzer may mark nativeCandidate.
     var nativeEngineEnabled: Bool {
         didSet {
-            // Recreate analyzer with flag — kept simple for Phase 1
+            analyzer = PlaybackCompatibilityAnalyzer(
+                capabilities: .current,
+                nativeEngineEnabled: nativeEngineEnabled
+            )
         }
     }
 
@@ -35,12 +35,15 @@ final class PlayerEngineRouter {
         self.nativeBackend = NativeMediaBackend(logger: logger)
     }
 
-    /// Predict path; does not start playback. Used by PlaybackEngine before AVPlayer play.
     func resolve(
         metadata: PlexMetadata,
         decision: PlaybackDecision,
         network: NetworkClass
     ) -> CompatibilityReport {
+        let enabled = PlaybackSettingsStore.shared.preferences.allowNativeMediaEngine
+        if enabled != nativeEngineEnabled {
+            nativeEngineEnabled = enabled
+        }
         let report = analyzer.analyze(
             metadata: metadata,
             decision: decision,
@@ -54,7 +57,6 @@ final class PlayerEngineRouter {
         return report
     }
 
-    /// Ordered fallbacks after a runtime failure on `path`.
     func fallbackSteps(after path: PlaybackPath, failure: PlaybackFailure?) -> [PlaybackFallbackPolicy.Step] {
         let report = lastReport ?? CompatibilityReport(
             tracks: TrackCompatibility(
@@ -72,8 +74,12 @@ final class PlayerEngineRouter {
         return fallback.nextSteps(after: path, failure: failure, report: report)
     }
 
-    /// Phase 1: native prepare always fails → caller should not use for production play.
     func nativeBackendInstance() -> NativeMediaBackend { nativeBackend }
+
+    func markActive(_ backend: PlaybackBackend) {
+        activeBackend = backend
+        lastBackend = backend
+    }
 
     private func formatDiagnostics(report: CompatibilityReport, decision: PlaybackDecision) -> String {
         let t = report.tracks

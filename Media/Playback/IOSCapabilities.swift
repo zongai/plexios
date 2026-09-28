@@ -221,7 +221,8 @@ struct PlaybackPreferences: Sendable {
         preferredSubtitleLanguage: nil,
         subtitlesEnabled: true,
         defaultPlaybackRate: 1.0,
-        defaultAspectMode: .fit
+        defaultAspectMode: .fit,
+        allowNativeMediaEngine: false
     )
 
     static let rateOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
@@ -239,6 +240,7 @@ final class PlaybackSettingsStore {
         static let subsEnabled = "playback.subtitlesEnabled"
         static let rate = "playback.defaultRate"
         static let aspect = "playback.aspectMode"
+        static let nativeEngine = "playback.allowNativeMediaEngine"
         static let audioLang = "playback.audioLang"
         static let subLang = "playback.subLang"
     }
@@ -257,7 +259,8 @@ final class PlaybackSettingsStore {
                 preferredSubtitleLanguage: defaults.string(forKey: Keys.subLang),
                 subtitlesEnabled: defaults.object(forKey: Keys.subsEnabled) as? Bool ?? true,
                 defaultPlaybackRate: defaults.object(forKey: Keys.rate) as? Float ?? 1.0,
-                defaultAspectMode: VideoAspectMode(rawValue: defaults.string(forKey: Keys.aspect) ?? "") ?? .fit
+                defaultAspectMode: VideoAspectMode(rawValue: defaults.string(forKey: Keys.aspect) ?? "") ?? .fit,
+                allowNativeMediaEngine: defaults.object(forKey: Keys.nativeEngine) as? Bool ?? false
             )
         }
         set {
@@ -270,6 +273,7 @@ final class PlaybackSettingsStore {
             defaults.set(newValue.subtitlesEnabled, forKey: Keys.subsEnabled)
             defaults.set(newValue.defaultPlaybackRate, forKey: Keys.rate)
             defaults.set(newValue.defaultAspectMode.rawValue, forKey: Keys.aspect)
+            defaults.set(newValue.allowNativeMediaEngine, forKey: Keys.nativeEngine)
             if let a = newValue.preferredAudioLanguage {
                 defaults.set(a, forKey: Keys.audioLang)
             } else {

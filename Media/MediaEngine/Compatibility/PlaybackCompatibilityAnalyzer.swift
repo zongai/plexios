@@ -113,15 +113,17 @@ struct PlaybackCompatibilityAnalyzer: Sendable {
 
     private func analyzeVideo(_ raw: String?) -> CompatibilityLevel {
         guard let c = IOSCapabilities.normalizeVideoCodec(raw) else { return .unsupported }
+        let vt = VideoToolboxCapabilities.shared
         switch c {
-        case "h264", "mpeg4", "mpeg2video":
+        case "h264":
+            return vt.supportsH264Hardware ? .hardwareSupported : .unsupported
+        case "mpeg4", "mpeg2video":
             return .hardwareSupported
         case "hevc":
-            return capabilities.supportsHEVC ? .hardwareSupported : .unsupported
+            return vt.supportsHEVCHardware ? .hardwareSupported : .unsupported
         case "av1":
             return capabilities.supportsAV1 ? .hardwareSupported : .softwareSupported
         case "vp9":
-            // AVPlayer cannot; native soft decode later
             return nativeEngineEnabled ? .softwareSupported : .unsupported
         default:
             return .unsupported

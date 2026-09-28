@@ -54,7 +54,7 @@ struct PlaybackDiagnostics: Sendable, Equatable {
             },
             videoDecoder: report.preferredBackend == .avPlayer
                 ? "AVPlayer / system"
-                : (report.tracks.video == .hardwareSupported ? "VideoToolbox (planned)" : "Software (planned)"),
+                : (report.tracks.video == .hardwareSupported ? "VideoToolbox HW" : "Software (planned)"),
             audioDecoder: report.preferredBackend == .avPlayer ? "AVPlayer / system" : "Native (planned)",
             renderer: report.preferredBackend == .avPlayer ? "AVPlayerLayer" : "Metal (planned)",
             path: report.preferredPath,

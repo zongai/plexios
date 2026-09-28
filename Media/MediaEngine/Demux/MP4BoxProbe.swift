@@ -116,7 +116,7 @@ struct MP4BoxProbe: Sendable {
         while offset + 8 <= data.count {
             let size32 = readU32(data, offset)
             let type = readFourCC(data, offset + 4)
-            let boxSize = Int(size32 == 0 ? data.count - offset : size32)
+            let boxSize = size32 == 0 ? data.count - offset : Int(size32)
             if boxSize < 8 { break }
             let header = 8
             let payloadStart = offset + header

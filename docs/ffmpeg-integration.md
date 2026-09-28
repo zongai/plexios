@@ -79,3 +79,53 @@ void ffmpeg_video_close(void *ctx);
 
 Swift `SoftwareVideoDecoder` maps output to NV12 `CVPixelBuffer` via `makeNV12PixelBuffer`.
 Without the framework, setup throws and PlaybackFallbackPolicy escalates to **Plex Transcode**.
+
+## Why Native falls back today
+
+This repository **does not commit** multi‑MB `libav*` binaries. Without:
+
+```text
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = NATIVE_FFMPEG
++ linked libavformat / libavcodec / libavutil / libswresample / libswscale
+```
+
+`FFmpegAvailability.isLinked == false`, so:
+
+1. CompatibilityAnalyzer **never** sets `nativeCandidate`
+2. Playback stays on **AVPlayer** (no failed prepare loop)
+3. Settings toggle explains the build is without FFmpeg
+
+## Enable Native for real
+
+### A. Local XCFrameworks (recommended)
+
+1. Build or download LGPL `libavformat`, `libavcodec`, `libavutil`, `libswresample`, `libswscale` as XCFrameworks (see kewlbear/FFmpeg-iOS or your own `./configure` iOS build).
+2. Place under `Vendor/FFmpeg/*.xcframework`
+3. In `project.yml`:
+
+```yaml
+targets:
+  PlexiOS:
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: NATIVE_FFMPEG
+    dependencies:
+      - framework: Vendor/FFmpeg/libavformat.xcframework
+        embed: false
+      - framework: Vendor/FFmpeg/libavcodec.xcframework
+        embed: false
+      # ... util, swresample, swscale
+```
+
+4. `xcodegen generate` and implement C shim bodies in `FFmpegDemuxer` / `SoftwareVideoDecoder`.
+
+### B. Script helper
+
+```bash
+./scripts/prepare-ffmpeg-vendor.sh   # documents expected layout; does not download GPL blobs by default
+```
+
+### CI
+
+Default `build-ipa.yml` stays **without** NATIVE_FFMPEG so unsigned IPAs stay smaller and AVPlayer-only.
+Optional workflow input `ffmpeg: true` when Vendor frameworks are present.

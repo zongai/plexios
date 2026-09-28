@@ -2,7 +2,7 @@
 
 | Area | Status | Mitigation |
 |------|--------|------------|
-| FFmpeg demux/decode | Not linked by default | AVPlayer + Plex Transcode; enable `NATIVE_FFMPEG` + XCFramework |
+| FFmpeg demux/decode | Not linked by default | `FFmpegAvailability.isLinked == false` → Native never selected; AVPlayer only |
 | VP9 / OPUS Direct Play | Needs soft decode | Server transcode |
 | PiP on Native/Metal | Unsupported | Use AVPlayer backend |
 | AirPlay Video on Native | Unsupported | Use AVPlayer backend |

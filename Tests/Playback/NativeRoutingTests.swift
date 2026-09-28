@@ -49,8 +49,14 @@ final class NativeRoutingTests: XCTestCase {
 
         let on = PlaybackCompatibilityAnalyzer(nativeEngineEnabled: true)
             .analyze(metadata: item, decision: decision, network: .lan)
-        XCTAssertTrue(on.nativeCandidate)
-        XCTAssertEqual(on.preferredBackend, .nativeMediaEngine)
-        XCTAssertEqual(on.preferredPath, .nativeDirectPlay)
+        // Without NATIVE_FFMPEG, candidate stays false (no failed Native prepare).
+        if FFmpegAvailability.isLinked {
+            XCTAssertTrue(on.nativeCandidate)
+            XCTAssertEqual(on.preferredBackend, .nativeMediaEngine)
+            XCTAssertEqual(on.preferredPath, .nativeDirectPlay)
+        } else {
+            XCTAssertFalse(on.nativeCandidate)
+            XCTAssertEqual(on.preferredBackend, .avPlayer)
+        }
     }
 }

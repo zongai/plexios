@@ -53,6 +53,9 @@ final class PlayerEngineRouter {
         lastPath = report.preferredPath
         lastBackend = report.preferredBackend
         diagnosticsLine = formatDiagnostics(report: report, decision: decision)
+        if enabled && !FFmpegAvailability.isLinked {
+            logger.playback.info("Native toggle on but \(FFmpegAvailability.statusMessage)")
+        }
         logger.playback.info("Router: \(diagnosticsLine)")
         return report
     }

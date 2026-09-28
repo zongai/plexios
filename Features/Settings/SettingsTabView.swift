@@ -77,7 +77,10 @@ struct SettingsTabView: View {
                         .onChange(of: prefs.subtitlesEnabled) { _, _ in savePrefs() }
                     Toggle("Native Media Engine (experimental)", isOn: $prefs.allowNativeMediaEngine)
                         .onChange(of: prefs.allowNativeMediaEngine) { _, _ in savePrefs() }
-                    Text("When enabled, Direct Play may use the native pipeline (FFmpeg demux required for full support). Failures fall back to AVPlayer / Transcode.")
+                    Text(FFmpegAvailability.isLinked
+                        ? "FFmpeg linked. Direct Play may use the native pipeline; failures fall back to AVPlayer / Transcode."
+                        : "FFmpeg is not linked in this build. Toggle is kept for UI, but playback stays on AVPlayer until you add XCFrameworks (docs/ffmpeg-integration.md)."
+                    )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if prefs.allowNativeMediaEngine {

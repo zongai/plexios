@@ -63,8 +63,10 @@ struct PlaybackCompatibilityAnalyzer: Sendable {
             reasons.append("audio \(audioCodec ?? "?") needs transcode or soft decode")
         }
 
-        // Native candidate: engine enabled + container/video look viable for Direct Play.
+        // Native candidate: engine enabled + FFmpeg linked + Direct Play viable.
+        // Without FFmpeg, never prefer Native (avoids prepare→fail→fallback on every play).
         let nativeCandidate = nativeEngineEnabled
+            && FFmpegAvailability.isLinked
             && decision.mode == .directPlay
             && containerLevel != .unsupported
             && (videoLevel == .hardwareSupported || videoLevel == .softwareSupported)

@@ -20,15 +20,20 @@ actor PlexAPIClient {
 
     // MARK: - Auth (plex.tv)
 
-    /// Create a strong PIN for user sign-in.
+    /// Create a PIN for user sign-in at plex.tv/link.
+    ///
+    /// Do **not** pass `strong=true`: that returns a long (~25 char) code meant for
+    /// embedded OAuth URLs (`app.plex.tv/auth#?code=…`). plex-for-kodi and the
+    /// classic link page expect a short 4-character code from a non-strong PIN.
     func createPIN() async throws -> PlexPin {
         var request = try makeRequest(
             base: clientsPlexTVBase,
             path: "api/v2/pins",
-            query: [URLQueryItem(name: "strong", value: "true")],
             method: "POST"
         )
         applyIdentityHeaders(to: &request)
+        // Prefer JSON so APIPINResponse decoding is stable
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let response = try await http.data(for: request)
         let dto = try decode(APIPINResponse.self, from: response.data)

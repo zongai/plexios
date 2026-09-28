@@ -74,17 +74,33 @@ final class PlaybackDecisionTests: XCTestCase {
 
     func testBitrateCapForcesTranscode() {
         let item = movie(container: "mp4", videoCodec: "h264", audioCodec: "aac", bitrate: 20000)
-        let prefs = PlaybackPreferences(
-            maxVideoBitrateKbps: 4000,
-            autoPlayNextEpisode: true,
-            preferredAudioLanguage: nil,
-            preferredSubtitleLanguage: nil,
-            subtitlesEnabled: true
-        )
+        var prefs = PlaybackPreferences.default
+        prefs.maxVideoBitrateKbps = 4000
         let decision = PlaybackDecisionEngine(preferences: prefs)
             .decide(metadata: item, network: .lan)
         XCTAssertEqual(decision.mode, .transcode)
         XCTAssertTrue(decision.reason.contains("Quality limited"))
+    }
+
+    /// VP9 + OPUS is common (YouTube-style / WebM). AVPlayer cannot decode VP9 → must transcode.
+    func testVP9OpusForcesTranscode() {
+        let item = movie(container: "webm", videoCodec: "vp9", audioCodec: "opus", bitrate: 2340)
+        let decision = PlaybackDecisionEngine().decide(metadata: item, network: .lan)
+        XCTAssertEqual(decision.mode, .transcode)
+        XCTAssertTrue(
+            decision.reason.lowercased().contains("vp9")
+                || decision.reason.lowercased().contains("video codec")
+                || decision.reason.lowercased().contains("opus"),
+            "Expected codec reason, got: \(decision.reason)"
+        )
+    }
+
+    func testOpusAudioAloneForcesTranscodeOrRemux() {
+        // H.264 video is fine but OPUS audio is not native → not Direct Play
+        let item = movie(container: "mp4", videoCodec: "h264", audioCodec: "opus")
+        let decision = PlaybackDecisionEngine().decide(metadata: item, network: .lan)
+        XCTAssertNotEqual(decision.mode, .directPlay)
+        XCTAssertTrue(decision.mode == .transcode || decision.mode == .directStream)
     }
 
     func testPGSBurnIn() {

@@ -23,8 +23,10 @@ struct IOSCapabilities: Sendable {
             let av01: CMVideoCodecType = 0x61307661 // 'av01'
             return VTIsHardwareDecodeSupported(av01)
         }()
-        // VP9: software/hardware varies; allow Direct Stream / remux — AVPlayer handles many VP9 in fMP4/HLS.
-        let vp9 = true
+        // VP9: AVPlayer on iOS does **not** reliably decode VP9 (WebM/MKV/fMP4).
+        // Direct Play / Direct Stream would keep VP9 → black screen / failure.
+        // Must transcode to H.264/HEVC on the server.
+        let vp9Native = false
 
         var video: Set<String> = [
             "h264", "avc", "avc1", "mpeg4", "mpeg2video", "mp4v"
@@ -32,21 +34,24 @@ struct IOSCapabilities: Sendable {
         if hevc {
             video.formUnion(["hevc", "h265", "hev1", "hvc1"])
         }
-        if vp9 {
-            video.formUnion(["vp9", "vp09"])
-        }
+        // Do not add vp9/vp09 — forces PlaybackDecision → transcode
         if av1 {
+            // Only when hardware reports support (A17+ / M-series class devices)
             video.formUnion(["av1", "av01"])
         }
 
-        // Direct Play containers only (AVPlayer-native). MKV stays Direct Stream/remux.
+        // Direct Play containers only (AVPlayer-native). MKV/WebM stay remux or transcode.
         let containers: Set<String> = [
             "mp4", "m4v", "mov", "mpegts", "hls", "m3u8", "isom", "mp3", "aac"
         ]
 
+        // OPUS / Vorbis: not reliable in AVPlayer for progressive/Direct Play.
+        // Leave them unsupported so decision engine requests server audio transcode
+        // (or full transcode when paired with VP9).
         var audio: Set<String> = [
             "aac", "mp3", "ac3", "eac3", "eac3_atmos", "eac3-atmos",
-            "flac", "alac", "opus", "vorbis", "pcm", "dca", "dts", "truehd"
+            "flac", "alac", "pcm"
+            // intentionally omit: opus, vorbis, dca/dts, truehd (transcode audio)
         ]
 
         return IOSCapabilities(
@@ -59,24 +64,25 @@ struct IOSCapabilities: Sendable {
             ],
             maxAudioChannels: 8,
             supportsHEVC: hevc,
-            supportsVP9: vp9,
+            supportsVP9: vp9Native,
             supportsAV1: av1,
             supportsHDR10: true,
             supportsDolbyVision: false
         )
     }()
 
-    /// Comma list for Plex universal transcoder `videoCodecs=` param.
+    /// Codecs the **server may deliver** in HLS after decision.
+    /// Never advertise VP9 — PMS would pass through and AVPlayer still fails.
     var videoCodecsQueryValue: String {
         var list: [String] = ["h264"]
         if supportsHEVC { list.append("hevc") }
-        if supportsVP9 { list.append("vp9") }
         if supportsAV1 { list.append("av1") }
         return list.joined(separator: ",")
     }
 
     var audioCodecsQueryValue: String {
-        "aac,mp3,ac3,eac3,flac"
+        // Request AAC as primary so OPUS sources are transcoded
+        "aac,mp3,ac3,eac3"
     }
 
     var subtitleCodecsQueryValue: String {

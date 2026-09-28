@@ -36,7 +36,10 @@ struct PlaybackURLBuilder: Sendable {
         )
 
         let directPlay = decision.mode == .directPlay ? "1" : "0"
-        let directStream = (decision.mode == .directPlay || decision.mode == .directStream) ? "1" : "0"
+        // Direct Stream only when we explicitly remux; full transcode must disable both
+        let directStream = decision.mode == .directStream ? "1" : "0"
+        // Only pass through audio when Direct Play / Direct Stream and audio is native-safe
+        let directStreamAudio = (decision.mode == .directPlay || decision.mode == .directStream) ? "1" : "0"
 
         let caps = IOSCapabilities.current
         var items: [URLQueryItem] = [
@@ -47,8 +50,8 @@ struct PlaybackURLBuilder: Sendable {
             URLQueryItem(name: "fastSeek", value: "1"),
             URLQueryItem(name: "directPlay", value: directPlay),
             URLQueryItem(name: "directStream", value: directStream),
-            URLQueryItem(name: "directStreamAudio", value: "1"),
-            // Advertise device decode support so PMS keeps HEVC/VP9/AV1 when possible
+            URLQueryItem(name: "directStreamAudio", value: directStreamAudio),
+            // Only codecs AVPlayer can decode — never VP9/OPUS
             URLQueryItem(name: "videoCodecs", value: caps.videoCodecsQueryValue),
             URLQueryItem(name: "audioCodecs", value: caps.audioCodecsQueryValue),
             URLQueryItem(name: "subtitleCodecs", value: caps.subtitleCodecsQueryValue),

@@ -10,41 +10,38 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14
-    timeout-minutes: 45
+    runs-on: macos-15
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app || sudo xcode-select -s /Applications/Xcode.app
-
-      - name: Show Xcode version
-        run: xcodebuild -version
+        run: |
+          for v in 16.4 16.3 16.2 16.1 16.0 15.4 15.3; do
+            if [ -d "/Applications/Xcode_${v}.app" ]; then
+              sudo xcode-select -s "/Applications/Xcode_${v}.app"
+              break
+            fi
+          done
+          if [ ! -f "$(xcode-select -p)/usr/bin/xcodebuild" ]; then
+            sudo xcode-select -s /Applications/Xcode.app
+          fi
+          xcodebuild -version
+          ls /Applications | grep -i xcode || true
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          xcodebuild -list -project PlexiOS.xcodeproj
 
       - name: Build Release (unsigned)
         run: |
           set -euo pipefail
-          xcodebuild \
-            -project PlexiOS.xcodeproj \
-            -scheme PlexiOS \
-            -configuration Release \
-            -destination "generic/platform=iOS" \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            ONLY_ACTIVE_ARCH=NO \
-            build | xcpretty || true
-          # xcpretty may not exist; ensure raw build status
           xcodebuild \
             -project PlexiOS.xcodeproj \
             -scheme PlexiOS \
@@ -64,7 +61,7 @@ jobs:
           APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -1)
           if [ -z "$APP_PATH" ]; then
             echo "App not found under Release-iphoneos; listing products:"
-            find build/DerivedData/Build/Products -maxdepth 3 -type d -name "*.app" || true
+            find build/DerivedData/Build/Products -maxdepth 4 -type d -name "*.app" || true
             exit 1
           fi
           echo "Packaging: $APP_PATH"
@@ -74,7 +71,6 @@ jobs:
           IPA_NAME="PlexiOS-unsigned-${{ github.run_number }}.ipa"
           zip -r "$IPA_NAME" Payload
           ls -lh "$IPA_NAME"
-          echo "IPA_NAME=$IPA_NAME" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -89,10 +85,9 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
           body: |
-            Unsigned IPA build from `${{ github.sha }}` on `${{ github.ref_name }}`.
+            Unsigned IPA from `${{ github.sha }}` on `${{ github.ref_name }}`.
 
-            Install via AltStore / Sideloadly / TrollStore (or re-sign with your team).
-            This build is **not** code-signed by Apple.
+            Not code-signed. Install via AltStore / Sideloadly / TrollStore, or re-sign with your team.
           files: PlexiOS-unsigned-*.ipa
           generate_release_notes: true
           fail_on_unmatched_files: true

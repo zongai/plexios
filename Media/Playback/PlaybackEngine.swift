@@ -114,8 +114,26 @@ final class PlaybackEngine {
         logger.playback.info("Decision: \(decision.mode.rawValue) — \(decision.reason)")
         if let router = playerEngineRouter {
             let report = router.resolve(metadata: metadata, decision: decision, network: network)
-            let probe = MediaProbe().probeFromPlexMetadata(metadata, mediaIndex: decision.mediaIndex, partIndex: decision.partIndex)
+            var probe = MediaProbe().probeFromPlexMetadata(
+                metadata,
+                mediaIndex: decision.mediaIndex,
+                partIndex: decision.partIndex
+            )
+            // Phase 2: best-effort HTTP Range container probe (does not block path choice)
+            if let ctx = self.context ?? Optional(context) {
+                if let enriched = await MediaProbe().probePlexPart(
+                    metadata: metadata,
+                    context: ctx,
+                    mediaIndex: decision.mediaIndex,
+                    partIndex: decision.partIndex
+                ) {
+                    probe = enriched
+                }
+            }
             lastDiagnostics = PlaybackDiagnostics.from(info: probe, decision: decision, report: report)
+            if let line = lastDiagnostics?.displayLines.joined(separator: " · ") {
+                logger.playback.info("Diagnostics: \(line)")
+            }
         }
 
         guard let media = metadata.media[safe: decision.mediaIndex],

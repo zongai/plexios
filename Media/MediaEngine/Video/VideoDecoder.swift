@@ -20,13 +20,12 @@ enum VideoDecoderError: Error, LocalizedError, Sendable {
     }
 }
 
-/// Hardware-first video decoder surface (VideoToolbox in Phase 3).
+/// Hardware-first video decoder surface (VideoToolbox + software fallback).
 protocol VideoDecoder: AnyObject {
     var codec: VideoCodecID { get }
     var isReady: Bool { get }
 
     func setup(config: VideoDecoderConfig) throws
-    /// Feed one encoded access unit / NAL set. May output 0..n frames asynchronously depending on implementation.
     func decode(packet: MediaPacket) throws -> [VideoFrame]
     func flush()
     func invalidate()
@@ -34,16 +33,8 @@ protocol VideoDecoder: AnyObject {
 
 enum VideoDecoderFactory {
     /// Prefer VideoToolbox for H.264/HEVC when hardware reports support.
+    /// For VP9/AV1 returns software decoder instance (setup may still need NATIVE_FFMPEG).
     static func make(codec: VideoCodecID) throws -> any VideoDecoder {
-        switch codec {
-        case .h264, .hevc:
-            let caps = VideoToolboxCapabilities.shared
-            guard caps.canHardwareDecode(codec) else {
-                throw VideoDecoderError.unsupportedCodec(codec.rawValue + " (no HW)")
-            }
-            return VideoToolboxDecoder(codec: codec)
-        case .unknown:
-            throw VideoDecoderError.unsupportedCodec("unknown")
-        }
+        try make(codec: codec, policy: .hardwareThenSoftware)
     }
 }

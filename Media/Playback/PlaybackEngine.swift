@@ -66,6 +66,11 @@ final class PlaybackEngine {
     var nativeLatestVideoFrame: VideoFrame? {
         nativeVideoFrameSink?.latestFrame
     }
+
+    var nativeVideoPresenter: MetalVideoRenderer.Presenter? {
+        guard isNativeBackendActive else { return nil }
+        return playerEngineRouter?.nativeBackendInstance().videoPresenter
+    }
     private var nativeTimelineTask: Task<Void, Never>?
     private(set) var nativeSystemBridge: NativeSystemMediaBridge?
 

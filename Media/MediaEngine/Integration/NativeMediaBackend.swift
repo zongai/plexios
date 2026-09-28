@@ -1,4 +1,5 @@
 import Foundation
+import Metal
 import Observation
 
 /// Native Media Engine backend. Phase 6: hosts PlaybackPipeline.
@@ -15,6 +16,8 @@ final class NativeMediaBackend: PlayerEngineBackend {
     private let logger: LogRouter
     private let pipeline = PlaybackPipeline()
     private var positionTimer: Task<Void, Never>?
+    /// Shared Metal presenter bound by PlayerView + fed by PlaybackPipeline.
+    private(set) var videoPresenter: MetalVideoRenderer.Presenter?
 
     /// Decoded frames for Metal surface in PlayerView.
     var videoFrameSink: VideoFrameSink { pipeline.frameSink }
@@ -75,7 +78,10 @@ final class NativeMediaBackend: PlayerEngineBackend {
             )
         }
 
-        pipeline.configure(video: videoConfig, audio: audioConfig, presenter: nil)
+        if videoPresenter == nil, let metal = MetalVideoRenderer(device: MTLCreateSystemDefaultDevice()) {
+            videoPresenter = MetalVideoRenderer.Presenter(metal: metal)
+        }
+        pipeline.configure(video: videoConfig, audio: audioConfig, presenter: videoPresenter)
         durationMs = request.metadata.duration ?? part?.duration ?? 0
         rate = Float(request.preferences.defaultPlaybackRate)
 

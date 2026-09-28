@@ -28,6 +28,7 @@ struct PlayerView: View {
                 MetalVideoView(
                     aspectMode: engine.aspectMode,
                     sink: engine.nativeVideoFrameSink,
+                    presenter: engine.nativeVideoPresenter,
                     frame: engine.nativeLatestVideoFrame
                 )
                 .ignoresSafeArea()

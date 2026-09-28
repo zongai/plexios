@@ -3,21 +3,29 @@ import SwiftUI
 
 /// UIKit host for Metal video output (Native Media Engine).
 final class MetalVideoUIView: MTKView {
-    let renderer: MetalVideoRenderer?
+    /// Local renderer if no shared presenter is supplied.
+    private let localRenderer: MetalVideoRenderer?
+    /// Shared presenter from PlaybackPipeline (preferred).
+    var rendererBridge: MetalVideoRenderer.Presenter?
+
     private var displayLink: CADisplayLink?
     private weak var boundSink: VideoFrameSink?
     private var lastFrameCount = -1
 
+    var activeRenderer: MetalVideoRenderer? {
+        rendererBridge?.metal ?? localRenderer
+    }
+
     override init(frame: CGRect, device: MTLDevice?) {
         let metalDevice = device ?? MTLCreateSystemDefaultDevice()
-        self.renderer = MetalVideoRenderer(device: metalDevice)
+        self.localRenderer = MetalVideoRenderer(device: metalDevice)
         super.init(frame: frame, device: metalDevice)
         isOpaque = true
         backgroundColor = .black
         enableSetNeedsDisplay = true
         isPaused = true
-        if let renderer {
-            renderer.attach(to: self)
+        if let localRenderer {
+            localRenderer.attach(to: self)
         }
     }
 
@@ -28,26 +36,45 @@ final class MetalVideoUIView: MTKView {
 
     deinit {
         displayLink?.invalidate()
+        rendererBridge?.detach()
     }
 
     func present(_ frame: VideoFrame) {
-        renderer?.enqueue(frame, on: self)
+        if let bridge = rendererBridge {
+            bridge.present(frame)
+        } else {
+            localRenderer?.enqueue(frame, on: self)
+        }
     }
 
     func setAspectMode(_ mode: VideoAspectMode) {
-        renderer?.aspectMode = mode
-        setNeedsDisplay()
+        if let bridge = rendererBridge {
+            bridge.aspectMode = mode
+        } else {
+            localRenderer?.aspectMode = mode
+            setNeedsDisplay()
+        }
     }
 
     func clearFrame() {
-        renderer?.clear(on: self)
+        if let bridge = rendererBridge {
+            bridge.clear()
+        } else {
+            localRenderer?.clear(on: self)
+        }
     }
 
-    func bind(sink: VideoFrameSink?) {
+    /// Bind pipeline sink (fallback path) and/or shared presenter.
+    func bind(sink: VideoFrameSink?, presenter: MetalVideoRenderer.Presenter?) {
+        if let presenter {
+            presenter.attach(view: self)
+            rendererBridge = presenter
+        }
         boundSink = sink
         lastFrameCount = -1
         displayLink?.invalidate()
-        guard sink != nil else { return }
+        // DisplayLink only needed when driving from sink without presenter draws
+        guard sink != nil, presenter == nil else { return }
         let link = CADisplayLink(target: self, selector: #selector(tick))
         link.add(to: .main, forMode: .common)
         displayLink = link
@@ -62,16 +89,17 @@ final class MetalVideoUIView: MTKView {
     }
 }
 
-/// SwiftUI wrapper for Native backend — pulls frames from `VideoFrameSink`.
+/// SwiftUI wrapper — prefers shared `MetalVideoRenderer.Presenter` from Native pipeline.
 struct MetalVideoView: UIViewRepresentable {
     var aspectMode: VideoAspectMode
     var sink: VideoFrameSink?
+    var presenter: MetalVideoRenderer.Presenter?
     var frame: VideoFrame?
 
     func makeUIView(context: Context) -> MetalVideoUIView {
         let view = MetalVideoUIView(frame: .zero, device: nil)
+        view.bind(sink: sink, presenter: presenter)
         view.setAspectMode(aspectMode)
-        view.bind(sink: sink)
         if let frame {
             view.present(frame)
         }
@@ -79,15 +107,15 @@ struct MetalVideoView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: MetalVideoUIView, context: Context) {
+        uiView.bind(sink: sink, presenter: presenter)
         uiView.setAspectMode(aspectMode)
-        uiView.bind(sink: sink)
         if let frame {
             uiView.present(frame)
         }
     }
 
     static func dismantleUIView(_ uiView: MetalVideoUIView, coordinator: ()) {
-        uiView.bind(sink: nil)
+        uiView.bind(sink: nil, presenter: nil)
         uiView.clearFrame()
     }
 }

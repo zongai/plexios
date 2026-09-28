@@ -55,6 +55,47 @@ void plex_ff_packet_free(PlexFFPacket *pkt);
 /// Seek to timestamp in milliseconds. Returns 0 on success.
 int plex_ff_seek_ms(PlexFFContext *ctx, int64_t ms);
 
+/* ---- Software video decoder (avcodec) ---- */
+
+typedef struct PlexFFVideoDecoder PlexFFVideoDecoder;
+
+typedef struct PlexFFVideoFrame {
+    int width;
+    int height;
+    int64_t pts_ms;
+    int is_keyframe;
+    /* NV12 contiguous: Y plane size = width*height, UV = width*height/2 */
+    uint8_t *nv12;
+    int nv12_size;
+} PlexFFVideoFrame;
+
+/// codec_name: "h264","hevc","vp9","av1", etc.
+PlexFFVideoDecoder *plex_ff_video_open(
+    const char *codec_name,
+    int width,
+    int height,
+    const uint8_t *extradata,
+    int extradata_size
+);
+
+void plex_ff_video_close(PlexFFVideoDecoder *dec);
+
+/// Decode one compressed packet. May produce 0..n frames via repeated calls with same packet / flush.
+/// Returns 0 on success (check *out_count), 1 need more data, negative error.
+/// Caller frees each frame with plex_ff_video_frame_free.
+int plex_ff_video_decode(
+    PlexFFVideoDecoder *dec,
+    const uint8_t *data,
+    int size,
+    int64_t pts_ms,
+    int is_keyframe,
+    PlexFFVideoFrame **out_frames,
+    int *out_count
+);
+
+void plex_ff_video_frame_free(PlexFFVideoFrame *frame);
+void plex_ff_video_flush(PlexFFVideoDecoder *dec);
+
 #ifdef __cplusplus
 }
 #endif

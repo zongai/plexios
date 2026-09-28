@@ -1,15 +1,18 @@
 import CoreVideo
 import Foundation
 
+#if NATIVE_FFMPEG
+import PlexFFmpeg
+#endif
+
 /// FFmpeg-backed software video decoder — fallback when VideoToolbox fails or codec lacks HW (VP9/AV1).
-/// Without `NATIVE_FFMPEG` + XCFramework, setup throws so the router can fall back to Plex Transcode.
 final class SoftwareVideoDecoder: VideoDecoder {
     let codec: VideoCodecID
     private(set) var isReady = false
     private var config: VideoDecoderConfig?
 
     #if NATIVE_FFMPEG
-    private var codecContext: OpaquePointer?
+    private var decoder: OpaquePointer?
     #endif
 
     init(codec: VideoCodecID) {
@@ -26,7 +29,7 @@ final class SoftwareVideoDecoder: VideoDecoder {
         isReady = true
         #else
         throw VideoDecoderError.unsupportedCodec(
-            "Software decode for \(config.codec.rawValue) requires NATIVE_FFMPEG (Phase 9). Use Plex Transcode until FFmpeg is linked."
+            "Software decode for \(config.codec.rawValue) requires NATIVE_FFMPEG"
         )
         #endif
     }
@@ -40,10 +43,20 @@ final class SoftwareVideoDecoder: VideoDecoder {
         #endif
     }
 
-    func flush() {}
+    func flush() {
+        #if NATIVE_FFMPEG
+        if let decoder {
+            plex_ff_video_flush(decoder)
+        }
+        #endif
+    }
+
     func invalidate() {
         #if NATIVE_FFMPEG
-        codecContext = nil
+        if let decoder {
+            plex_ff_video_close(decoder)
+        }
+        decoder = nil
         #endif
         isReady = false
         config = nil
@@ -51,13 +64,92 @@ final class SoftwareVideoDecoder: VideoDecoder {
 
     #if NATIVE_FFMPEG
     private func openFFmpeg(config: VideoDecoderConfig) throws {
-        throw VideoDecoderError.unsupportedCodec(
-            "FFmpegSupport video open not bound — complete C shim for \(config.codec.rawValue)"
-        )
+        let name = config.codec.rawValue
+        let opened: OpaquePointer? = name.withCString { cName in
+            if let extra = config.extradata, !extra.isEmpty {
+                return extra.withUnsafeBytes { raw in
+                    plex_ff_video_open(
+                        cName,
+                        Int32(config.width),
+                        Int32(config.height),
+                        raw.bindMemory(to: UInt8.self).baseAddress,
+                        Int32(extra.count)
+                    )
+                }
+            }
+            return plex_ff_video_open(cName, Int32(config.width), Int32(config.height), nil, 0)
+        }
+        guard let opened else {
+            throw VideoDecoderError.unsupportedCodec(
+                "plex_ff_video_open failed for \(config.codec.rawValue)"
+            )
+        }
+        decoder = opened
     }
 
     private func decodeFFmpeg(_ packet: MediaPacket) throws -> [VideoFrame] {
-        throw VideoDecoderError.noFrame
+        guard let decoder else { throw VideoDecoderError.notReady }
+
+        var outPtr: UnsafeMutablePointer<PlexFFVideoFrame>?
+        var outCount: Int32 = 0
+        let pts = packet.ptsMs ?? -1
+        let key = packet.isKeyFrame ? Int32(1) : Int32(0)
+
+        let rc: Int32 = packet.data.withUnsafeBytes { raw in
+            let base = raw.bindMemory(to: UInt8.self).baseAddress
+            return plex_ff_video_decode(
+                decoder,
+                base,
+                Int32(packet.data.count),
+                pts,
+                key,
+                &outPtr,
+                &outCount
+            )
+        }
+
+        if rc == 1 {
+            return [] // need more data
+        }
+        if rc < 0 {
+            throw VideoDecoderError.decodeFailed(OSStatus(rc))
+        }
+        guard let outPtr, outCount > 0 else { return [] }
+
+        var frames: [VideoFrame] = []
+        frames.reserveCapacity(Int(outCount))
+        for i in 0..<Int(outCount) {
+            let ff = outPtr[i]
+            defer {
+                if let nv = ff.nv12 {
+                    // free via av_free equivalent - use plex helper on a stack copy
+                    var tmp = ff
+                    plex_ff_video_frame_free(&tmp)
+                }
+            }
+            guard let nv = ff.nv12, ff.nv12_size > 0, ff.width > 0, ff.height > 0 else { continue }
+            let nvData = Data(bytes: nv, count: Int(ff.nv12_size))
+            // Clear pointer so free doesn't double-free after we copied — actually we copied and still need free nv12
+            let ySize = Int(ff.width * ff.height)
+            let y = nvData.prefix(ySize)
+            let uv = nvData.dropFirst(ySize)
+            guard let pb = Self.makeNV12PixelBuffer(
+                width: Int(ff.width),
+                height: Int(ff.height),
+                y: Data(y),
+                uv: Data(uv)
+            ) else { continue }
+            frames.append(
+                VideoFrame(
+                    pixelBuffer: pb,
+                    ptsMs: ff.pts_ms >= 0 ? ff.pts_ms : packet.ptsMs,
+                    durationMs: packet.durationMs,
+                    isKeyFrame: ff.is_keyframe != 0
+                )
+            )
+        }
+        free(outPtr)
+        return frames
     }
 
     static func makeNV12PixelBuffer(width: Int, height: Int, y: Data, uv: Data) -> CVPixelBuffer? {
@@ -77,21 +169,33 @@ final class SoftwareVideoDecoder: VideoDecoder {
         guard status == kCVReturnSuccess, let pb else { return nil }
         CVPixelBufferLockBaseAddress(pb, [])
         defer { CVPixelBufferUnlockBaseAddress(pb, []) }
+
         if let baseY = CVPixelBufferGetBaseAddressOfPlane(pb, 0) {
             let bpr = CVPixelBufferGetBytesPerRowOfPlane(pb, 0)
             y.withUnsafeBytes { raw in
                 guard let src = raw.baseAddress else { return }
                 for row in 0..<height {
-                    memcpy(baseY.advanced(by: row * bpr), src.advanced(by: row * width), min(width, y.count - row * width))
+                    let srcOff = row * width
+                    let dstOff = row * bpr
+                    let len = min(width, y.count - srcOff)
+                    if len > 0 {
+                        memcpy(baseY.advanced(by: dstOff), src.advanced(by: srcOff), len)
+                    }
                 }
             }
         }
         if let baseUV = CVPixelBufferGetBaseAddressOfPlane(pb, 1) {
             let bpr = CVPixelBufferGetBytesPerRowOfPlane(pb, 1)
+            let uvHeight = height / 2
             uv.withUnsafeBytes { raw in
                 guard let src = raw.baseAddress else { return }
-                for row in 0..<(height / 2) {
-                    memcpy(baseUV.advanced(by: row * bpr), src.advanced(by: row * width), min(width, uv.count - row * width))
+                for row in 0..<uvHeight {
+                    let srcOff = row * width
+                    let dstOff = row * bpr
+                    let len = min(width, uv.count - srcOff)
+                    if len > 0 {
+                        memcpy(baseUV.advanced(by: dstOff), src.advanced(by: srcOff), len)
+                    }
                 }
             }
         }
@@ -100,7 +204,7 @@ final class SoftwareVideoDecoder: VideoDecoder {
     #endif
 }
 
-// MARK: - Factory policies
+// MARK: - Factory policies (unchanged API)
 
 extension VideoDecoderFactory {
     enum Policy: Sendable {
@@ -138,7 +242,6 @@ extension VideoDecoderFactory {
     }
 }
 
-/// VT → Software → (caller) Transcode
 enum VideoDecodeFallbackChain {
     enum Stage: String, Sendable {
         case videoToolbox

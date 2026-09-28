@@ -17,11 +17,19 @@ final class SoftwareVideoDecoderTests: XCTestCase {
         XCTAssertNotNil(outcome.decoder)
     }
 
-    func testSoftwareSetupFailsWithoutFFmpeg() {
+    func testSoftwareSetupDependsOnFFmpeg() {
         let soft = SoftwareVideoDecoder(codec: .vp9)
-        XCTAssertThrowsError(try soft.setup(config: VideoDecoderConfig(
-            codec: .vp9, width: 1920, height: 1080, extradata: nil, bitDepth: 8
-        )))
+        if FFmpegAvailability.isLinked {
+            // May still fail if binary lacks vp9 decoder; must not crash.
+            _ = try? soft.setup(config: VideoDecoderConfig(
+                codec: .vp9, width: 1920, height: 1080, extradata: nil, bitDepth: 8
+            ))
+            soft.invalidate()
+        } else {
+            XCTAssertThrowsError(try soft.setup(config: VideoDecoderConfig(
+                codec: .vp9, width: 1920, height: 1080, extradata: nil, bitDepth: 8
+            )))
+        }
     }
 
     func testCodecIDVP9() {

@@ -97,10 +97,11 @@ struct SettingsTabView: View {
 
                 Section("Codecs (device)") {
                     let caps = IOSCapabilities.current
-                    LabeledContent("HEVC / H.265", value: caps.supportsHEVC ? "Supported" : "No")
-                    LabeledContent("VP9", value: caps.supportsVP9 ? "Supported" : "No")
-                    LabeledContent("AV1", value: caps.supportsAV1 ? "Supported" : "No")
-                    Text("Unsupported codecs are remuxed or transcoded by the server.")
+                    LabeledContent("HEVC / H.265", value: caps.supportsHEVC ? "Hardware" : "Transcode")
+                    LabeledContent("VP9", value: "Server transcode")
+                    LabeledContent("AV1", value: caps.supportsAV1 ? "Hardware" : "Transcode")
+                    LabeledContent("OPUS audio", value: "Server transcode → AAC")
+                    Text("VP9 / OPUS cannot be decoded by iOS AVPlayer; the server converts them to H.264/HEVC + AAC.")
                         .font(AppTypography.caption)
                         .foregroundStyle(AppColors.secondaryText)
                 }

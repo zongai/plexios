@@ -80,6 +80,20 @@ struct SettingsTabView: View {
                     Text("When enabled, Direct Play may use the native pipeline (FFmpeg demux required for full support). Failures fall back to AVPlayer / Transcode.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if prefs.allowNativeMediaEngine {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Native system capabilities")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Now Playing / Lock Screen / Remote: Yes")
+                                .font(.caption)
+                            Text("Background Audio / AirPlay Audio: Yes")
+                                .font(.caption)
+                            Text("PiP / AirPlay Video: No on Metal path (use AVPlayer)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
 
                     Toggle("Autoplay next episode", isOn: $prefs.autoPlayNextEpisode)
                         .onChange(of: prefs.autoPlayNextEpisode) { _, _ in savePrefs() }

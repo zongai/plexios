@@ -56,6 +56,7 @@ final class PlaybackEngine {
     private(set) var lastDiagnostics: PlaybackDiagnostics?
     private(set) var activePlaybackBackend: PlaybackBackend = .avPlayer
     private var nativeTimelineTask: Task<Void, Never>?
+    private(set) var nativeSystemBridge: NativeSystemMediaBridge?
 
     init(
         decisionEngine: PlaybackDecisionEngine = PlaybackDecisionEngine(),
@@ -225,6 +226,20 @@ final class PlaybackEngine {
                 router.markActive(.nativeMediaEngine)
                 await newSession.updateState(.playing)
                 sessionState = .playing
+                if nativeSystemBridge == nil {
+                    nativeSystemBridge = NativeSystemMediaBridge(
+                        nowPlaying: nowPlaying,
+                        audioSession: audioSession,
+                        logger: logger
+                    )
+                }
+                nativeSystemBridge?.activate(
+                    metadata: metadata,
+                    artworkURL: artworkURL,
+                    durationMs: duration,
+                    positionMs: startMs,
+                    rate: playbackRate
+                )
                 startNativeTimelineLoop()
                 logger.playback.info("Playing via Native Media Engine")
                 return
@@ -274,19 +289,29 @@ final class PlaybackEngine {
     }
 
     private func applyRateToPlayer() {
+        if activePlaybackBackend == .nativeMediaEngine {
+            playerEngineRouter?.nativeBackendInstance().setRate(playbackRate)
+            return
+        }
         guard let player else { return }
         if sessionState == .playing || player.timeControlStatus == .playing {
             player.rate = playbackRate
         } else if playbackRate > 0 {
-            // Keep preferred rate for next resume
             player.rate = 0
         }
     }
 
     func pause() {
-        player?.pause()
+        if activePlaybackBackend == .nativeMediaEngine {
+            playerEngineRouter?.nativeBackendInstance().pause()
+        } else {
+            player?.pause()
+        }
         sessionState = .paused
         nowPlaying.updateProgress(positionMs: positionMs, durationMs: durationMs, isPlaying: false)
+        nativeSystemBridge?.updateProgress(
+            positionMs: positionMs, durationMs: durationMs, isPlaying: false, rate: playbackRate
+        )
         Task {
             await session?.updateState(.paused)
             await reportTimeline(force: true)
@@ -294,10 +319,17 @@ final class PlaybackEngine {
     }
 
     func resume() {
-        player?.play()
-        applyRateToPlayer()
+        if activePlaybackBackend == .nativeMediaEngine {
+            playerEngineRouter?.nativeBackendInstance().play()
+        } else {
+            player?.play()
+            applyRateToPlayer()
+        }
         sessionState = .playing
         nowPlaying.updateProgress(positionMs: positionMs, durationMs: durationMs, isPlaying: true)
+        nativeSystemBridge?.updateProgress(
+            positionMs: positionMs, durationMs: durationMs, isPlaying: true, rate: playbackRate
+        )
         Task {
             await session?.updateState(.playing)
             await reportTimeline(force: true)
@@ -309,11 +341,18 @@ final class PlaybackEngine {
     }
 
     func seek(toMs ms: Int64) async {
-        let time = CMTime(value: ms, timescale: 1000)
-        await player?.seek(to: time)
+        if activePlaybackBackend == .nativeMediaEngine {
+            await playerEngineRouter?.nativeBackendInstance().seek(toMs: ms)
+        } else {
+            let time = CMTime(value: ms, timescale: 1000)
+            await player?.seek(to: time)
+        }
         positionMs = ms
         await session?.updatePosition(ms)
         nowPlaying.updateProgress(positionMs: positionMs, durationMs: durationMs, isPlaying: isPlaying)
+        nativeSystemBridge?.updateProgress(
+            positionMs: positionMs, durationMs: durationMs, isPlaying: isPlaying, rate: playbackRate
+        )
         await reportTimeline(force: true)
     }
 
@@ -329,6 +368,7 @@ final class PlaybackEngine {
         nativeTimelineTask = nil
         if activePlaybackBackend == .nativeMediaEngine {
             await playerEngineRouter?.nativeBackendInstance().stop()
+            nativeSystemBridge?.deactivate()
         }
         activePlaybackBackend = .avPlayer
         removeObservers()
@@ -512,6 +552,12 @@ final class PlaybackEngine {
                 let pos: Int64 = await MainActor.run {
                     let p = self.playerEngineRouter?.nativeBackendInstance().positionMs ?? self.positionMs
                     self.positionMs = p
+                    self.nativeSystemBridge?.updateProgress(
+                        positionMs: p,
+                        durationMs: self.durationMs,
+                        isPlaying: self.sessionState == .playing,
+                        rate: self.playbackRate
+                    )
                     return p
                 }
                 if let context = await MainActor.run(body: { self.context }),

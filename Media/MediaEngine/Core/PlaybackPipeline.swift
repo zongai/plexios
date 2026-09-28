@@ -31,6 +31,8 @@ final class PlaybackPipeline: @unchecked Sendable {
     private var pipelineTask: Task<Void, Never>?
     private var videoConfig: VideoDecoderConfig?
     private var audioConfig: AudioDecoderConfig?
+    let subtitleController = SubtitleTrackController()
+    private var subtitleFormat: SubtitleFormat = .unknown
 
     /// Drop video frame if ahead of clock by more than this (ms).
     var maxVideoLeadMs: Int64 = 40
@@ -42,12 +44,14 @@ final class PlaybackPipeline: @unchecked Sendable {
     func configure(
         video: VideoDecoderConfig?,
         audio: AudioDecoderConfig?,
-        presenter: MetalVideoRenderer.Presenter?
+        presenter: MetalVideoRenderer.Presenter?,
+        subtitleFormat: SubtitleFormat = .unknown
     ) {
         lock.lock()
         videoConfig = video
         audioConfig = audio
         metalPresenter = presenter
+        self.subtitleFormat = subtitleFormat
         lock.unlock()
     }
 
@@ -213,6 +217,21 @@ final class PlaybackPipeline: @unchecked Sendable {
             }
         }
         // Audio
+        
+        // Subtitle packets → cues
+        if subtitleFormat != .unknown {
+            while let pkt = buffers.popSubtitlePacket() {
+                do {
+                    let decoder = try SubtitleDecoderFactory.make(format: subtitleFormat)
+                    let cues = try decoder.decode(packet: pkt)
+                    subtitleController.append(cues)
+                } catch {
+                    lastError = error.localizedDescription
+                    break
+                }
+            }
+        }
+
         if let audioHub {
             while let pkt = buffers.popAudioPacket() {
                 do {

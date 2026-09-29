@@ -101,73 +101,54 @@ struct PlayerView: View {
 
     private var controlsOverlay: some View {
         VStack {
-            HStack {
-                Button {
+            // Top bar — icons only
+            HStack(spacing: AppSpacing.md) {
+                controlIconButton("xmark", label: "Close") {
                     Task {
                         await engine.stop(report: true)
                         dismiss()
                     }
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                        .padding()
                 }
 
                 Spacer()
 
-                // AirPlay
                 AirPlayRoutePickerView()
                     .frame(width: 44, height: 44)
-
-                if let decision = engine.decision {
-                    Text(backendLabel(for: decision))
-                        .font(AppTypography.caption2)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .padding(.trailing, 8)
-                }
+                    .accessibilityLabel("AirPlay")
             }
+            .padding(.horizontal, AppSpacing.sm)
+            .padding(.top, AppSpacing.sm)
 
             Spacer()
 
+            // Center transport — icons only
             HStack(spacing: 48) {
-                Button {
+                controlIconButton("gobackward.10", label: "Back 10 seconds", size: 28) {
                     Task { await engine.skip(seconds: -10) }
                     bumpControls()
-                } label: {
-                    Image(systemName: "gobackward.10")
-                        .font(.title)
-                        .foregroundStyle(.white)
                 }
 
                 Button {
                     engine.togglePlayPause()
                     bumpControls()
                 } label: {
-                    Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 44))
+                    Image(systemName: engine.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 56))
                         .foregroundStyle(.white)
+                        .symbolRenderingMode(.hierarchical)
                 }
+                .accessibilityLabel(engine.isPlaying ? "Pause" : "Play")
 
-                Button {
+                controlIconButton("goforward.10", label: "Forward 10 seconds", size: 28) {
                     Task { await engine.skip(seconds: 10) }
                     bumpControls()
-                } label: {
-                    Image(systemName: "goforward.10")
-                        .font(.title)
-                        .foregroundStyle(.white)
                 }
             }
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                Text(activeItem.title)
-                    .font(AppTypography.headline)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .accessibilityLabel(activeItem.title)
-
+            VStack(spacing: AppSpacing.sm) {
+                // Scrubber + times (times stay as minimal chrome)
                 GeometryReader { geo in
                     let progress = dragProgress ?? playbackProgress
                     ZStack(alignment: .leading) {
@@ -196,111 +177,116 @@ struct PlayerView: View {
                     )
                 }
                 .frame(height: 24)
+                .accessibilityLabel("Playback position")
 
                 HStack {
                     Text(formatTime(engine.positionMs))
+                        .monospacedDigit()
                     Spacer()
                     Text(formatTime(engine.durationMs))
+                        .monospacedDigit()
                 }
-                .font(AppTypography.caption)
-                .foregroundStyle(.white.opacity(0.8))
+                .font(AppTypography.caption2)
+                .foregroundStyle(.white.opacity(0.75))
 
-                HStack(spacing: AppSpacing.lg) {
+                // Bottom tool row — icon-only menus
+                HStack(spacing: AppSpacing.xl) {
                     if !engine.audioStreams.isEmpty {
                         Menu {
                             ForEach(engine.audioStreams, id: \.id) { stream in
                                 Button {
                                     Task { await engine.selectAudio(streamId: stream.id) }
                                 } label: {
-                                    HStack {
+                                    if stream.id == engine.selectedAudioId {
+                                        Label(
+                                            stream.displayTitle ?? stream.language ?? "Track \(stream.id)",
+                                            systemImage: "checkmark"
+                                        )
+                                    } else {
                                         Text(stream.displayTitle ?? stream.language ?? "Track \(stream.id)")
-                                        if stream.id == engine.selectedAudioId {
-                                            Image(systemName: "checkmark")
-                                        }
                                     }
                                 }
                             }
                         } label: {
-                            Label("Audio", systemImage: "speaker.wave.2")
-                                .foregroundStyle(.white)
+                            controlIcon("speaker.wave.2.fill", label: "Audio tracks")
                         }
                     }
 
-                    Menu {
-                        Button {
-                            Task { await engine.selectSubtitle(streamId: nil) }
-                        } label: {
-                            HStack {
-                                Text("Off")
-                                if engine.selectedSubtitleId == nil {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                        ForEach(engine.subtitleStreams, id: \.id) { stream in
+                    if !engine.subtitleStreams.isEmpty {
+                        Menu {
                             Button {
-                                Task { await engine.selectSubtitle(streamId: stream.id) }
+                                Task { await engine.selectSubtitle(streamId: nil) }
                             } label: {
-                                HStack {
-                                    Text(stream.displayTitle ?? stream.language ?? "Sub \(stream.id)")
+                                if engine.selectedSubtitleId == nil {
+                                    Label("Off", systemImage: "checkmark")
+                                } else {
+                                    Text("Off")
+                                }
+                            }
+                            ForEach(engine.subtitleStreams, id: \.id) { stream in
+                                Button {
+                                    Task { await engine.selectSubtitle(streamId: stream.id) }
+                                } label: {
                                     if stream.id == engine.selectedSubtitleId {
-                                        Image(systemName: "checkmark")
+                                        Label(
+                                            stream.displayTitle ?? stream.language ?? "Sub \(stream.id)",
+                                            systemImage: "checkmark"
+                                        )
+                                    } else {
+                                        Text(stream.displayTitle ?? stream.language ?? "Sub \(stream.id)")
                                     }
                                 }
                             }
+                        } label: {
+                            controlIcon(
+                                engine.selectedSubtitleId == nil ? "captions.bubble" : "captions.bubble.fill",
+                                label: "Subtitles"
+                            )
                         }
-                    } label: {
-                        Label("Subtitles", systemImage: "captions.bubble")
-                            .foregroundStyle(.white)
                     }
 
-                    // Playback speed
                     Menu {
                         ForEach(PlaybackPreferences.rateOptions, id: \.self) { rate in
                             Button {
                                 engine.setPlaybackRate(rate)
                                 bumpControls()
                             } label: {
-                                HStack {
+                                if abs(engine.playbackRate - rate) < 0.01 {
+                                    Label(rateLabel(rate), systemImage: "checkmark")
+                                } else {
                                     Text(rateLabel(rate))
-                                    if abs(engine.playbackRate - rate) < 0.01 {
-                                        Image(systemName: "checkmark")
-                                    }
                                 }
                             }
                         }
                     } label: {
-                        Label(rateLabel(engine.playbackRate), systemImage: "gauge.with.dots.needle.33percent")
-                            .foregroundStyle(.white)
+                        controlIcon("gauge.with.dots.needle.33percent", label: "Speed \(rateLabel(engine.playbackRate))")
                     }
 
-                    // Aspect ratio
                     Menu {
                         ForEach(VideoAspectMode.allCases) { mode in
                             Button {
                                 engine.setAspectMode(mode)
                                 bumpControls()
                             } label: {
-                                HStack {
+                                if engine.aspectMode == mode {
+                                    Label(mode.title, systemImage: "checkmark")
+                                } else {
                                     Text(mode.title)
-                                    if engine.aspectMode == mode {
-                                        Image(systemName: "checkmark")
-                                    }
                                 }
                             }
                         }
                     } label: {
-                        Label("Aspect", systemImage: engine.aspectMode == .fit ? "rectangle" : "rectangle.arrowtriangle.2.outward")
-                            .foregroundStyle(.white)
+                        controlIcon(
+                            engine.aspectMode == .fit
+                                ? "rectangle"
+                                : (engine.aspectMode == .fill ? "rectangle.arrowtriangle.2.outward" : "arrow.up.left.and.arrow.down.right"),
+                            label: "Aspect ratio"
+                        )
                     }
 
-                    Spacer()
-
-                    Image(systemName: "pip.enter")
-                        .foregroundStyle(.white.opacity(0.6))
-                        .accessibilityLabel("Picture in Picture available via system controls")
+                    Spacer(minLength: 0)
                 }
-                .font(AppTypography.subheadline)
+                .padding(.top, AppSpacing.xs)
             }
             .padding(.horizontal, AppSpacing.lg)
             .padding(.bottom, AppSpacing.xl)
@@ -358,6 +344,32 @@ struct PlayerView: View {
         if engine.errorMessage == nil {
             bumpControls()
         }
+    }
+
+
+    private func controlIcon(_ systemName: String, label: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 40, height: 40)
+            .contentShape(Rectangle())
+            .accessibilityLabel(label)
+    }
+
+    private func controlIconButton(
+        _ systemName: String,
+        label: String,
+        size: CGFloat = 20,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(label)
     }
 
     private func backendLabel(for decision: PlaybackDecision) -> String {

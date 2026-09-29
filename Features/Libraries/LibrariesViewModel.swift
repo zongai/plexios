@@ -21,7 +21,8 @@ final class LibrariesViewModel {
 
     func load(context: ServerContext?, force: Bool = false) async {
         guard let context else {
-            state = .failed("No server connected")
+            if case .loaded = state, !libraries.isEmpty { return }
+            state = .loading
             return
         }
         if case .loaded = state, !force { return }

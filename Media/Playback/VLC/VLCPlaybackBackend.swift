@@ -48,15 +48,31 @@ final class VLCPlaybackBackend: NSObject {
     /// Last requested aspect mode (re-applied after rebind / when video size is known).
     private(set) var aspectMode: VideoAspectMode = .fit
 
+    /// Pixel size of the decoded video (0 if not yet known). Used by VLCPlayerContainer layout.
+    var currentVideoSize: CGSize {
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+        guard let mediaPlayer else { return .zero }
+        let s = mediaPlayer.videoSize
+        return CGSize(width: CGFloat(s.width), height: CGFloat(s.height))
+#else
+        return .zero
+#endif
+    }
+
     /// Call after rotation / container layout so VLC uses non-zero landscape bounds.
     func rebindDrawable() {
+        rebindDrawablePreservingAspect()
+        applyAspectMode(aspectMode)
+    }
+
+    /// Re-attach drawable without re-entering aspect layout (avoids feedback loops).
+    func rebindDrawablePreservingAspect() {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         guard let mediaPlayer else { return }
         drawableView.setNeedsLayout()
         drawableView.layoutIfNeeded()
         mediaPlayer.drawable = nil
         mediaPlayer.drawable = drawableView
-        applyAspectMode(aspectMode)
 #endif
     }
 
@@ -72,50 +88,20 @@ final class VLCPlaybackBackend: NSObject {
         drawableView.setNeedsLayout()
         drawableView.layoutIfNeeded()
 
+        // Layout in VLCPlayerContainer owns fit/fill frames. Here we only force
+        // stretch to fill the drawable; fit/fill clear crop/ratio.
         mediaPlayer.scaleFactor = 0
-        // Always clear previous crop/ratio first.
         applyVLCStringProperty(nil, to: mediaPlayer, crop: true)
         applyVLCStringProperty(nil, to: mediaPlayer, crop: false)
 
         let viewSize = drawableView.bounds.size
-        let videoSize = mediaPlayer.videoSize
-        let hasVideo = videoSize.width > 1 && videoSize.height > 1
         let hasView = viewSize.width > 1 && viewSize.height > 1
 
         switch mode {
-        case .fit:
-            // Default letterbox — no forced geometry (safest path).
+        case .fit, .fill:
             break
         case .stretch:
             if hasView {
-                let w = max(1, Int(viewSize.width.rounded()))
-                let h = max(1, Int(viewSize.height.rounded()))
-                applyVLCStringProperty("\(w):\(h)", to: mediaPlayer, crop: false)
-            }
-        case .fill:
-            if hasVideo, hasView {
-                let vW = CGFloat(videoSize.width)
-                let vH = CGFloat(videoSize.height)
-                let viewAspect = viewSize.width / viewSize.height
-                let videoAspect = vW / vH
-                if viewAspect > videoAspect {
-                    let newH = vW / viewAspect
-                    let y = max(0, (vH - newH) / 2)
-                    applyVLCStringProperty(
-                        "0+\(Int(y.rounded()))+\(Int(vW.rounded()))x\(Int(newH.rounded()))",
-                        to: mediaPlayer,
-                        crop: true
-                    )
-                } else {
-                    let newW = vH * viewAspect
-                    let x = max(0, (vW - newW) / 2)
-                    applyVLCStringProperty(
-                        "\(Int(x.rounded()))+0+\(Int(newW.rounded()))x\(Int(vH.rounded()))",
-                        to: mediaPlayer,
-                        crop: true
-                    )
-                }
-            } else if hasView {
                 let w = max(1, Int(viewSize.width.rounded()))
                 let h = max(1, Int(viewSize.height.rounded()))
                 applyVLCStringProperty("\(w):\(h)", to: mediaPlayer, crop: false)
@@ -124,10 +110,7 @@ final class VLCPlaybackBackend: NSObject {
 #endif
     }
 
-#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-    /// MobileVLCKit exposes `char *` properties. Some bindings store the pointer without copying;
-    /// `withCString` would leave a dangling pointer and crash during playback. Always `strdup`
-    /// so the buffer outlives the call. If the ObjC setter also strdup's, we only leak a few bytes.
+
     private func applyVLCStringProperty(_ value: String?, to player: VLCMediaPlayer, crop: Bool) {
         if let value {
             let ptr = strdup(value)

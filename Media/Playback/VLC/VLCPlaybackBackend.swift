@@ -65,6 +65,7 @@ final class VLCPlaybackBackend: NSObject {
     private var pendingAudioPlexId: Int?
     private var pendingAudioStream: PlexStream?
     private var pendingAudioAll: [PlexStream] = []
+    private var trackApplyTask: Task<Void, Never>?
     private var externalSubtitleURLs: [URL] = []
     private var httpHeaders: [String: String] = [:]
 
@@ -200,16 +201,36 @@ final class VLCPlaybackBackend: NSObject {
     }
 
     /// Select audio using Plex metadata (language / title / embedded order).
+    /// If tracks are not enumerated yet, keeps `pending*` and retries via `scheduleTrackRefreshAndApply`.
     func applyPlexAudio(stream: PlexStream?, allAudioStreams: [PlexStream]) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         pendingAudioStream = stream
         pendingAudioAll = allAudioStreams
         pendingAudioPlexId = stream?.id
         refreshTracks()
-        guard let stream else { return }
-        if let idx = matchAudioTrack(for: stream, all: allAudioStreams) {
-            selectAudioIndex(idx)
+        if tryApplyPendingAudio() {
+            return
         }
+        // Tracks not ready — schedule aggressive retries
+        scheduleTrackRefreshAndApply()
+#endif
+    }
+
+    /// Returns true when a pending audio preference was applied successfully.
+    @discardableResult
+    func tryApplyPendingAudio() -> Bool {
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+        refreshTracks()
+        guard let stream = pendingAudioStream else { return pendingAudioPlexId == nil }
+        guard !audioTracks.isEmpty else { return false }
+        if let idx = matchAudioTrack(for: stream, all: pendingAudioAll) {
+            selectAudioIndex(idx)
+            // Keep pending so late track-list reshuffles can re-assert preference
+            return true
+        }
+        return false
+#else
+        return true
 #endif
     }
 
@@ -220,19 +241,22 @@ final class VLCPlaybackBackend: NSObject {
         // 1) Language / name overlap with VLC track name
         if let hit = audioTracks.first(where: { track in
             let name = track.name.lowercased()
-            return needles.contains { name.contains($0) }
+            return needles.contains { !$0.isEmpty && name.contains($0) }
         }) {
             return hit.index
         }
 
-        // 2) Same order among embedded audio streams
+        // 2) Same order among embedded audio streams (Plex list vs VLC list)
         let embedded = all.filter { $0.streamType == .audio }
         if let order = embedded.firstIndex(where: { $0.id == stream.id }),
            order < audioTracks.count {
             return audioTracks[order].index
         }
 
-        // 3) Prefer default/selected flag order
+        // 3) Single audio track — must be it
+        if audioTracks.count == 1 {
+            return audioTracks[0].index
+        }
         return nil
     }
 
@@ -434,25 +458,38 @@ final class VLCPlaybackBackend: NSObject {
         }
         subtitleTracks = subs
         selectedSubtitleIndex = Int(mediaPlayer.currentVideoSubTitleIndex)
+        if pendingAudioStream != nil {
+            _ = tryApplyPendingAudio()
+        }
         onTracksUpdated?()
 #endif
     }
 
     private func scheduleTrackRefreshAndApply() {
-        Task { @MainActor in
-            for delay in [300, 800, 1500, 2500] as [UInt64] {
+        trackApplyTask?.cancel()
+        trackApplyTask = Task { @MainActor in
+            // VLC may expose tracks only after buffering/playing (multi-second on some streams).
+            let delays: [UInt64] = [150, 400, 800, 1200, 2000, 3500, 5000, 8000]
+            for delay in delays {
                 try? await Task.sleep(for: .milliseconds(delay))
+                guard !Task.isCancelled else { return }
                 refreshTracks()
-                if let stream = pendingAudioStream, !audioTracks.isEmpty {
-                    if let idx = matchAudioTrack(for: stream, all: pendingAudioAll) {
-                        selectAudioIndex(idx)
-                    }
+                let audioOK = tryApplyPendingAudio()
+                if audioOK, !audioTracks.isEmpty {
+                    // Re-assert once — track list sometimes reshuffles after first play
+                    try? await Task.sleep(for: .milliseconds(700))
+                    guard !Task.isCancelled else { return }
+                    refreshTracks()
+                    _ = tryApplyPendingAudio()
+                    return
                 }
             }
         }
     }
 
     private func stopInternal() {
+        trackApplyTask?.cancel()
+        trackApplyTask = nil
         timeTimer?.invalidate()
         timeTimer = nil
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)

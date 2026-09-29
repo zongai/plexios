@@ -261,6 +261,11 @@ final class PlaybackEngine {
                     case .playing:
                         self.sessionState = .playing
                         self.isPlaying = true
+                        // Audio tracks frequently become valid at first playing transition
+                        self.applyVLCAudioSelection(self.selectedAudioId)
+                        if let ctx = self.context {
+                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                        }
                     case .paused:
                         self.sessionState = .paused
                         self.isPlaying = false
@@ -296,13 +301,25 @@ final class PlaybackEngine {
                 vlc.setRate(playbackRate)
                 applyVLCAudioSelection(decision.selectedAudioStreamId)
                 applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
-                // Tracks often appear after a short delay — re-apply preferred audio/sub.
+                // Tracks often appear only after playing — retry for several seconds.
+                vlc.onTracksUpdated = { [weak self] in
+                    guard let self else { return }
+                    self.applyVLCAudioSelection(self.selectedAudioId)
+                    if let ctx = self.context {
+                        self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                    }
+                }
                 Task { @MainActor in
-                    for delay in [400, 1000, 2000] as [UInt64] {
+                    for delay in [300, 700, 1200, 2000, 3500, 5500, 8000] as [UInt64] {
                         try? await Task.sleep(for: .milliseconds(delay))
                         self.applyVLCAudioSelection(self.selectedAudioId)
                         if let ctx = self.context {
                             self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                        }
+                        // Stop early if VLC already shows a selected track matching preference
+                        if self.vlcBackend?.tryApplyPendingAudio() == true,
+                           !(self.vlcBackend?.audioTracks.isEmpty ?? true) {
+                            break
                         }
                     }
                 }
@@ -549,6 +566,11 @@ final class PlaybackEngine {
                     case .playing:
                         self.sessionState = .playing
                         self.isPlaying = true
+                        // Audio tracks frequently become valid at first playing transition
+                        self.applyVLCAudioSelection(self.selectedAudioId)
+                        if let ctx = self.context {
+                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                        }
                     case .paused:
                         self.sessionState = .paused
                         self.isPlaying = false

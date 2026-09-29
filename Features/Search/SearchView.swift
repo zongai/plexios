@@ -20,9 +20,10 @@ final class SearchViewModel {
         searchTask?.cancel()
 
         let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count >= 2, let context else {
+        guard !trimmed.isEmpty, let context else {
             results = []
             isSearching = false
+            errorMessage = nil
             return
         }
 
@@ -30,8 +31,7 @@ final class SearchViewModel {
         errorMessage = nil
 
         searchTask = Task {
-            // Debounce
-            try? await Task.sleep(for: .milliseconds(350))
+            try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
 
             do {
@@ -58,13 +58,13 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            content
+            searchContent
                 .navigationTitle(L10n.search)
                 .navigationDestination(for: MediaRoute.self) { route in
                     MediaDestinationView(route: route)
                 }
         }
-        .task {
+        .onAppear {
             if viewModel == nil {
                 viewModel = SearchViewModel(repository: environment.searchRepository)
             }
@@ -72,29 +72,48 @@ struct SearchView: View {
     }
 
     @ViewBuilder
-    private var content: some View {
-        let vm = viewModel
+    private var searchContent: some View {
+        if let viewModel {
+            SearchResultsList(
+                viewModel: viewModel,
+                path: $path,
+                serverContext: environment.serverContext
+            )
+        } else {
+            ProgressView()
+        }
+    }
+}
+
+/// Isolated so `@Bindable` tracks SearchViewModel mutations reliably.
+private struct SearchResultsList: View {
+    @Bindable var viewModel: SearchViewModel
+    @Binding var path: NavigationPath
+    let serverContext: ServerContext?
+
+    var body: some View {
         List {
             Section {
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(AppColors.secondaryText)
                     TextField(
-                        "Movies, shows, episodes…",
+                        L10n.searchPlaceholder,
                         text: Binding(
-                            get: { vm?.query ?? "" },
-                            set: { vm?.queryChanged($0, context: environment.serverContext) }
+                            get: { viewModel.query },
+                            set: { viewModel.queryChanged($0, context: serverContext) }
                         )
                     )
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    if vm?.isSearching == true {
+                    .submitLabel(.search)
+                    if viewModel.isSearching {
                         ProgressView()
                     }
                 }
             }
 
-            if let message = vm?.errorMessage {
+            if let message = viewModel.errorMessage {
                 Section {
                     Text(message)
                         .foregroundStyle(AppColors.destructive)
@@ -102,8 +121,8 @@ struct SearchView: View {
                 }
             }
 
-            if let hubs = vm?.results, !hubs.isEmpty {
-                ForEach(hubs) { hub in
+            if !viewModel.results.isEmpty {
+                ForEach(viewModel.results) { hub in
                     Section(hub.title) {
                         ForEach(hub.items) { item in
                             Button {
@@ -111,14 +130,15 @@ struct SearchView: View {
                             } label: {
                                 SearchResultRow(
                                     item: item,
-                                    baseURL: environment.serverContext?.baseURL,
-                                    token: environment.serverContext?.token
+                                    baseURL: serverContext?.baseURL,
+                                    token: serverContext?.token
                                 )
                             }
                         }
                     }
                 }
-            } else if (vm?.query.count ?? 0) >= 2, vm?.isSearching == false {
+            } else if !viewModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                      !viewModel.isSearching {
                 Section {
                     Text(L10n.noResults)
                         .foregroundStyle(AppColors.secondaryText)
@@ -126,6 +146,8 @@ struct SearchView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(AppColors.background)
     }
 }
 

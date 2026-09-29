@@ -129,16 +129,21 @@ enum PlexAPIMapper {
     // MARK: - Hub
 
     static func hub(from dto: APIHub) -> PlexHub? {
-        guard let key = dto.key ?? dto.hubKey, let title = dto.title else { return nil }
+        // Search hubs sometimes omit `key` and only provide hubIdentifier / title.
+        let title = dto.title ?? dto.type ?? "Results"
+        let key = dto.key ?? dto.hubKey ?? dto.hubIdentifier ?? title
+        let items = (dto.metadata ?? []).compactMap(metadata(from:))
+        // Keep empty hubs out of the UI list
+        guard !items.isEmpty else { return nil }
         return PlexHub(
             key: key,
             hubIdentifier: dto.hubIdentifier,
             title: title,
             type: dto.type,
             style: dto.style,
-            size: dto.size,
+            size: dto.size ?? items.count,
             more: dto.more ?? false,
-            items: (dto.metadata ?? []).compactMap(metadata(from:))
+            items: items
         )
     }
 

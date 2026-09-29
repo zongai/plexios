@@ -152,19 +152,52 @@ actor PlexAPIClient {
     }
 
     func search(query: String, baseURL: URL, token: String) async throws -> [PlexHub] {
+        // Primary: /hubs/search (grouped by type). See developer.plex.tv / plexopedia.
         var request = try makeRequest(
             base: baseURL,
             path: "hubs/search",
             query: [
                 URLQueryItem(name: "query", value: query),
-                URLQueryItem(name: "limit", value: "30")
+                URLQueryItem(name: "limit", value: "50"),
+                URLQueryItem(name: "includeCollections", value: "1"),
+                URLQueryItem(name: "includeExternalMedia", value: "1")
             ]
         )
         applyPMSHeaders(to: &request, token: token)
 
         let response = try await perform(request)
         let container = try decode(APIMediaContainer<APIHubsContainer>.self, from: response.data)
-        return (container.mediaContainer.hub ?? []).compactMap(PlexAPIMapper.hub(from:))
+        let hubs = (container.mediaContainer.hub ?? []).compactMap(PlexAPIMapper.hub(from:))
+        if !hubs.isEmpty {
+            return hubs
+        }
+
+        // Fallback: /library/search — flat Metadata list on some PMS builds.
+        var fallback = try makeRequest(
+            base: baseURL,
+            path: "library/search",
+            query: [
+                URLQueryItem(name: "query", value: query),
+                URLQueryItem(name: "limit", value: "50")
+            ]
+        )
+        applyPMSHeaders(to: &fallback, token: token)
+        let fallbackResponse = try await perform(fallback)
+        let metaContainer = try decode(APIMediaContainer<APIMetadataContainer>.self, from: fallbackResponse.data)
+        let items = (metaContainer.mediaContainer.metadata ?? []).compactMap(PlexAPIMapper.metadata(from:))
+        guard !items.isEmpty else { return [] }
+        return [
+            PlexHub(
+                key: "search",
+                hubIdentifier: "search",
+                title: "Results",
+                type: nil,
+                style: nil,
+                size: items.count,
+                more: false,
+                items: items
+            )
+        ]
     }
 
     // MARK: - Collections / Playlists / Favorites / Related
@@ -356,5 +389,7 @@ actor PlexAPIClient {
     private func applyPMSHeaders(to request: inout URLRequest, token: String) {
         applyIdentityHeaders(to: &request)
         request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
+        // PMS defaults to XML; force JSON so Decodable paths work.
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
     }
 }

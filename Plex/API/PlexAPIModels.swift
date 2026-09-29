@@ -93,7 +93,15 @@ struct APIHubsContainer: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case size
-        case hub = "Hub"
+        case Hub
+        case hub
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        size = try c.decodeIfPresent(Int.self, forKey: .size)
+        hub = try c.decodeIfPresent([APIHub].self, forKey: .Hub)
+            ?? c.decodeIfPresent([APIHub].self, forKey: .hub)
     }
 }
 
@@ -123,7 +131,16 @@ struct APIMetadataContainer: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case size, allowSync
-        case metadata = "Metadata"
+        case Metadata
+        case metadata
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        size = try c.decodeIfPresent(Int.self, forKey: .size)
+        allowSync = try c.decodeIfPresent(Bool.self, forKey: .allowSync)
+        metadata = try c.decodeIfPresent([APIMetadata].self, forKey: .Metadata)
+            ?? c.decodeIfPresent([APIMetadata].self, forKey: .metadata)
     }
 }
 

@@ -331,6 +331,22 @@ struct PlayerView: View {
         return min(1, Double(engine.positionMs) / Double(engine.durationMs))
     }
 
+    private func waitForLandscapeLayout() async {
+        for _ in 0..<20 {
+            if Task.isCancelled { return }
+            if let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).first {
+                let o = scene.interfaceOrientation
+                if o == .landscapeLeft || o == .landscapeRight {
+                    try? await Task.sleep(for: .milliseconds(100))
+                    return
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        try? await Task.sleep(for: .milliseconds(200))
+    }
+
     private func startPlayback() async {
         guard let context = environment.serverContext else {
             localError = "No server connected"

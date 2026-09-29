@@ -68,23 +68,25 @@ enum AppLayout {
     static let railSpacing: CGFloat = PlexSpacing.railGap
 
     static func posterWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        // ~10% smaller than previous baseline so Continue Watching stands out more.
         switch horizontalSizeClass {
-        case .regular: return 150
-        default: return 120
+        case .regular: return 135
+        default: return 108
         }
     }
 
     static func continueWatchingWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        // ~10% larger landscape cards for Continue Watching / Recently Played.
         switch horizontalSizeClass {
-        case .regular: return 280
-        default: return 220
+        case .regular: return 308
+        default: return 242
         }
     }
 
     static func gridMinWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
         switch horizontalSizeClass {
-        case .regular: return 140
-        default: return 110
+        case .regular: return 126
+        default: return 99
         }
     }
 

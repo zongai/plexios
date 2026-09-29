@@ -9,7 +9,7 @@ struct RootView: View {
         Group {
             switch environment.authenticationService.state {
             case .unknown:
-                ProgressView("Starting…")
+                ProgressView(L10n.starting)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(AppColors.background)
                     .accessibilityLabel("Starting")
@@ -49,10 +49,10 @@ struct RootView: View {
         if connection.activeServer?.preferredConnection?.baseURL != nil {
             AdaptiveRootView()
         } else if !bootstrapFinished || connection.isRefreshing {
-            ProgressView("Connecting to server…")
+            ProgressView(L10n.connectingServer)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppColors.background)
-                .accessibilityLabel("Connecting to server")
+                .accessibilityLabel(L10n.connectingServer)
         } else if let error = connection.lastError {
             ErrorStateView(message: error.localizedDescription) {
                 Task {
@@ -63,10 +63,10 @@ struct RootView: View {
             }
         } else if connection.servers.isEmpty {
             EmptyStateView(
-                title: "No servers found",
+                title: L10n.noServersTitle,
                 systemImage: "server.rack",
-                subtitle: "Sign in on plex.tv and make sure your Plex Media Server is online.",
-                actionTitle: "Refresh",
+                subtitle: L10n.noServersSubtitle,
+                actionTitle: L10n.refresh,
                 action: {
                     Task {
                         if let token = environment.authenticationService.authToken {
@@ -77,7 +77,7 @@ struct RootView: View {
             )
         } else {
             // Servers listed but none reachable yet
-            ProgressView("Finding a working connection…")
+            ProgressView(L10n.findingConnection)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppColors.background)
                 .task {

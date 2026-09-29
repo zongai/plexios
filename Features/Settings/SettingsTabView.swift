@@ -170,7 +170,10 @@ struct SettingsTabView: View {
     }
 
     private var aboutSection: some View {
-        Section("About") {
+        Section(L10n.settingsAbout) {
+            Text(L10n.languageNote)
+                .font(AppTypography.caption)
+                .foregroundStyle(AppColors.secondaryText)
             LabeledContent("App", value: "PlexiOS")
             LabeledContent("Version", value: "0.1.0")
         }

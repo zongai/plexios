@@ -8,7 +8,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $path) {
             content
-                .navigationTitle(environment.connectionManager.activeServer?.name ?? "Home")
+                .navigationTitle(environment.connectionManager.activeServer?.name ?? L10n.home)
                 .navigationBarTitleDisplayMode(.large)
                 .toolbarBackground(AppColors.background, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)
@@ -50,9 +50,9 @@ struct HomeView: View {
             hubList
         case .empty:
             EmptyStateView(
-                title: "Nothing here yet",
+                title: L10n.homeEmptyTitle,
                 systemImage: "film",
-                subtitle: "Play something on your Plex server to populate Home."
+                subtitle: L10n.homeEmptySubtitle
             )
         case .failed(let message):
             ErrorStateView(message: message) {

@@ -32,7 +32,7 @@ struct AdaptiveRootView: View {
                 .tag(AppSection.libraries)
 
             MoreBrowseView()
-                .tabItem { Label("More", systemImage: "ellipsis.circle.fill") }
+                .tabItem { Label(L10n.more, systemImage: "ellipsis.circle.fill") }
                 .tag(AppSection.collections)
 
             SearchView()

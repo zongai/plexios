@@ -10,7 +10,7 @@ struct CollectionsView: View {
 
     var body: some View {
         content
-            .navigationTitle("Collections")
+            .navigationTitle(L10n.collections)
             .navigationDestination(for: CollectionRoute.self) { route in
                 CollectionDetailView(ratingKey: route.ratingKey, title: route.title)
             }

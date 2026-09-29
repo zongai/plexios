@@ -19,7 +19,7 @@ struct ShowDetailView: View {
             } else if let show {
                 content(show)
             } else {
-                ErrorStateView(message: errorMessage ?? "Not found") {
+                ErrorStateView(message: errorMessage ?? L10n.notFound) {
                     Task { await load() }
                 }
             }
@@ -41,7 +41,7 @@ struct ShowDetailView: View {
                     token: environment.serverContext?.token,
                     year: show.year,
                     contentRating: show.contentRating,
-                    durationLabel: show.leafCount.map { "\($0) episodes" },
+                    durationLabel: show.leafCount.map { L10n.episodesCount($0) },
                     rating: show.rating,
                     isInProgress: show.isInProgress,
                     progress: show.isInProgress ? show.progressFraction : nil,
@@ -61,7 +61,7 @@ struct ShowDetailView: View {
                     }
 
                     if !seasons.isEmpty {
-                        Text("Seasons")
+                        Text(L10n.seasons)
                             .font(AppTypography.section)
                             .foregroundStyle(AppColors.primaryText)
 
@@ -74,7 +74,7 @@ struct ShowDetailView: View {
                                     )) {
                                         PosterCard(
                                             title: season.title,
-                                            subtitle: season.leafCount.map { "\($0) episodes" },
+                                            subtitle: season.leafCount.map { L10n.episodesCount($0) },
                                             imagePath: season.thumb ?? show.thumb,
                                             progress: nil,
                                             baseURL: environment.serverContext?.baseURL,
@@ -98,7 +98,7 @@ struct ShowDetailView: View {
         isLoading = true
         defer { isLoading = false }
         guard let context = environment.serverContext else {
-            errorMessage = "No server connected"
+            errorMessage = L10n.noServer
             return
         }
         do {
@@ -132,7 +132,7 @@ struct SeasonDetailView: View {
             if isLoading {
                 LoadingStateView()
             } else if episodes.isEmpty {
-                EmptyStateView(title: "No episodes", systemImage: "tv")
+                EmptyStateView(title: L10n.noEpisodes, systemImage: "tv")
             } else {
                 ScrollView {
                     LazyVStack(spacing: AppSpacing.md) {
@@ -152,7 +152,7 @@ struct SeasonDetailView: View {
                 .background(AppColors.background.ignoresSafeArea())
             }
         }
-        .navigationTitle(showTitle ?? "Season")
+        .navigationTitle(showTitle ?? L10n.season)
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
@@ -161,7 +161,7 @@ struct SeasonDetailView: View {
         isLoading = true
         defer { isLoading = false }
         guard let context = environment.serverContext else {
-            errorMessage = "No server connected"
+            errorMessage = L10n.noServer
             return
         }
         do {

@@ -61,7 +61,7 @@ struct PlayerView: View {
             } else if engine.sessionState == .loading {
                 ProgressView()
                     .tint(.white)
-                    .accessibilityLabel("Loading playback")
+                    .accessibilityLabel(L10n.loadingPlayback)
             } else if let error = localError ?? engine.errorMessage {
                 VStack(spacing: AppSpacing.md) {
                     Text(error)
@@ -112,7 +112,7 @@ struct PlayerView: View {
         VStack {
             // Top bar — icons only
             HStack(spacing: AppSpacing.md) {
-                controlIconButton("xmark", label: "Close") {
+                controlIconButton("xmark", label: L10n.playerClose) {
                     Task {
                         await engine.stop(report: true)
                         dismiss()
@@ -123,7 +123,7 @@ struct PlayerView: View {
 
                 AirPlayRoutePickerView()
                     .frame(width: 44, height: 44)
-                    .accessibilityLabel("AirPlay")
+                    .accessibilityLabel(L10n.airPlay)
             }
             .padding(.horizontal, AppSpacing.sm)
             .padding(.top, AppSpacing.sm)
@@ -132,7 +132,7 @@ struct PlayerView: View {
 
             // Center transport — icons only
             HStack(spacing: 48) {
-                controlIconButton("gobackward.10", label: "Back 10 seconds", size: 28) {
+                controlIconButton("gobackward.10", label: L10n.back10, size: 28) {
                     Task { await engine.skip(seconds: -10) }
                     bumpControls()
                 }
@@ -146,9 +146,9 @@ struct PlayerView: View {
                         .foregroundStyle(.white)
                         .symbolRenderingMode(.hierarchical)
                 }
-                .accessibilityLabel(engine.isPlaying ? "Pause" : "Play")
+                .accessibilityLabel(engine.isPlaying ? L10n.playerPause : L10n.playerPlay)
 
-                controlIconButton("goforward.10", label: "Forward 10 seconds", size: 28) {
+                controlIconButton("goforward.10", label: L10n.forward10, size: 28) {
                     Task { await engine.skip(seconds: 10) }
                     bumpControls()
                 }
@@ -186,7 +186,7 @@ struct PlayerView: View {
                     )
                 }
                 .frame(height: 24)
-                .accessibilityLabel("Playback position")
+                .accessibilityLabel(L10n.playbackPosition)
 
                 HStack {
                     Text(formatTime(engine.positionMs))
@@ -217,7 +217,7 @@ struct PlayerView: View {
                                 }
                             }
                         } label: {
-                            controlIcon("speaker.wave.2.fill", label: "Audio tracks")
+                            controlIcon("speaker.wave.2.fill", label: L10n.audioTracks)
                         }
                     }
 
@@ -227,9 +227,9 @@ struct PlayerView: View {
                                 Task { await engine.selectSubtitle(streamId: nil) }
                             } label: {
                                 if engine.selectedSubtitleId == nil {
-                                    Label("Off", systemImage: "checkmark")
+                                    Label(L10n.off, systemImage: "checkmark")
                                 } else {
-                                    Text("Off")
+                                    Text(L10n.off)
                                 }
                             }
                             ForEach(engine.subtitleStreams, id: \.id) { stream in
@@ -249,7 +249,7 @@ struct PlayerView: View {
                         } label: {
                             controlIcon(
                                 engine.selectedSubtitleId == nil ? "captions.bubble" : "captions.bubble.fill",
-                                label: "Subtitles"
+                                label: L10n.subtitles
                             )
                         }
                     }
@@ -268,7 +268,7 @@ struct PlayerView: View {
                             }
                         }
                     } label: {
-                        controlIcon("gauge.with.dots.needle.33percent", label: "Speed \(rateLabel(engine.playbackRate))")
+                        controlIcon("gauge.with.dots.needle.33percent", label: "\(L10n.speed) \(rateLabel(engine.playbackRate))")
                     }
 
                     Menu {
@@ -289,7 +289,7 @@ struct PlayerView: View {
                             engine.aspectMode == .fit
                                 ? "rectangle"
                                 : (engine.aspectMode == .fill ? "rectangle.arrowtriangle.2.outward" : "arrow.up.left.and.arrow.down.right"),
-                            label: "Aspect ratio"
+                            label: L10n.aspectRatio
                         )
                     }
 

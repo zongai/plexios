@@ -59,7 +59,7 @@ struct SearchView: View {
     var body: some View {
         NavigationStack(path: $path) {
             content
-                .navigationTitle("Search")
+                .navigationTitle(L10n.search)
                 .navigationDestination(for: MediaRoute.self) { route in
                     MediaDestinationView(route: route)
                 }
@@ -120,7 +120,7 @@ struct SearchView: View {
                 }
             } else if (vm?.query.count ?? 0) >= 2, vm?.isSearching == false {
                 Section {
-                    Text("No results")
+                    Text(L10n.noResults)
                         .foregroundStyle(AppColors.secondaryText)
                 }
             }

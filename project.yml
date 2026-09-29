@@ -39,6 +39,8 @@ targets:
       - path: Media
       - path: Features
       - path: UI
+      - path: Localization
+        buildPhase: resources
     dependencies:
       - package: PlexFFmpeg
         product: PlexFFmpeg

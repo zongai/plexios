@@ -17,7 +17,7 @@ struct MovieDetailView: View {
             } else if let item {
                 detailScroll(item)
             } else {
-                ErrorStateView(message: errorMessage ?? "Not found") {
+                ErrorStateView(message: errorMessage ?? L10n.notFound) {
                     Task { await load() }
                 }
             }
@@ -49,7 +49,7 @@ struct MovieDetailView: View {
                             HStack(spacing: AppSpacing.sm) {
                                 MediaDetailIconButton(
                                     systemImage: (item.viewCount ?? 0) > 0 ? "checkmark.circle.fill" : "checkmark.circle",
-                                    label: "Mark watched",
+                                    label: L10n.markWatched,
                                     isOn: (item.viewCount ?? 0) > 0
                                 ) {
                                     Task {
@@ -60,7 +60,7 @@ struct MovieDetailView: View {
                                 }
                                 MediaDetailIconButton(
                                     systemImage: isFavorite ? "star.fill" : "star",
-                                    label: isFavorite ? "Remove favorite" : "Favorite",
+                                    label: isFavorite ? L10n.unfavorite : L10n.favorite,
                                     isOn: isFavorite
                                 ) {
                                     Task {
@@ -98,18 +98,18 @@ struct MovieDetailView: View {
                     }
 
                     if !item.genres.isEmpty {
-                        flowTags(title: "Genres", tags: item.genres)
+                        flowTags(title: L10n.genres, tags: item.genres)
                     }
                     if !item.directors.isEmpty {
-                        flowTags(title: "Director", tags: item.directors)
+                        flowTags(title: L10n.director, tags: item.directors)
                     }
                     if !item.writers.isEmpty {
-                        flowTags(title: "Writers", tags: item.writers)
+                        flowTags(title: L10n.writers, tags: item.writers)
                     }
 
                     if !item.actors.isEmpty {
                         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                            Text("Cast")
+                            Text(L10n.cast)
                                 .font(AppTypography.headline)
                                 .foregroundStyle(AppColors.primaryText)
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -174,7 +174,7 @@ struct MovieDetailView: View {
 
     private func mediaInfo(_ media: PlexMedia) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("Media")
+            Text(L10n.media)
                 .font(AppTypography.headline)
                 .foregroundStyle(AppColors.primaryText)
             let parts = [
@@ -193,7 +193,7 @@ struct MovieDetailView: View {
         isLoading = true
         defer { isLoading = false }
         guard let context = environment.serverContext else {
-            errorMessage = "No server connected"
+            errorMessage = L10n.noServer
             return
         }
         do {

@@ -1,0 +1,94 @@
+/* Tabs & sections */
+"tab.home" = "首页";
+"tab.libraries" = "媒体库";
+"tab.collections" = "合集";
+"tab.playlists" = "播放列表";
+"tab.search" = "搜索";
+"tab.settings" = "设置";
+"tab.more" = "更多";
+
+/* Common */
+"common.ok" = "好";
+"common.cancel" = "取消";
+"common.close" = "关闭";
+"common.retry" = "重试";
+"common.loading" = "加载中…";
+"common.starting" = "正在启动…";
+"common.refresh" = "刷新";
+"common.off" = "关闭";
+"common.error" = "出了点问题";
+"common.not_found" = "未找到";
+"common.no_server" = "未连接服务器";
+
+/* Home */
+"home.empty.title" = "这里还是空的";
+"home.empty.subtitle" = "在 Plex 服务器上播放内容后，首页会显示相关条目。";
+"home.connecting" = "正在连接服务器…";
+"home.finding_connection" = "正在查找可用连接…";
+"home.no_servers.title" = "未找到服务器";
+"home.no_servers.subtitle" = "请在 plex.tv 登录，并确认 Plex Media Server 在线。";
+
+/* Sign-in */
+"signin.title" = "登录 Plex";
+"signin.subtitle" = "将此应用与你的 Plex 账号关联";
+"signin.code_hint" = "在 plex.tv/link 输入以下验证码";
+"signin.copy_code" = "复制验证码";
+"signin.copied" = "已复制";
+"signin.open_link" = "打开 plex.tv/link";
+"signin.waiting" = "等待确认…";
+"signin.expired" = "验证码已过期 — 请重新获取";
+"signin.generate" = "获取验证码";
+
+/* Libraries */
+"libraries.title" = "媒体库";
+"libraries.empty" = "暂无媒体库";
+
+/* Search */
+"search.title" = "搜索";
+"search.placeholder" = "搜索电影、剧集、音乐…";
+"search.no_results" = "无结果";
+
+/* Detail */
+"detail.play" = "播放";
+"detail.resume" = "继续播放";
+"detail.watched" = "标记已看";
+"detail.favorite" = "收藏";
+"detail.unfavorite" = "取消收藏";
+"detail.seasons" = "季";
+"detail.season" = "季";
+"detail.episodes_count" = "%d 集";
+"detail.genres" = "类型";
+"detail.director" = "导演";
+"detail.writers" = "编剧";
+"detail.cast" = "演员";
+"detail.media" = "媒体信息";
+"detail.no_episodes" = "暂无剧集";
+
+/* Player */
+"player.play" = "播放";
+"player.pause" = "暂停";
+"player.close" = "关闭";
+"player.airplay" = "隔空播放";
+"player.audio" = "音轨";
+"player.subtitles" = "字幕";
+"player.speed" = "倍速";
+"player.aspect" = "画面比例";
+"player.back_10" = "后退 10 秒";
+"player.forward_10" = "前进 10 秒";
+"player.loading" = "正在加载播放";
+"player.position" = "播放进度";
+
+/* Settings */
+"settings.title" = "设置";
+"settings.playback" = "播放";
+"settings.cache" = "缓存";
+"settings.about" = "关于";
+"settings.clear_cache" = "清除响应与图片缓存";
+"settings.prefer_system_player" = "优先使用系统播放器";
+"settings.allow_vlc" = "允许 MobileVLCKit";
+"settings.language_note" = "语言跟随系统设置。";
+"settings.version" = "版本";
+
+/* Playlists / Collections */
+"playlists.title" = "播放列表";
+"collections.title" = "合集";

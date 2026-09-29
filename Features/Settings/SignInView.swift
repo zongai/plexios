@@ -16,7 +16,7 @@ struct SignInView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(AppColors.accent)
 
-            Text("Sign in to Plex")
+            Text(L10n.signInTitle)
                 .font(AppTypography.title)
                 .foregroundStyle(AppColors.primaryText)
                 .accessibilityAddTraits(.isHeader)
@@ -96,7 +96,7 @@ struct SignInView: View {
                         .foregroundStyle(AppColors.primaryText)
                         .textSelection(.enabled)
                     Label(
-                        didCopyCode ? "Copied" : "Tap to copy",
+                        didCopyCode ? L10n.copied : "Tap to copy",
                         systemImage: didCopyCode ? "checkmark.circle.fill" : "doc.on.doc"
                     )
                     .font(AppTypography.caption)

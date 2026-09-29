@@ -104,12 +104,12 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .home: return "Home"
-        case .libraries: return "Libraries"
-        case .collections: return "Collections"
-        case .playlists: return "Playlists"
-        case .search: return "Search"
-        case .settings: return "Settings"
+        case .home: return L10n.home
+        case .libraries: return L10n.libraries
+        case .collections: return L10n.collections
+        case .playlists: return L10n.playlists
+        case .search: return L10n.search
+        case .settings: return L10n.settings
         }
     }
 

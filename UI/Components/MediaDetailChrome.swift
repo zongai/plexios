@@ -71,7 +71,7 @@ struct MediaDetailHero: View {
                         Button(action: onPlay) {
                             HStack(spacing: 8) {
                                 Image(systemName: "play.fill")
-                                Text(isInProgress ? "Resume" : "Play")
+                                Text(isInProgress ? L10n.resume : L10n.play)
                                     .fontWeight(.semibold)
                             }
                             .font(AppTypography.headline)
@@ -81,7 +81,7 @@ struct MediaDetailHero: View {
                             .background(AppColors.accent, in: Capsule())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(isInProgress ? "Resume" : "Play")
+                        .accessibilityLabel(isInProgress ? L10n.resume : L10n.play)
                     }
 
                     if let secondaryActions {

@@ -1,0 +1,94 @@
+/* Tabs & sections */
+"tab.home" = "Home";
+"tab.libraries" = "Libraries";
+"tab.collections" = "Collections";
+"tab.playlists" = "Playlists";
+"tab.search" = "Search";
+"tab.settings" = "Settings";
+"tab.more" = "More";
+
+/* Common */
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.close" = "Close";
+"common.retry" = "Try Again";
+"common.loading" = "Loading…";
+"common.starting" = "Starting…";
+"common.refresh" = "Refresh";
+"common.off" = "Off";
+"common.error" = "Something went wrong";
+"common.not_found" = "Not found";
+"common.no_server" = "No server connected";
+
+/* Home */
+"home.empty.title" = "Nothing here yet";
+"home.empty.subtitle" = "Play something on your Plex server to populate Home.";
+"home.connecting" = "Connecting to server…";
+"home.finding_connection" = "Finding a working connection…";
+"home.no_servers.title" = "No servers found";
+"home.no_servers.subtitle" = "Sign in on plex.tv and make sure your Plex Media Server is online.";
+
+/* Sign-in */
+"signin.title" = "Sign in to Plex";
+"signin.subtitle" = "Link this app with your Plex account";
+"signin.code_hint" = "Enter this code at plex.tv/link";
+"signin.copy_code" = "Copy code";
+"signin.copied" = "Copied";
+"signin.open_link" = "Open plex.tv/link";
+"signin.waiting" = "Waiting for approval…";
+"signin.expired" = "Code expired — generate a new one";
+"signin.generate" = "Get code";
+
+/* Libraries */
+"libraries.title" = "Libraries";
+"libraries.empty" = "No libraries";
+
+/* Search */
+"search.title" = "Search";
+"search.placeholder" = "Search movies, shows, music…";
+"search.no_results" = "No results";
+
+/* Detail */
+"detail.play" = "Play";
+"detail.resume" = "Resume";
+"detail.watched" = "Mark watched";
+"detail.favorite" = "Favorite";
+"detail.unfavorite" = "Remove favorite";
+"detail.seasons" = "Seasons";
+"detail.season" = "Season";
+"detail.episodes_count" = "%d episodes";
+"detail.genres" = "Genres";
+"detail.director" = "Director";
+"detail.writers" = "Writers";
+"detail.cast" = "Cast";
+"detail.media" = "Media";
+"detail.no_episodes" = "No episodes";
+
+/* Player */
+"player.play" = "Play";
+"player.pause" = "Pause";
+"player.close" = "Close";
+"player.airplay" = "AirPlay";
+"player.audio" = "Audio tracks";
+"player.subtitles" = "Subtitles";
+"player.speed" = "Speed";
+"player.aspect" = "Aspect ratio";
+"player.back_10" = "Back 10 seconds";
+"player.forward_10" = "Forward 10 seconds";
+"player.loading" = "Loading playback";
+"player.position" = "Playback position";
+
+/* Settings */
+"settings.title" = "Settings";
+"settings.playback" = "Playback";
+"settings.cache" = "Cache";
+"settings.about" = "About";
+"settings.clear_cache" = "Clear response & image cache";
+"settings.prefer_system_player" = "Prefer system player";
+"settings.allow_vlc" = "Allow MobileVLCKit";
+"settings.language_note" = "Language follows the system language.";
+"settings.version" = "Version";
+
+/* Playlists / Collections */
+"playlists.title" = "Playlists";
+"collections.title" = "Collections";

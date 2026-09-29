@@ -9,7 +9,7 @@ struct PlaylistsView: View {
 
     var body: some View {
         content
-            .navigationTitle("Playlists")
+            .navigationTitle(L10n.playlists)
             .navigationDestination(for: PlaylistRoute.self) { route in
                 PlaylistDetailView(ratingKey: route.ratingKey, title: route.title)
             }

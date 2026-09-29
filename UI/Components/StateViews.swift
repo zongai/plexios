@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LoadingStateView: View {
-    var message: String = "Loading…"
+    var message: String = String(localized: "common.loading")
 
     var body: some View {
         VStack(spacing: AppSpacing.md) {
@@ -60,7 +60,7 @@ struct ErrorStateView: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Something went wrong", systemImage: "exclamationmark.triangle")
+            Label(L10n.errorTitle, systemImage: "exclamationmark.triangle")
         } description: {
             VStack(spacing: AppSpacing.xs) {
                 Text(message)
@@ -72,7 +72,7 @@ struct ErrorStateView: View {
             }
         } actions: {
             if let retry {
-                Button("Try Again", action: retry)
+                Button(L10n.retry, action: retry)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut("r", modifiers: [.command])
             }

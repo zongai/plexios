@@ -38,9 +38,9 @@ struct SettingsTabView: View {
     // MARK: - Sections
 
     private var accountSection: some View {
-        Section("Account") {
+        Section(String(localized: "settings.account")) {
             if case .signedIn = environment.authenticationService.state {
-                LabeledContent("Status", value: "Signed in")
+                LabeledContent(String(localized: "settings.status"), value: String(localized: "settings.signed_in"))
             }
             Button(String(localized: "settings.sign_out"), role: .destructive) {
                 Task {
@@ -52,7 +52,7 @@ struct SettingsTabView: View {
     }
 
     private var serverSection: some View {
-        Section("Server") {
+        Section(String(localized: "settings.server")) {
             if environment.connectionManager.servers.isEmpty {
                 Text(String(localized: "settings.no_servers"))
                     .foregroundStyle(AppColors.secondaryText)
@@ -81,7 +81,7 @@ struct SettingsTabView: View {
                 }
             }
 
-            Button("Refresh servers") {
+            Button(String(localized: "settings.refresh_servers")) {
                 Task {
                     if let token = environment.authenticationService.authToken {
                         await environment.connectionManager.discover(authToken: token)
@@ -90,8 +90,6 @@ struct SettingsTabView: View {
             }
         }
     }
-
-
 
     private var iptvSettingsSection: some View {
         Section(String(localized: "iptv.title")) {
@@ -157,16 +155,16 @@ struct SettingsTabView: View {
     }
 
     private var playbackSection: some View {
-        Section("Playback") {
-            Picker("Default speed", selection: $prefs.defaultPlaybackRate) {
+        Section(L10n.settingsPlayback) {
+            Picker(String(localized: "settings.default_speed"), selection: $prefs.defaultPlaybackRate) {
                 ForEach(PlaybackPreferences.rateOptions, id: \.self) { rate in
-                    Text(rate == 1.0 ? "1x (Normal)" : String(format: "%.2gx", rate))
+                    Text(rate == 1.0 ? String(localized: "settings.speed_normal") : String(format: "%.2gx", rate))
                         .tag(rate)
                 }
             }
             .onChange(of: prefs.defaultPlaybackRate) { _, _ in savePrefs() }
 
-            Picker("Default aspect", selection: $prefs.defaultAspectMode) {
+            Picker(String(localized: "settings.default_aspect"), selection: $prefs.defaultAspectMode) {
                 ForEach(VideoAspectMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
@@ -176,7 +174,6 @@ struct SettingsTabView: View {
             Toggle(String(localized: "settings.subtitles_default"), isOn: $prefs.subtitlesEnabled)
                 .onChange(of: prefs.subtitlesEnabled) { _, _ in savePrefs() }
 
-            // Ordered language priority (1st → 2nd → 3rd)
             ForEach(0..<3, id: \.self) { index in
                 Picker(String(format: String(localized: "settings.audio_priority"), index + 1), selection: audioLangBinding(at: index)) {
                     ForEach(PlaybackPreferences.languageOptions, id: \.code) { opt in
@@ -194,7 +191,7 @@ struct SettingsTabView: View {
                 .disabled(!prefs.subtitlesEnabled)
             }
 
-            Toggle("Native Media Engine (experimental)", isOn: $prefs.allowNativeMediaEngine)
+            Toggle(String(localized: "settings.native_engine"), isOn: $prefs.allowNativeMediaEngine)
                 .onChange(of: prefs.allowNativeMediaEngine) { _, _ in savePrefs() }
 
             Text(nativeEngineHelpText)
@@ -205,25 +202,25 @@ struct SettingsTabView: View {
                 nativeCapabilitiesNote
             }
 
-            Toggle("Autoplay next episode", isOn: $prefs.autoPlayNextEpisode)
+            Toggle(String(localized: "settings.autoplay_next"), isOn: $prefs.autoPlayNextEpisode)
                 .onChange(of: prefs.autoPlayNextEpisode) { _, _ in savePrefs() }
 
-            Picker("Max quality", selection: maxQualityBinding) {
-                Text("Original").tag(0)
-                Text("20 Mbps").tag(20_000)
-                Text("12 Mbps").tag(12_000)
-                Text("8 Mbps").tag(8_000)
-                Text("4 Mbps").tag(4_000)
-                Text("2 Mbps").tag(2_000)
+            Picker(String(localized: "settings.max_quality"), selection: maxQualityBinding) {
+                Text(String(localized: "settings.quality_original")).tag(0)
+                Text(String(localized: "settings.quality_20mbps")).tag(20_000)
+                Text(String(localized: "settings.quality_12mbps")).tag(12_000)
+                Text(String(localized: "settings.quality_8mbps")).tag(8_000)
+                Text(String(localized: "settings.quality_4mbps")).tag(4_000)
+                Text(String(localized: "settings.quality_2mbps")).tag(2_000)
             }
         }
     }
 
     private var playerEngineSection: some View {
-        Section("Player engine") {
-            Toggle("MobileVLCKit Direct Play", isOn: $prefs.allowVLCPlayer)
+        Section(String(localized: "settings.player_engine")) {
+            Toggle(String(localized: "settings.allow_vlc"), isOn: $prefs.allowVLCPlayer)
                 .onChange(of: prefs.allowVLCPlayer) { _, _ in savePrefs() }
-            Toggle("Prefer system player (AVPlayer)", isOn: $prefs.preferSystemPlayer)
+            Toggle(String(localized: "settings.prefer_system_player"), isOn: $prefs.preferSystemPlayer)
                 .onChange(of: prefs.preferSystemPlayer) { _, _ in savePrefs() }
             Text(vlcHelpText)
                 .font(AppTypography.caption)
@@ -232,27 +229,27 @@ struct SettingsTabView: View {
     }
 
     private var codecsSection: some View {
-        Section("Codecs (device)") {
+        Section(String(localized: "settings.codecs")) {
             let caps = IOSCapabilities.current
-            LabeledContent("HEVC / H.265", value: caps.supportsHEVC ? "Hardware" : "Transcode")
-            LabeledContent("VP9", value: (prefs.allowVLCPlayer && !prefs.preferSystemPlayer) ? "VLC Direct Play" : "Server transcode")
-            LabeledContent("AV1", value: caps.supportsAV1 ? "Hardware" : "Transcode")
-            LabeledContent("OPUS audio", value: (prefs.allowVLCPlayer && !prefs.preferSystemPlayer) ? "VLC Direct Play" : "Server transcode → AAC")
-            Text("With MobileVLCKit enabled, MKV/VP9/OPUS and advanced subtitles can Direct Play. Prefer system player for PiP / AirPlay Video.")
+            LabeledContent("HEVC / H.265", value: caps.supportsHEVC ? String(localized: "settings.codec_hw") : String(localized: "settings.codec_transcode"))
+            LabeledContent("VP9", value: (prefs.allowVLCPlayer && !prefs.preferSystemPlayer) ? String(localized: "settings.codec_vlc_dp") : String(localized: "settings.codec_server_tc"))
+            LabeledContent("AV1", value: caps.supportsAV1 ? String(localized: "settings.codec_hw") : String(localized: "settings.codec_transcode"))
+            LabeledContent(String(localized: "settings.codec_opus"), value: (prefs.allowVLCPlayer && !prefs.preferSystemPlayer) ? String(localized: "settings.codec_vlc_dp") : String(localized: "settings.codec_server_aac"))
+            Text(String(localized: "settings.codecs_footer"))
                 .font(AppTypography.caption)
                 .foregroundStyle(AppColors.secondaryText)
         }
     }
 
     private var networkSection: some View {
-        Section("Network") {
-            LabeledContent("Path", value: environment.networkMonitor.currentPathDescription)
+        Section(String(localized: "settings.network")) {
+            LabeledContent(String(localized: "settings.network_path"), value: environment.networkMonitor.currentPathDescription)
         }
     }
 
     private var cacheSection: some View {
-        Section("Cache") {
-            Button("Clear response & image cache", role: .destructive) {
+        Section(L10n.settingsCache) {
+            Button(L10n.clearCache, role: .destructive) {
                 Task {
                     if let mid = environment.serverContext?.machineIdentifier {
                         await environment.libraryRepository.invalidate(machineIdentifier: mid)
@@ -269,34 +266,34 @@ struct SettingsTabView: View {
             Text(L10n.languageNote)
                 .font(AppTypography.caption)
                 .foregroundStyle(AppColors.secondaryText)
-            LabeledContent("App", value: "PlexiOS")
-            LabeledContent("Version", value: "0.1.0")
+            LabeledContent(String(localized: "settings.app_name"), value: "PlexiOS")
+            LabeledContent(L10n.version, value: "0.1.0")
         }
     }
 
     private var vlcHelpText: String {
         if VLCPlaybackBackend.isLinked {
-            return "VLC is linked. Direct Play uses MobileVLCKit unless you prefer the system player. PiP and AirPlay Video are limited on the VLC path."
+            return String(localized: "settings.vlc_help_linked")
         }
-        return "MobileVLCKit is not linked in this build (SPM package missing). Playback stays on AVPlayer until the package resolves."
+        return String(localized: "settings.vlc_help_missing")
     }
 
     private var nativeEngineHelpText: String {
         if FFmpegAvailability.isLinked {
-            return "FFmpeg linked. Direct Play may use the native pipeline; failures fall back to AVPlayer / Transcode."
+            return String(localized: "settings.native_help_linked")
         }
-        return "FFmpeg is not linked in this build. Toggle is kept for UI, but playback stays on AVPlayer until you add XCFrameworks (docs/ffmpeg-integration.md)."
+        return String(localized: "settings.native_help_missing")
     }
 
     private var nativeCapabilitiesNote: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Native system capabilities")
+            Text(String(localized: "settings.native_caps_title"))
                 .font(.subheadline.weight(.semibold))
-            Text("Now Playing / Lock Screen / Remote: Yes")
+            Text(String(localized: "settings.native_caps_np"))
                 .font(.caption)
-            Text("Background Audio / AirPlay Audio: Yes")
+            Text(String(localized: "settings.native_caps_audio"))
                 .font(.caption)
-            Text("PiP / AirPlay Video: No on Metal path (use AVPlayer)")
+            Text(String(localized: "settings.native_caps_pip"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -312,7 +309,6 @@ struct SettingsTabView: View {
             }
         )
     }
-
 
     private func audioLangBinding(at index: Int) -> Binding<String> {
         languageListBinding(index: index, get: { prefs.preferredAudioLanguages }, set: { prefs.preferredAudioLanguages = $0 })

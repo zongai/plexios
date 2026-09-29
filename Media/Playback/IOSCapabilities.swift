@@ -230,9 +230,9 @@ enum VideoAspectMode: String, Sendable, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .fit: return "Fit (default)"
-        case .fill: return "Fill"
-        case .stretch: return "Stretch"
+        case .fit: return String(localized: "settings.aspect.fit")
+        case .fill: return String(localized: "settings.aspect.fill")
+        case .stretch: return String(localized: "settings.aspect.stretch")
         }
     }
 }

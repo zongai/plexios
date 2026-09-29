@@ -291,11 +291,8 @@ final class VLCPlaybackBackend: NSObject {
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent("plex-sub-\(UUID().uuidString).\(ext)")
             try data.write(to: tmp, options: .atomic)
-            // addPlaybackSlave returns Int32 in some MobileVLCKit versions (0 = fail).
-            let result = mediaPlayer.addPlaybackSlave(tmp, type: .subtitle, enforce: enforce)
-            if result == 0 {
-                _ = mediaPlayer.addPlaybackSlave(url, type: .subtitle, enforce: enforce)
-            }
+            // Return type varies by MobileVLCKit version — ignore result.
+            _ = mediaPlayer.addPlaybackSlave(tmp, type: .subtitle, enforce: enforce)
         } catch {
             _ = mediaPlayer.addPlaybackSlave(url, type: .subtitle, enforce: enforce)
         }

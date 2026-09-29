@@ -54,6 +54,9 @@
 	<string>Plex iOS discovers and connects to your Plex Media Server on the local network.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
+		<!-- IPTV M3U / live streams frequently use plain http:// -->
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 		<key>NSAllowsArbitraryLoadsInWebContent</key>

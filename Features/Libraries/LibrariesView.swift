@@ -9,6 +9,16 @@ struct LibrariesView: View {
         NavigationStack(path: $path) {
             content
                 .navigationTitle(String(localized: "libraries.title"))
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            SearchView()
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                        }
+                        .accessibilityLabel(L10n.search)
+                    }
+                }
                 .navigationDestination(for: PlexLibrary.self) { library in
                     if library.type == .artist {
                         MusicLibraryView(library: library)
@@ -40,14 +50,37 @@ struct LibrariesView: View {
         case .idle, .loading:
             LoadingStateView()
         case .loaded:
-            List(viewModel?.libraries ?? []) { library in
-                NavigationLink(value: library) {
-                    LibraryRow(library: library)
+            List {
+                Section {
+                    NavigationLink {
+                        SearchView()
+                    } label: {
+                        Label(L10n.search, systemImage: "magnifyingglass")
+                    }
+                }
+                Section(String(localized: "libraries.title")) {
+                    ForEach(viewModel?.libraries ?? []) { library in
+                        NavigationLink(value: library) {
+                            LibraryRow(library: library)
+                        }
+                    }
                 }
             }
             .listStyle(.insetGrouped)
         case .empty:
-            EmptyStateView(title: String(localized: "libraries.empty"), systemImage: "books.vertical")
+            List {
+                Section {
+                    NavigationLink {
+                        SearchView()
+                    } label: {
+                        Label(L10n.search, systemImage: "magnifyingglass")
+                    }
+                }
+                Section {
+                    EmptyStateView(title: String(localized: "libraries.empty"), systemImage: "books.vertical")
+                }
+            }
+            .listStyle(.insetGrouped)
         case .failed(let message):
             ErrorStateView(message: message) {
                 Task { await viewModel?.load(context: environment.serverContext, force: true) }

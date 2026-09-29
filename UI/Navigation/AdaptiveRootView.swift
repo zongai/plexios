@@ -35,10 +35,6 @@ struct AdaptiveRootView: View {
                 .tabItem { Label(L10n.more, systemImage: "ellipsis.circle.fill") }
                 .tag(AppSection.collections)
 
-            SearchView()
-                .tabItem { Label(AppSection.search.title, systemImage: AppSection.search.systemImage) }
-                .tag(AppSection.search)
-
             IPTVView()
                 .tabItem { Label(AppSection.iptv.title, systemImage: AppSection.iptv.systemImage) }
                 .tag(AppSection.iptv)
@@ -50,13 +46,11 @@ struct AdaptiveRootView: View {
     }
 
     // MARK: - iPad
-    // Keep section views alive in a ZStack so NavigationPath / scroll position
-    // are not destroyed when switching the sidebar selection.
 
     private var iPadSplitView: some View {
         NavigationSplitView {
             List(selection: $selectedSection) {
-                ForEach(AppSection.allCases) { section in
+                ForEach(AppSection.sidebarCases) { section in
                     Label(section.title, systemImage: section.systemImage)
                         .tag(Optional(section))
                 }
@@ -69,7 +63,6 @@ struct AdaptiveRootView: View {
                 sectionLayer(.libraries) { LibrariesView() }
                 sectionLayer(.collections) { NavigationStack { CollectionsView() } }
                 sectionLayer(.playlists) { NavigationStack { PlaylistsView() } }
-                sectionLayer(.search) { SearchView() }
                 sectionLayer(.iptv) { IPTVView() }
                 sectionLayer(.settings) { SettingsTabView() }
             }
@@ -97,15 +90,15 @@ struct MoreBrowseView: View {
                 NavigationLink {
                     CollectionsView()
                 } label: {
-                    Label("Collections", systemImage: "square.stack.fill")
+                    Label(L10n.collections, systemImage: "square.stack.fill")
                 }
                 NavigationLink {
                     PlaylistsView()
                 } label: {
-                    Label("Playlists", systemImage: "music.note.list")
+                    Label(L10n.playlists, systemImage: "music.note.list")
                 }
             }
-            .navigationTitle("More")
+            .navigationTitle(L10n.more)
         }
     }
 }

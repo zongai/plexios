@@ -99,10 +99,12 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case collections
     case playlists
     case iptv
-    case search
     case settings
 
     var id: String { rawValue }
+
+    /// Sidebar / primary navigation (search lives inside Libraries).
+    static var sidebarCases: [AppSection] { allCases }
 
     var title: String {
         switch self {
@@ -111,7 +113,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .collections: return L10n.collections
         case .playlists: return L10n.playlists
         case .iptv: return String(localized: "iptv.title")
-        case .search: return L10n.search
         case .settings: return L10n.settings
         }
     }
@@ -123,7 +124,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .collections: return "square.stack.fill"
         case .playlists: return PlexIcon.playlist
         case .iptv: return "tv"
-        case .search: return PlexIcon.search
         case .settings: return PlexIcon.settings
         }
     }

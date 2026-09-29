@@ -39,6 +39,10 @@ struct AdaptiveRootView: View {
                 .tabItem { Label(AppSection.search.title, systemImage: AppSection.search.systemImage) }
                 .tag(AppSection.search)
 
+            IPTVView()
+                .tabItem { Label(AppSection.iptv.title, systemImage: AppSection.iptv.systemImage) }
+                .tag(AppSection.iptv)
+
             SettingsTabView()
                 .tabItem { Label(AppSection.settings.title, systemImage: AppSection.settings.systemImage) }
                 .tag(AppSection.settings)
@@ -66,6 +70,7 @@ struct AdaptiveRootView: View {
                 sectionLayer(.collections) { NavigationStack { CollectionsView() } }
                 sectionLayer(.playlists) { NavigationStack { PlaylistsView() } }
                 sectionLayer(.search) { SearchView() }
+                sectionLayer(.iptv) { IPTVView() }
                 sectionLayer(.settings) { SettingsTabView() }
             }
         }

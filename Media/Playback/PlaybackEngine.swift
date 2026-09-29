@@ -447,6 +447,109 @@ final class PlaybackEngine {
         }
     }
 
+
+    /// IPTV / direct URL playback — no Plex session, timeline, or transcode.
+    func playIPTV(
+        url: URL,
+        headers: [String: String] = [:],
+        title: String,
+        preferVLC: Bool = true
+    ) async {
+        await stop(report: false)
+        context = nil
+        session = nil
+        errorMessage = nil
+        isPlaying = false
+        sessionState = .loading
+        currentItem = nil
+        decision = nil
+        positionMs = 0
+        durationMs = 0
+        audioStreams = []
+        subtitleStreams = []
+        selectedAudioId = nil
+        selectedSubtitleId = nil
+
+        let effectivePrefs = PlaybackSettingsStore.shared.preferences
+        playbackRate = effectivePrefs.defaultPlaybackRate
+        aspectMode = effectivePrefs.defaultAspectMode
+
+        // Prefer VLC for TS / exotic IPTV; HLS often works on AVPlayer
+        let useVLC = preferVLC
+            && effectivePrefs.allowVLCPlayer
+            && !effectivePrefs.preferSystemPlayer
+            && VLCPlaybackBackend.isLinked
+
+        if useVLC {
+            do {
+                let vlc = vlcBackend ?? VLCPlaybackBackend()
+                vlcBackend = vlc
+                vlc.onTimeChange = { [weak self] pos, dur in
+                    guard let self else { return }
+                    self.positionMs = pos
+                    if dur > 0 { self.durationMs = dur }
+                }
+                vlc.onEnded = { [weak self] in
+                    Task { await self?.handlePlaybackEnded() }
+                }
+                vlc.onError = { [weak self] message in
+                    self?.errorMessage = message
+                    self?.sessionState = .error
+                    self?.isPlaying = false
+                }
+                vlc.onStateChange = { [weak self] st in
+                    guard let self else { return }
+                    switch st {
+                    case .playing:
+                        self.sessionState = .playing
+                        self.isPlaying = true
+                    case .paused:
+                        self.sessionState = .paused
+                        self.isPlaying = false
+                    case .buffering:
+                        self.sessionState = .buffering
+                    case .failed:
+                        self.sessionState = .error
+                        self.isPlaying = false
+                    default:
+                        break
+                    }
+                }
+                try await vlc.prepare(
+                    url: url,
+                    headers: headers,
+                    startPositionMs: 0,
+                    externalSubtitles: [],
+                    preferredSubtitlePlexId: nil,
+                    forceSoftwareDecode: false
+                )
+                activePlaybackBackend = .vlc
+                isPlaying = true
+                sessionState = .playing
+                // Synthetic title for Now Playing
+                nowPlaying.updateTitle(title, subtitle: "IPTV")
+                return
+            } catch {
+                logger.playback.error("IPTV VLC failed: \(error.localizedDescription)")
+                // fall through to AVPlayer
+            }
+        }
+
+        var request = URLRequest(url: url)
+        for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
+        let asset = AVURLAsset(url: url, options: headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        let item = AVPlayerItem(asset: asset)
+        let avPlayer = AVPlayer(playerItem: item)
+        avPlayer.actionAtItemEnd = .pause
+        self.player = avPlayer
+        activePlaybackBackend = .avPlayer
+        observe(player: avPlayer, item: item)
+        avPlayer.play()
+        isPlaying = true
+        sessionState = .playing
+        nowPlaying.updateTitle(title, subtitle: "IPTV")
+    }
+
     func togglePlayPause() {
         if isPlaying { pause() } else { resume() }
     }

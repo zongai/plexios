@@ -98,6 +98,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case libraries
     case collections
     case playlists
+    case iptv
     case search
     case settings
 
@@ -109,6 +110,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .libraries: return L10n.libraries
         case .collections: return L10n.collections
         case .playlists: return L10n.playlists
+        case .iptv: return String(localized: "iptv.title")
         case .search: return L10n.search
         case .settings: return L10n.settings
         }
@@ -120,6 +122,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .libraries: return PlexIcon.library
         case .collections: return "square.stack.fill"
         case .playlists: return PlexIcon.playlist
+        case .iptv: return "tv"
         case .search: return PlexIcon.search
         case .settings: return PlexIcon.settings
         }

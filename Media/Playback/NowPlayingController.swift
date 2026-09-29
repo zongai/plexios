@@ -44,6 +44,14 @@ final class NowPlayingController {
         }
     }
 
+    func updateTitle(_ title: String, subtitle: String? = nil) {
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        info[MPMediaItemPropertyTitle] = title
+        if let subtitle { info[MPMediaItemPropertyAlbumTitle] = subtitle }
+        info[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.video.rawValue
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
     func updateProgress(positionMs: Int64, durationMs: Int64, isPlaying: Bool) {
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000.0

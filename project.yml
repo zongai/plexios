@@ -38,6 +38,7 @@ targets:
       - path: Plex
       - path: Media
       - path: Features
+      - path: IPTV
       - path: UI
       - path: Localization
         buildPhase: resources

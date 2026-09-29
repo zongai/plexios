@@ -12,6 +12,7 @@ struct SettingsTabView: View {
                 accountSection
                 serverSection
                 homeSection
+                iptvSettingsSection
                 playbackSection
                 playerEngineSection
                 codecsSection
@@ -90,6 +91,17 @@ struct SettingsTabView: View {
         }
     }
 
+
+
+    private var iptvSettingsSection: some View {
+        Section(String(localized: "iptv.title")) {
+            NavigationLink {
+                IPTVSettingsView()
+            } label: {
+                Label(String(localized: "iptv.playlists"), systemImage: "tv")
+            }
+        }
+    }
 
     private var homeSection: some View {
         Section {

@@ -21,6 +21,9 @@ settings:
 packages:
   PlexFFmpeg:
     path: Vendor/PlexFFmpeg
+  VLCKitSPM:
+    url: https://github.com/tylerjonesio/vlckit-spm
+    from: "3.6.0"
 
 targets:
   PlexiOS:
@@ -39,6 +42,8 @@ targets:
     dependencies:
       - package: PlexFFmpeg
         product: PlexFFmpeg
+      - package: VLCKitSPM
+        product: VLCKitSPM
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.plexios.app

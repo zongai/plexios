@@ -36,3 +36,16 @@ Push to `main` runs **Build unsigned IPA** (`.github/workflows/build-ipa.yml`):
 3. Package `.ipa` and publish a GitHub Release (`build-N`)
 
 Re-sign the IPA with your Apple team before installing on a device (or use AltStore / Sideloadly).
+
+
+## Playback engines
+
+| Backend | When used |
+|---------|-----------|
+| **MobileVLCKit** | Default Direct Play when linked (`allowVLCPlayer`, not `preferSystemPlayer`) |
+| **AVPlayer** | HLS / transcode, or when system player is preferred (PiP / AirPlay Video) |
+| **Native (FFmpeg)** | Experimental toggle |
+
+### License note (MobileVLCKit)
+
+MobileVLCKit is **LGPLv2.1+**. This app links it as a dynamic framework via SPM. Source for VideoLAN components is available from [videolan.org](https://www.videolan.org/). App-specific changes to this repository remain under the project license.

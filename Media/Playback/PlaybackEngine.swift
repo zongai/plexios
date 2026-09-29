@@ -57,6 +57,10 @@ final class PlaybackEngine {
     private(set) var activePlaybackBackend: PlaybackBackend = .avPlayer
 
     var isNativeBackendActive: Bool { activePlaybackBackend == .nativeMediaEngine }
+    var isVLCBackendActive: Bool { activePlaybackBackend == .vlc }
+
+    /// Shared VLC backend instance (drawable bound by PlayerView).
+    private(set) var vlcBackend: VLCPlaybackBackend?
 
     var nativeVideoFrameSink: VideoFrameSink? {
         guard isNativeBackendActive else { return nil }
@@ -119,10 +123,7 @@ final class PlaybackEngine {
         playbackRate = effectivePrefs.defaultPlaybackRate
         aspectMode = effectivePrefs.defaultAspectMode
 
-        let engine = PlaybackDecisionEngine(
-            capabilities: .current,
-            preferences: effectivePrefs
-        )
+        let engine = PlaybackDecisionEngine.make(preferences: effectivePrefs)
         let decision = engine.decide(
             metadata: metadata,
             network: network,
@@ -221,7 +222,60 @@ final class PlaybackEngine {
             height: 900
         )
 
-        // Phase 10: optional Native Media Engine for Direct Play
+        // Prefer MobileVLCKit Direct Play when enabled (broad codec/container support).
+        let useVLC = decision.mode == .directPlay
+            && effectivePrefs.allowVLCPlayer
+            && !effectivePrefs.preferSystemPlayer
+            && VLCPlaybackBackend.isLinked
+
+        if useVLC {
+            do {
+                let vlc = vlcBackend ?? VLCPlaybackBackend()
+                vlcBackend = vlc
+                vlc.onTimeChange = { [weak self] pos, dur in
+                    guard let self else { return }
+                    self.positionMs = pos
+                    if dur > 0 { self.durationMs = dur }
+                    self.nowPlaying.updateProgress(
+                        positionMs: pos, durationMs: self.durationMs, isPlaying: self.isPlaying
+                    )
+                }
+                vlc.onEnded = { [weak self] in
+                    Task { await self?.handlePlaybackEnded() }
+                }
+                vlc.onError = { [weak self] message in
+                    self?.logger.playback.error("VLC: \(message)")
+                    self?.errorMessage = message
+                }
+                vlc.onStateChange = { [weak self] st in
+                    guard let self else { return }
+                    switch st {
+                    case .playing: self.sessionState = .playing
+                    case .paused: self.sessionState = .paused
+                    case .buffering: self.sessionState = .buffering
+                    case .failed: self.sessionState = .error
+                    default: break
+                    }
+                }
+                var headers = identityHeaders
+                headers["X-Plex-Token"] = context.token
+                try await vlc.prepare(url: url, headers: headers, startPositionMs: startMs)
+                vlc.setRate(playbackRate)
+                activePlaybackBackend = .vlc
+                playerEngineRouter?.markActive(.vlc)
+                await newSession.updateState(.playing)
+                sessionState = .playing
+                startPeriodicReporting()
+                publishNowPlaying()
+                logger.playback.info("Playing via MobileVLCKit")
+                return
+            } catch {
+                logger.playback.info("VLC failed, trying other backends: \(error.localizedDescription)")
+                activePlaybackBackend = .avPlayer
+            }
+        }
+
+        // Optional Native Media Engine for Direct Play
         if let router = playerEngineRouter,
            router.lastReport?.preferredBackend == .nativeMediaEngine,
            decision.mode == .directPlay {
@@ -263,7 +317,6 @@ final class PlaybackEngine {
                 logger.playback.info("Native engine failed, falling back to AVPlayer: \(error.localizedDescription)")
                 activePlaybackBackend = .avPlayer
                 router.markActive(.avPlayer)
-                // Continue to AVPlayer below
             }
         } else {
             activePlaybackBackend = .avPlayer
@@ -305,6 +358,10 @@ final class PlaybackEngine {
     }
 
     private func applyRateToPlayer() {
+        if activePlaybackBackend == .vlc {
+            vlcBackend?.setRate(playbackRate)
+            return
+        }
         if activePlaybackBackend == .nativeMediaEngine {
             playerEngineRouter?.nativeBackendInstance().setRate(playbackRate)
             return
@@ -318,7 +375,9 @@ final class PlaybackEngine {
     }
 
     func pause() {
-        if activePlaybackBackend == .nativeMediaEngine {
+        if activePlaybackBackend == .vlc {
+            vlcBackend?.pause()
+        } else if activePlaybackBackend == .nativeMediaEngine {
             playerEngineRouter?.nativeBackendInstance().pause()
         } else {
             player?.pause()
@@ -335,7 +394,10 @@ final class PlaybackEngine {
     }
 
     func resume() {
-        if activePlaybackBackend == .nativeMediaEngine {
+        if activePlaybackBackend == .vlc {
+            vlcBackend?.play()
+            applyRateToPlayer()
+        } else if activePlaybackBackend == .nativeMediaEngine {
             playerEngineRouter?.nativeBackendInstance().play()
         } else {
             player?.play()
@@ -357,7 +419,9 @@ final class PlaybackEngine {
     }
 
     func seek(toMs ms: Int64) async {
-        if activePlaybackBackend == .nativeMediaEngine {
+        if activePlaybackBackend == .vlc {
+            await vlcBackend?.seek(toMs: ms)
+        } else if activePlaybackBackend == .nativeMediaEngine {
             await playerEngineRouter?.nativeBackendInstance().seek(toMs: ms)
         } else {
             let time = CMTime(value: ms, timescale: 1000)
@@ -382,6 +446,9 @@ final class PlaybackEngine {
         reportTask = nil
         nativeTimelineTask?.cancel()
         nativeTimelineTask = nil
+        if activePlaybackBackend == .vlc {
+            await vlcBackend?.stop()
+        }
         if activePlaybackBackend == .nativeMediaEngine {
             await playerEngineRouter?.nativeBackendInstance().stop()
             nativeSystemBridge?.deactivate()
@@ -412,6 +479,17 @@ final class PlaybackEngine {
         selectedAudioId = streamId
         guard let metadata = currentItem, let context else { return }
 
+        if activePlaybackBackend == .vlc, let vlc = vlcBackend {
+            // Map Plex stream order to VLC indexes when possible
+            if let idx = audioStreams.firstIndex(where: { $0.id == streamId }),
+               idx < vlc.audioTracks.count {
+                vlc.selectAudioIndex(vlc.audioTracks[idx].index)
+                return
+            }
+            vlc.selectAudioIndex(streamId)
+            return
+        }
+
         // Prefer in-player media selection when Direct Play (no server round-trip)
         if decision?.mode == .directPlay,
            await applyAVMediaSelection(audioStreamId: streamId, subtitleStreamId: selectedSubtitleId) {
@@ -435,6 +513,21 @@ final class PlaybackEngine {
     func selectSubtitle(streamId: Int?) async {
         selectedSubtitleId = streamId
         guard let metadata = currentItem, let context else { return }
+
+        if activePlaybackBackend == .vlc, let vlc = vlcBackend {
+            if streamId == nil {
+                vlc.selectSubtitleIndex(nil)
+                return
+            }
+            if let sid = streamId,
+               let idx = subtitleStreams.firstIndex(where: { $0.id == sid }),
+               idx < vlc.subtitleTracks.count {
+                vlc.selectSubtitleIndex(vlc.subtitleTracks[idx].index)
+                return
+            }
+            vlc.selectSubtitleIndex(streamId)
+            return
+        }
 
         if decision?.mode == .directPlay,
            await applyAVMediaSelection(audioStreamId: selectedAudioId, subtitleStreamId: streamId) {

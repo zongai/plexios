@@ -33,6 +33,10 @@ struct PlayerView: View {
                 )
                 .ignoresSafeArea()
                 .onTapGesture { toggleControls() }
+            } else if engine.isVLCBackendActive, let vlc = engine.vlcBackend {
+                VLCPlayerContainer(backend: vlc, aspectMode: engine.aspectMode)
+                    .ignoresSafeArea()
+                    .onTapGesture { toggleControls() }
             } else if let player = engine.player {
                 PlayerLayerView(player: player, aspectMode: engine.aspectMode) { active in
                     isPiPActive = active

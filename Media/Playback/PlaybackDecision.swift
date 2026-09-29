@@ -32,6 +32,14 @@ struct PlaybackDecisionEngine: Sendable {
         self.preferences = preferences
     }
 
+    /// Builds an engine using the capability matrix matching user prefs (VLC vs AVPlayer).
+    static func make(preferences: PlaybackPreferences) -> PlaybackDecisionEngine {
+        PlaybackDecisionEngine(
+            capabilities: IOSCapabilities.active(preferences: preferences),
+            preferences: preferences
+        )
+    }
+
     func decide(
         metadata: PlexMetadata,
         network: NetworkClass,
@@ -132,11 +140,15 @@ struct PlaybackDecisionEngine: Sendable {
         // has no selectable text track for external WEBVTT/SRT.
         let softSubSelected = subtitleId != nil && !needBurnIn
 
-        // Direct Play (native container + codecs, no burn-in, no soft-sub packaging need)
-        if containerOK && videoOK && audioOK && !needBurnIn && !externalSoftSub && !softSubSelected {
+        // Direct Play (native container + codecs, no burn-in)
+        // VLC profile can soft-render external/text subs without HLS remux.
+        let vlcSoftOK = capabilities.isVLCProfile && !needBurnIn
+        if containerOK && videoOK && audioOK && !needBurnIn
+            && (vlcSoftOK || (!externalSoftSub && !softSubSelected)) {
+            let via = capabilities.isVLCProfile ? "VLC" : "AVPlayer"
             return PlaybackDecision(
                 mode: .directPlay,
-                reason: "Container, video (\(normalizedVideo ?? videoCodec ?? "?")), and audio (\(audioCodec ?? "?")) supported natively",
+                reason: "Direct Play via \(via): \(container ?? "?") / \(normalizedVideo ?? videoCodec ?? "?") / \(audioCodec ?? "?")",
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,

@@ -13,19 +13,19 @@ struct IOSCapabilities: Sendable {
     var supportsAV1: Bool
     var supportsHDR10: Bool
     var supportsDolbyVision: Bool
+    /// True when matrix reflects MobileVLCKit Direct Play breadth.
+    var isVLCProfile: Bool
+
+    /// AVPlayer-only matrix (strict).
+    static let current: IOSCapabilities = avPlayerProfile
 
     /// Probe hardware decode where possible (iOS 17+ deployment).
-    static let current: IOSCapabilities = {
+    static let avPlayerProfile: IOSCapabilities = {
         let hevc = VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
-        // AV1 constant available on recent SDKs; fall back if missing.
-        // AV1 fourcc 'av01' = 0x61307661; constant may be missing on older SDKs
         let av1: Bool = {
             let av01: CMVideoCodecType = 0x61307661 // 'av01'
             return VTIsHardwareDecodeSupported(av01)
         }()
-        // VP9: AVPlayer on iOS does **not** reliably decode VP9 (WebM/MKV/fMP4).
-        // Direct Play / Direct Stream would keep VP9 → black screen / failure.
-        // Must transcode to H.264/HEVC on the server.
         let vp9Native = false
 
         var video: Set<String> = [
@@ -34,31 +34,23 @@ struct IOSCapabilities: Sendable {
         if hevc {
             video.formUnion(["hevc", "h265", "hev1", "hvc1"])
         }
-        // Do not add vp9/vp09 — forces PlaybackDecision → transcode
         if av1 {
-            // Only when hardware reports support (A17+ / M-series class devices)
             video.formUnion(["av1", "av01"])
         }
 
-        // Direct Play containers only (AVPlayer-native). MKV/WebM stay remux or transcode.
         let containers: Set<String> = [
             "mp4", "m4v", "mov", "mpegts", "hls", "m3u8", "isom", "mp3", "aac"
         ]
 
-        // OPUS / Vorbis: not reliable in AVPlayer for progressive/Direct Play.
-        // Leave them unsupported so decision engine requests server audio transcode
-        // (or full transcode when paired with VP9).
-        var audio: Set<String> = [
+        let audio: Set<String> = [
             "aac", "mp3", "ac3", "eac3", "eac3_atmos", "eac3-atmos",
             "flac", "alac", "pcm"
-            // intentionally omit: opus, vorbis, dca/dts, truehd (transcode audio)
         ]
 
         return IOSCapabilities(
             supportedContainers: containers,
             supportedVideoCodecs: video,
             supportedAudioCodecs: audio,
-            // Text tracks AVPlayer can render without burn-in
             nativeSubtitleFormats: [
                 "srt", "vtt", "webvtt", "mov_text", "tx3g", "text", "subrip", "utf-8", "utf8"
             ],
@@ -67,9 +59,49 @@ struct IOSCapabilities: Sendable {
             supportsVP9: vp9Native,
             supportsAV1: av1,
             supportsHDR10: true,
-            supportsDolbyVision: false
+            supportsDolbyVision: false,
+            isVLCProfile: false
         )
     }()
+
+    /// Broader Direct Play matrix when MobileVLCKit is the playback backend.
+    static let vlcProfile: IOSCapabilities = {
+        let base = avPlayerProfile
+        var video = base.supportedVideoCodecs
+        video.formUnion(["vp9", "vp09", "mpeg2video", "mpeg4", "wmv", "vc1", "msmpeg4"])
+        var audio = base.supportedAudioCodecs
+        audio.formUnion([
+            "opus", "vorbis", "dca", "dts", "truehd", "mlp", "wmav2", "pcm_s16le"
+        ])
+        var containers = base.supportedContainers
+        containers.formUnion([
+            "mkv", "matroska", "webm", "avi", "wmv", "asf", "flv", "ts", "m2ts", "ogg", "ogm"
+        ])
+        var subs = base.nativeSubtitleFormats
+        subs.formUnion(["ass", "ssa", "pgs", "vobsub", "dvd_subtitle", "hdmv_pgs_subtitle"])
+
+        return IOSCapabilities(
+            supportedContainers: containers,
+            supportedVideoCodecs: video,
+            supportedAudioCodecs: audio,
+            nativeSubtitleFormats: subs,
+            maxAudioChannels: 16,
+            supportsHEVC: base.supportsHEVC,
+            supportsVP9: true,
+            supportsAV1: base.supportsAV1,
+            supportsHDR10: true,
+            supportsDolbyVision: false,
+            isVLCProfile: true
+        )
+    }()
+
+    /// Active matrix: VLC when linked + user allows it and is not forcing system player.
+    static func active(preferences: PlaybackPreferences) -> IOSCapabilities {
+        let wantVLC = preferences.allowVLCPlayer
+            && !preferences.preferSystemPlayer
+            && VLCPlaybackBackend.isLinked
+        return wantVLC ? .vlcProfile : .avPlayerProfile
+    }
 
     /// Codecs the **server may deliver** in HLS after decision.
     /// Never advertise VP9 — PMS would pass through and AVPlayer still fails.
@@ -114,6 +146,8 @@ struct IOSCapabilities: Sendable {
     }
 
     func requiresBurnIn(_ stream: PlexStream) -> Bool {
+        // VLC renders image + advanced text subs natively — no server burn-in.
+        if isVLCProfile { return false }
         let format = Self.normalizeSubtitleFormat(stream.format ?? stream.codec) ?? ""
         let burnIn: Set<String> = [
             "pgs", "vobsub", "dvd_subtitle", "dvdsub", "hdmv_pgs_subtitle",
@@ -215,6 +249,10 @@ struct PlaybackPreferences: Sendable {
     var defaultAspectMode: VideoAspectMode
     /// Experimental native media engine (FFmpeg demux + VT / soft decode).
     var allowNativeMediaEngine: Bool
+    /// Prefer MobileVLCKit for Direct Play (broader codecs/containers).
+    var allowVLCPlayer: Bool
+    /// Force AVPlayer path (better PiP / AirPlay Video) even when VLC is linked.
+    var preferSystemPlayer: Bool
 
     static let `default` = PlaybackPreferences(
         maxVideoBitrateKbps: nil,
@@ -224,7 +262,9 @@ struct PlaybackPreferences: Sendable {
         subtitlesEnabled: true,
         defaultPlaybackRate: 1.0,
         defaultAspectMode: .fit,
-        allowNativeMediaEngine: false
+        allowNativeMediaEngine: false,
+        allowVLCPlayer: true,
+        preferSystemPlayer: false
     )
 
     static let rateOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
@@ -243,6 +283,8 @@ final class PlaybackSettingsStore {
         static let rate = "playback.defaultRate"
         static let aspect = "playback.aspectMode"
         static let nativeEngine = "playback.allowNativeMediaEngine"
+        static let allowVLC = "playback.allowVLCPlayer"
+        static let preferSystem = "playback.preferSystemPlayer"
         static let audioLang = "playback.audioLang"
         static let subLang = "playback.subLang"
     }
@@ -262,7 +304,9 @@ final class PlaybackSettingsStore {
                 subtitlesEnabled: defaults.object(forKey: Keys.subsEnabled) as? Bool ?? true,
                 defaultPlaybackRate: defaults.object(forKey: Keys.rate) as? Float ?? 1.0,
                 defaultAspectMode: VideoAspectMode(rawValue: defaults.string(forKey: Keys.aspect) ?? "") ?? .fit,
-                allowNativeMediaEngine: defaults.object(forKey: Keys.nativeEngine) as? Bool ?? false
+                allowNativeMediaEngine: defaults.object(forKey: Keys.nativeEngine) as? Bool ?? false,
+                allowVLCPlayer: defaults.object(forKey: Keys.allowVLC) as? Bool ?? true,
+                preferSystemPlayer: defaults.object(forKey: Keys.preferSystem) as? Bool ?? false
             )
         }
         set {
@@ -276,6 +320,8 @@ final class PlaybackSettingsStore {
             defaults.set(newValue.defaultPlaybackRate, forKey: Keys.rate)
             defaults.set(newValue.defaultAspectMode.rawValue, forKey: Keys.aspect)
             defaults.set(newValue.allowNativeMediaEngine, forKey: Keys.nativeEngine)
+            defaults.set(newValue.allowVLCPlayer, forKey: Keys.allowVLC)
+            defaults.set(newValue.preferSystemPlayer, forKey: Keys.preferSystem)
             if let a = newValue.preferredAudioLanguage {
                 defaults.set(a, forKey: Keys.audioLang)
             } else {

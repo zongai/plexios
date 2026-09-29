@@ -10,6 +10,7 @@ struct SettingsTabView: View {
                 accountSection
                 serverSection
                 playbackSection
+                playerEngineSection
                 codecsSection
                 networkSection
                 cacheSection
@@ -123,14 +124,26 @@ struct SettingsTabView: View {
         }
     }
 
+    private var playerEngineSection: some View {
+        Section("Player engine") {
+            Toggle("MobileVLCKit Direct Play", isOn: $prefs.allowVLCPlayer)
+                .onChange(of: prefs.allowVLCPlayer) { _, _ in savePrefs() }
+            Toggle("Prefer system player (AVPlayer)", isOn: $prefs.preferSystemPlayer)
+                .onChange(of: prefs.preferSystemPlayer) { _, _ in savePrefs() }
+            Text(vlcHelpText)
+                .font(AppTypography.caption)
+                .foregroundStyle(AppColors.secondaryText)
+        }
+    }
+
     private var codecsSection: some View {
         Section("Codecs (device)") {
             let caps = IOSCapabilities.current
             LabeledContent("HEVC / H.265", value: caps.supportsHEVC ? "Hardware" : "Transcode")
-            LabeledContent("VP9", value: "Server transcode")
+            LabeledContent("VP9", value: (prefs.allowVLCPlayer && !prefs.preferSystemPlayer) ? "VLC Direct Play" : "Server transcode")
             LabeledContent("AV1", value: caps.supportsAV1 ? "Hardware" : "Transcode")
-            LabeledContent("OPUS audio", value: "Server transcode → AAC")
-            Text("VP9 / OPUS cannot be decoded by iOS AVPlayer; the server converts them to H.264/HEVC + AAC.")
+            LabeledContent("OPUS audio", value: (prefs.allowVLCPlayer && !prefs.preferSystemPlayer) ? "VLC Direct Play" : "Server transcode → AAC")
+            Text("With MobileVLCKit enabled, MKV/VP9/OPUS and advanced subtitles can Direct Play. Prefer system player for PiP / AirPlay Video.")
                 .font(AppTypography.caption)
                 .foregroundStyle(AppColors.secondaryText)
         }

@@ -35,17 +35,35 @@ enum MediaDisplayFormatting {
             // Poster-style: still prefer show name for consistency on mixed rails
             return item.grandparentTitle ?? item.title
         }
+        // Season cards in hubs: show the series name, not "Season 1" / "季 1"
+        if item.type == .season {
+            return item.parentTitle ?? item.title
+        }
         return item.title
     }
 
     /// Secondary line under the title.
+    /// TV shelves may mix `show` and `season` items; always prefer episode counts
+    /// so the bottom line is consistent (not "16 集" next to "季 1").
     static func cardSubtitle(for item: PlexMetadata, wide: Bool) -> String? {
         switch item.type {
         case .movie:
             return item.year.map(String.init)
         case .show:
-            if let leaf = item.leafCount {
+            if let leaf = item.leafCount, leaf > 0 {
                 return String(format: String(localized: "media.episode_count"), locale: Locale.current, leaf)
+            }
+            if let seasons = item.childCount, seasons > 0 {
+                return String(format: String(localized: "media.season_count"), locale: Locale.current, seasons)
+            }
+            return item.year.map(String.init)
+        case .season:
+            // Prefer episode count within the season; else "Season N"
+            if let leaf = item.leafCount, leaf > 0 {
+                return String(format: String(localized: "media.episode_count"), locale: Locale.current, leaf)
+            }
+            if let idx = item.index {
+                return String(format: String(localized: "media.season_n"), locale: Locale.current, idx)
             }
             return item.year.map(String.init)
         case .episode:

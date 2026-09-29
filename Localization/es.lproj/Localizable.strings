@@ -254,6 +254,7 @@
 "iptv.quality.highest" = "Más alta";
 "media.episode_count" = "%d episodios";
 "media.season_n" = "Temporada %d";
+"media.season_count" = "%d temporadas";
 "media.episode_n" = "Episodio %d";
 "player.more_tools" = "Más controles";
 "player.volume" = "Volumen";

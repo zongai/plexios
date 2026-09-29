@@ -254,6 +254,7 @@
 "iptv.quality.highest" = "최고";
 "media.episode_count" = "%d개 에피소드";
 "media.season_n" = "시즌 %d";
+"media.season_count" = "%d개 시즌";
 "media.episode_n" = "에피소드 %d";
 "player.more_tools" = "추가 컨트롤";
 "player.volume" = "볼륨";

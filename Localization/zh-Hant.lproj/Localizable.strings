@@ -254,6 +254,7 @@
 "iptv.quality.highest" = "最高";
 "media.episode_count" = "%d 集";
 "media.season_n" = "第%d季";
+"media.season_count" = "%d 季";
 "media.episode_n" = "第%d集";
 "player.more_tools" = "更多控制";
 "player.volume" = "音量";

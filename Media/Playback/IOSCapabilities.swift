@@ -323,6 +323,17 @@ final class PlaybackSettingsStore {
         self.defaults = defaults
     }
 
+    /// Ordered language preference list; migrates legacy single-string key if needed.
+    private static func loadLangList(_ defaults: UserDefaults, listKey: String, legacyKey: String) -> [String] {
+        if let list = defaults.stringArray(forKey: listKey), !list.isEmpty {
+            return list
+        }
+        if let single = defaults.string(forKey: legacyKey), !single.isEmpty {
+            return [single]
+        }
+        return []
+    }
+
     var preferences: PlaybackPreferences {
         get {
             let bitrate = defaults.object(forKey: Keys.maxBitrate) as? Int

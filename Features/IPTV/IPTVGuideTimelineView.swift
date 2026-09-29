@@ -128,7 +128,7 @@ struct IPTVGuideTimelineView: View {
 
             ZStack(alignment: .leading) {
                 Rectangle()
-                    .fill(AppColors.separator.opacity(0.35))
+                    .fill(PlexColors.separator.opacity(0.35))
                     .frame(height: 1)
                     .frame(maxHeight: .infinity, alignment: .bottom)
 
@@ -167,7 +167,7 @@ struct IPTVGuideTimelineView: View {
                     .fill(isNow ? PlexColors.accent.opacity(0.25) : AppColors.secondaryBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(isNow ? PlexColors.accent : AppColors.separator.opacity(0.5), lineWidth: 1)
+                            .strokeBorder(isNow ? PlexColors.accent : PlexColors.separator.opacity(0.5), lineWidth: 1)
                     )
             )
             .offset(x: x)

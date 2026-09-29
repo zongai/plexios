@@ -57,7 +57,7 @@ enum GzipDecompressor {
                 st = buffer.withUnsafeMutableBufferPointer { dest in
                     stream.next_out = dest.baseAddress
                     stream.avail_out = uInt(chunk)
-                    let r = inflate(&stream, Z_NO_FLUSH)
+                    let r = zlib.inflate(&stream, Z_NO_FLUSH)
                     let produced = chunk - Int(stream.avail_out)
                     if produced > 0 {
                         output.append(dest.baseAddress!, count: produced)

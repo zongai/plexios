@@ -291,13 +291,12 @@ final class VLCPlaybackBackend: NSObject {
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent("plex-sub-\(UUID().uuidString).\(ext)")
             try data.write(to: tmp, options: .atomic)
-            let ok = mediaPlayer.addPlaybackSlave(tmp, type: .subtitle, enforce: enforce)
-            if !ok {
-                // Fallback: try remote URL directly
+            // addPlaybackSlave returns Int32 in some MobileVLCKit versions (0 = fail).
+            let result = mediaPlayer.addPlaybackSlave(tmp, type: .subtitle, enforce: enforce)
+            if result == 0 {
                 _ = mediaPlayer.addPlaybackSlave(url, type: .subtitle, enforce: enforce)
             }
         } catch {
-            // Last resort: remote slave
             _ = mediaPlayer.addPlaybackSlave(url, type: .subtitle, enforce: enforce)
         }
 #endif
@@ -416,16 +415,26 @@ final class VLCPlaybackBackend: NSObject {
 
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
     private func sampleThroughput(from media: VLCMedia) {
-        let stats = media.statistics as NSObject
-        func number(for key: String) -> Double? {
-            if let d = stats.value(forKey: key) as? Double { return d }
-            if let f = stats.value(forKey: key) as? Float { return Double(f) }
-            if let n = stats.value(forKey: key) as? NSNumber { return n.doubleValue }
-            return nil
+        // VLCMedia.Stats may be a struct (SPM) — use Mirror, avoid NSObject cast.
+        let mirror = Mirror(reflecting: media.statistics)
+        var demux: Double?
+        var input: Double?
+        for child in mirror.children {
+            guard let label = child.label?.lowercased() else { continue }
+            let value: Double?
+            switch child.value {
+            case let d as Double: value = d
+            case let f as Float: value = Double(f)
+            case let i as Int: value = Double(i)
+            case let i as Int32: value = Double(i)
+            case let n as NSNumber: value = n.doubleValue
+            default: value = nil
+            }
+            guard let value, value > 0 else { continue }
+            if label.contains("demux") && label.contains("bit") { demux = value }
+            if label.contains("input") && label.contains("bit") { input = value }
         }
-        guard let raw = number(for: "demuxBitrate") ?? number(for: "inputBitrate"), raw > 0 else {
-            return
-        }
+        guard let raw = demux ?? input else { return }
         let mbps: Double
         if raw > 100_000 {
             mbps = raw / 1_000_000

@@ -51,13 +51,7 @@ struct LibrariesView: View {
             LoadingStateView()
         case .loaded:
             List {
-                Section {
-                    NavigationLink {
-                        SearchView()
-                    } label: {
-                        Label(L10n.search, systemImage: "magnifyingglass")
-                    }
-                }
+                browseSection
                 Section(String(localized: "libraries.title")) {
                     ForEach(viewModel?.libraries ?? []) { library in
                         NavigationLink(value: library) {
@@ -69,13 +63,7 @@ struct LibrariesView: View {
             .listStyle(.insetGrouped)
         case .empty:
             List {
-                Section {
-                    NavigationLink {
-                        SearchView()
-                    } label: {
-                        Label(L10n.search, systemImage: "magnifyingglass")
-                    }
-                }
+                browseSection
                 Section {
                     EmptyStateView(title: String(localized: "libraries.empty"), systemImage: "books.vertical")
                 }
@@ -84,6 +72,27 @@ struct LibrariesView: View {
         case .failed(let message):
             ErrorStateView(message: message) {
                 Task { await viewModel?.load(context: environment.serverContext, force: true) }
+            }
+        }
+    }
+
+    /// Search + Collections + Playlists (formerly the separate “More” tab).
+    private var browseSection: some View {
+        Section {
+            NavigationLink {
+                SearchView()
+            } label: {
+                Label(L10n.search, systemImage: "magnifyingglass")
+            }
+            NavigationLink {
+                CollectionsView()
+            } label: {
+                Label(L10n.collections, systemImage: "square.stack.fill")
+            }
+            NavigationLink {
+                PlaylistsView()
+            } label: {
+                Label(L10n.playlists, systemImage: "music.note.list")
             }
         }
     }

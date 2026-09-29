@@ -31,10 +31,6 @@ struct AdaptiveRootView: View {
                 .tabItem { Label(AppSection.libraries.title, systemImage: AppSection.libraries.systemImage) }
                 .tag(AppSection.libraries)
 
-            MoreBrowseView()
-                .tabItem { Label(L10n.more, systemImage: "ellipsis.circle.fill") }
-                .tag(AppSection.collections)
-
             IPTVView()
                 .tabItem { Label(AppSection.iptv.title, systemImage: AppSection.iptv.systemImage) }
                 .tag(AppSection.iptv)
@@ -61,8 +57,6 @@ struct AdaptiveRootView: View {
             ZStack {
                 sectionLayer(.home) { HomeView() }
                 sectionLayer(.libraries) { LibrariesView() }
-                sectionLayer(.collections) { NavigationStack { CollectionsView() } }
-                sectionLayer(.playlists) { NavigationStack { PlaylistsView() } }
                 sectionLayer(.iptv) { IPTVView() }
                 sectionLayer(.settings) { SettingsTabView() }
             }
@@ -79,26 +73,5 @@ struct AdaptiveRootView: View {
             .opacity(selectedSection == section ? 1 : 0)
             .allowsHitTesting(selectedSection == section)
             .accessibilityHidden(selectedSection != section)
-    }
-}
-
-/// iPhone “More” tab — single NavigationStack for Collections / Playlists.
-struct MoreBrowseView: View {
-    var body: some View {
-        NavigationStack {
-            List {
-                NavigationLink {
-                    CollectionsView()
-                } label: {
-                    Label(L10n.collections, systemImage: "square.stack.fill")
-                }
-                NavigationLink {
-                    PlaylistsView()
-                } label: {
-                    Label(L10n.playlists, systemImage: "music.note.list")
-                }
-            }
-            .navigationTitle(L10n.more)
-        }
     }
 }

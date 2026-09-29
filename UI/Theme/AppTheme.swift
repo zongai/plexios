@@ -96,22 +96,18 @@ enum AppLayout {
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case home
     case libraries
-    case collections
-    case playlists
     case iptv
     case settings
 
     var id: String { rawValue }
 
-    /// Sidebar / primary navigation (search lives inside Libraries).
+    /// Primary tabs / iPad sidebar (search, collections, playlists live under Libraries).
     static var sidebarCases: [AppSection] { allCases }
 
     var title: String {
         switch self {
         case .home: return L10n.home
         case .libraries: return L10n.libraries
-        case .collections: return L10n.collections
-        case .playlists: return L10n.playlists
         case .iptv: return String(localized: "iptv.title")
         case .settings: return L10n.settings
         }
@@ -121,8 +117,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .home: return "house.fill"
         case .libraries: return PlexIcon.library
-        case .collections: return "square.stack.fill"
-        case .playlists: return PlexIcon.playlist
         case .iptv: return "tv"
         case .settings: return PlexIcon.settings
         }

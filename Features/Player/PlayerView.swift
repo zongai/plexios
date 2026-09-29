@@ -503,20 +503,110 @@ struct PlayerView: View {
 
     private func loadSeasonEpisodes() async {
         guard activeItem.type == .episode,
-              let context = environment.serverContext,
-              let parentKey = activeItem.parentRatingKey else {
+              let context = environment.serverContext else {
             seasonEpisodes = []
             return
         }
-        do {
-            let kids = try await environment.metadataRepository.children(
+
+        // 1) Refresh full metadata — hub/playback payloads often omit parentRatingKey
+        var episode = activeItem
+        if episode.parentRatingKey == nil || episode.grandparentRatingKey == nil {
+            if let full = try? await environment.metadataRepository.metadata(
+                ratingKey: episode.ratingKey,
+                context: context,
+                force: true
+            ) {
+                episode = full
+            }
+        }
+
+        // 2) Season children via parentRatingKey
+        if let parentKey = episode.parentRatingKey {
+            if let kids = try? await environment.metadataRepository.children(
                 ratingKey: parentKey,
                 context: context
-            )
-            seasonEpisodes = kids.filter { $0.type == .episode }
-        } catch {
-            seasonEpisodes = []
+            ) {
+                let eps = kids.filter { $0.type == .episode }
+                    .sorted { ($0.index ?? 0) < ($1.index ?? 0) }
+                if !eps.isEmpty {
+                    seasonEpisodes = eps
+                    return
+                }
+            }
         }
+
+        // 3) Show → seasons → match current season by index or membership
+        if let showKey = episode.grandparentRatingKey {
+            if let seasons = try? await environment.metadataRepository.children(
+                ratingKey: showKey,
+                context: context
+            ) {
+                let seasonNodes = seasons.filter { $0.type == .season || $0.type == .unknown }
+                // Prefer season matching parentIndex
+                var ordered = seasonNodes
+                if let si = episode.parentIndex {
+                    ordered = seasonNodes.filter { $0.index == si } + seasonNodes.filter { $0.index != si }
+                }
+                for season in ordered {
+                    guard let kids = try? await environment.metadataRepository.children(
+                        ratingKey: season.ratingKey,
+                        context: context
+                    ) else { continue }
+                    let eps = kids.filter { $0.type == .episode }
+                        .sorted { ($0.index ?? 0) < ($1.index ?? 0) }
+                    if eps.contains(where: { $0.ratingKey == episode.ratingKey }) || episode.parentIndex == season.index {
+                        if !eps.isEmpty {
+                            seasonEpisodes = eps
+                            return
+                        }
+                    }
+                    // First non-empty season as weak fallback only if single season
+                    if seasonNodes.count == 1, !eps.isEmpty {
+                        seasonEpisodes = eps
+                        return
+                    }
+                }
+                // If membership match failed, use first season with episodes that share parentIndex
+                if let si = episode.parentIndex {
+                    for season in seasonNodes where season.index == si {
+                        if let kids = try? await environment.metadataRepository.children(
+                            ratingKey: season.ratingKey,
+                            context: context
+                        ) {
+                            let eps = kids.filter { $0.type == .episode }
+                                .sorted { ($0.index ?? 0) < ($1.index ?? 0) }
+                            if !eps.isEmpty {
+                                seasonEpisodes = eps
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4) Related hubs — collect episode-like items as a last-resort list
+        if let hubs = try? await environment.apiClient.fetchRelated(
+            ratingKey: episode.ratingKey,
+            baseURL: context.baseURL,
+            token: context.token
+        ) {
+            var seen = Set<String>()
+            var collected: [PlexMetadata] = []
+            for hub in hubs {
+                for item in hub.items where item.type == .episode {
+                    if seen.insert(item.ratingKey).inserted {
+                        collected.append(item)
+                    }
+                }
+            }
+            if !collected.isEmpty {
+                seasonEpisodes = collected.sorted { ($0.index ?? 0) < ($1.index ?? 0) }
+                return
+            }
+        }
+
+        seasonEpisodes = []
     }
 
     private var episodePickerSheet: some View {

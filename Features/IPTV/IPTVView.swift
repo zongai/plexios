@@ -411,6 +411,7 @@ struct IPTVPlayerView: View {
                     canGoPrevious: canGoPrevious,
                     canGoNext: canGoNext,
                     sourceCount: session.channel.sources.count,
+                    aspectMode: engine.aspectMode,
                     onClose: {
                         Task {
                             await engine.stop(report: false)
@@ -425,6 +426,10 @@ struct IPTVPlayerView: View {
                     },
                     onPreviousChannel: { switchChannel(delta: -1) },
                     onNextChannel: { switchChannel(delta: 1) },
+                    onAspectMode: { mode in
+                        engine.setAspectMode(mode)
+                        bumpControls()
+                    },
                     onToggleHUD: {
                         diagnostics.isVisible.toggle()
                         bumpControls()
@@ -637,11 +642,13 @@ private struct IPTVPlayerChrome: View {
     let canGoPrevious: Bool
     let canGoNext: Bool
     let sourceCount: Int
+    let aspectMode: VideoAspectMode
     let onClose: () -> Void
     let onSources: () -> Void
     let onPlayPause: () -> Void
     let onPreviousChannel: () -> Void
     let onNextChannel: () -> Void
+    let onAspectMode: (VideoAspectMode) -> Void
     let onToggleHUD: () -> Void
 
     var body: some View {
@@ -746,7 +753,30 @@ private struct IPTVPlayerChrome: View {
                 .font(AppTypography.caption)
                 .foregroundStyle(.white.opacity(0.8))
                 .lineLimit(1)
-            Spacer()
+            Spacer(minLength: 8)
+
+            // Aspect ratio — same options as Plex player
+            Menu {
+                ForEach(VideoAspectMode.allCases) { mode in
+                    Button {
+                        onAspectMode(mode)
+                    } label: {
+                        if aspectMode == mode {
+                            Label(mode.title, systemImage: "checkmark")
+                        } else {
+                            Text(mode.title)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: aspectIconName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(String(localized: "player.aspect"))
+
             if sourceCount > 1 {
                 Text(String(format: String(localized: "iptv.sources_count"), sourceCount))
                     .font(AppTypography.caption2)
@@ -755,6 +785,14 @@ private struct IPTVPlayerChrome: View {
         }
         .padding(.horizontal, 4)
         .padding(.bottom, AppSpacing.sm)
+    }
+
+    private var aspectIconName: String {
+        switch aspectMode {
+        case .fit: return "rectangle"
+        case .fill: return "rectangle.arrowtriangle.2.outward"
+        case .stretch: return "arrow.up.left.and.arrow.down.right"
+        }
     }
 
     private func chromeIcon(

@@ -7,6 +7,14 @@ struct VLCPlayerContainer: UIViewRepresentable {
     let backend: VLCPlaybackBackend
     var aspectMode: VideoAspectMode = .fit
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator {
+        var lastSize: CGSize = .zero
+    }
+
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .black
@@ -36,9 +44,20 @@ struct VLCPlayerContainer: UIViewRepresentable {
         case .stretch:
             backend.drawableView.contentMode = .scaleToFill
         }
-        // After rotation, force drawable to relayout (reduces glitches).
         uiView.setNeedsLayout()
         uiView.layoutIfNeeded()
         backend.drawableView.setNeedsLayout()
+        backend.drawableView.layoutIfNeeded()
+
+        let size = uiView.bounds.size
+        // Rebind when we gain a real landscape-sized frame (or any significant size change).
+        if size.width > 32, size.height > 32 {
+            let prev = context.coordinator.lastSize
+            let changed = abs(prev.width - size.width) > 8 || abs(prev.height - size.height) > 8
+            if changed {
+                context.coordinator.lastSize = size
+                backend.rebindDrawable()
+            }
+        }
     }
 }

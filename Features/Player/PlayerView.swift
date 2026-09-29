@@ -1,5 +1,6 @@
 import AVKit
 import SwiftUI
+import UIKit
 
 struct PlayerView: View {
     @Environment(AppEnvironment.self) private var environment
@@ -86,10 +87,13 @@ struct PlayerView: View {
         .persistentSystemOverlays(.hidden)
         .task {
             OrientationLock.lockLandscape()
-            // Let rotation settle so overlay lays out in landscape bounds.
-            try? await Task.sleep(for: .milliseconds(250))
+            // Wait until landscape geometry is applied so VLC drawable is not 0×portrait mid-rotate.
+            await waitForLandscapeLayout()
             showControls = true
             await startPlayback()
+            // Rebind once the representable has landscape bounds.
+            try? await Task.sleep(for: .milliseconds(150))
+            engine.vlcBackend?.rebindDrawable()
             bumpControls()
         }
         .onAppear {

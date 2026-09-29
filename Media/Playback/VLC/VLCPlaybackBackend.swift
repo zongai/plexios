@@ -41,6 +41,17 @@ final class VLCPlaybackBackend: NSObject {
     /// Fired after track lists refresh (UI can rebind menus).
     var onTracksUpdated: (() -> Void)?
 
+    /// Call after rotation / container layout so VLC uses non-zero landscape bounds.
+    func rebindDrawable() {
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+        guard let mediaPlayer else { return }
+        drawableView.setNeedsLayout()
+        drawableView.layoutIfNeeded()
+        mediaPlayer.drawable = nil
+        mediaPlayer.drawable = drawableView
+#endif
+    }
+
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
     private var mediaPlayer: VLCMediaPlayer?
 #endif

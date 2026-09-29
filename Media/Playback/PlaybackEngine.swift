@@ -276,18 +276,16 @@ final class PlaybackEngine {
                     baseURL: context.baseURL,
                     token: context.token
                 )
-                let videoCodec = (metadata.media.first?.videoCodec
-                    ?? metadata.media.first?.parts.first?.streams.first(where: { $0.streamType == .video })?.codec)
-                    ?.lowercased() ?? ""
-                let forceSoft = videoCodec.contains("vp9") || videoCodec.contains("vp09")
-                    || videoCodec.contains("av1") || videoCodec.contains("av01")
+                // Do not force software decode by default — VP9 played fine before landscape
+                // lock; glitches were from drawable size during rotation. Soft-decode remains
+                // available via forceSoftwareDecode if needed later.
                 try await vlc.prepare(
                     url: url,
                     headers: headers,
                     startPositionMs: startMs,
                     externalSubtitles: externalSubs,
                     preferredSubtitlePlexId: decision.selectedSubtitleStreamId,
-                    forceSoftwareDecode: forceSoft
+                    forceSoftwareDecode: false
                 )
                 vlc.setRate(playbackRate)
                 applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)

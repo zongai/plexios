@@ -105,3 +105,5 @@
 "lang.hi" = "Hindi";
 "lang.th" = "Thai";
 "lang.vi" = "Vietnamese";
+"settings.audio_priority" = "Prioridad de audio %d";
+"settings.subtitle_priority" = "Prioridad de subtítulos %d";

@@ -124,3 +124,5 @@
 "lang.hi" = "印地语";
 "lang.th" = "泰语";
 "lang.vi" = "越南语";
+"settings.audio_priority" = "音轨优先 %d";
+"settings.subtitle_priority" = "字幕优先 %d";

@@ -232,7 +232,7 @@ struct PlaybackDecisionEngine: Sendable {
 
     private func selectAudio(_ streams: [PlexStream], forced: Int?) -> Int? {
         if let forced, streams.contains(where: { $0.id == forced }) { return forced }
-        if let pref = preferences.preferredAudioLanguage, !pref.isEmpty {
+        for pref in preferences.preferredAudioLanguages where !pref.isEmpty {
             if let match = streams.first(where: { matchesLanguage($0, pref: pref) }) {
                 return match.id
             }
@@ -252,7 +252,7 @@ struct PlaybackDecisionEngine: Sendable {
                 return (forced, capabilities.requiresBurnIn(stream))
             }
         }
-        if let pref = preferences.preferredSubtitleLanguage, !pref.isEmpty {
+        for pref in preferences.preferredSubtitleLanguages where !pref.isEmpty {
             if let match = streams.first(where: { matchesLanguage($0, pref: pref) }) {
                 return (match.id, capabilities.requiresBurnIn(match))
             }

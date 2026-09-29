@@ -241,9 +241,14 @@ struct PlaybackPreferences: Sendable {
     /// nil = original / auto
     var maxVideoBitrateKbps: Int?
     var autoPlayNextEpisode: Bool
-    var preferredAudioLanguage: String?
-    var preferredSubtitleLanguage: String?
+    /// Ordered language preference (first match wins). Empty = auto/server default.
+    var preferredAudioLanguages: [String]
+    var preferredSubtitleLanguages: [String]
     var subtitlesEnabled: Bool
+
+    /// Convenience: first audio preference (legacy single-value access).
+    var preferredAudioLanguage: String? { preferredAudioLanguages.first }
+    var preferredSubtitleLanguage: String? { preferredSubtitleLanguages.first }
     /// Default rate when starting playback (1.0 = normal)
     var defaultPlaybackRate: Float
     var defaultAspectMode: VideoAspectMode
@@ -257,8 +262,8 @@ struct PlaybackPreferences: Sendable {
     static let `default` = PlaybackPreferences(
         maxVideoBitrateKbps: nil,
         autoPlayNextEpisode: true,
-        preferredAudioLanguage: nil,
-        preferredSubtitleLanguage: nil,
+        preferredAudioLanguages: [],
+        preferredSubtitleLanguages: [],
         subtitlesEnabled: true,
         defaultPlaybackRate: 1.0,
         defaultAspectMode: .fit,
@@ -308,8 +313,10 @@ final class PlaybackSettingsStore {
         static let nativeEngine = "playback.allowNativeMediaEngine"
         static let allowVLC = "playback.allowVLCPlayer"
         static let preferSystem = "playback.preferSystemPlayer"
-        static let audioLang = "playback.audioLang"
-        static let subLang = "playback.subLang"
+        static let audioLang = "playback.audioLang"       // legacy single
+        static let subLang = "playback.subLang"           // legacy single
+        static let audioLangs = "playback.audioLangs"     // ordered list
+        static let subLangs = "playback.subLangs"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -322,8 +329,8 @@ final class PlaybackSettingsStore {
             return PlaybackPreferences(
                 maxVideoBitrateKbps: bitrate,
                 autoPlayNextEpisode: defaults.object(forKey: Keys.autoplay) as? Bool ?? true,
-                preferredAudioLanguage: defaults.string(forKey: Keys.audioLang),
-                preferredSubtitleLanguage: defaults.string(forKey: Keys.subLang),
+                preferredAudioLanguages: Self.loadLangList(defaults, listKey: Keys.audioLangs, legacyKey: Keys.audioLang),
+                preferredSubtitleLanguages: Self.loadLangList(defaults, listKey: Keys.subLangs, legacyKey: Keys.subLang),
                 subtitlesEnabled: defaults.object(forKey: Keys.subsEnabled) as? Bool ?? true,
                 defaultPlaybackRate: defaults.object(forKey: Keys.rate) as? Float ?? 1.0,
                 defaultAspectMode: VideoAspectMode(rawValue: defaults.string(forKey: Keys.aspect) ?? "") ?? .fit,
@@ -345,12 +352,15 @@ final class PlaybackSettingsStore {
             defaults.set(newValue.allowNativeMediaEngine, forKey: Keys.nativeEngine)
             defaults.set(newValue.allowVLCPlayer, forKey: Keys.allowVLC)
             defaults.set(newValue.preferSystemPlayer, forKey: Keys.preferSystem)
-            if let a = newValue.preferredAudioLanguage {
+            defaults.set(newValue.preferredAudioLanguages, forKey: Keys.audioLangs)
+            defaults.set(newValue.preferredSubtitleLanguages, forKey: Keys.subLangs)
+            // Keep legacy keys in sync for older builds
+            if let a = newValue.preferredAudioLanguages.first {
                 defaults.set(a, forKey: Keys.audioLang)
             } else {
                 defaults.removeObject(forKey: Keys.audioLang)
             }
-            if let s = newValue.preferredSubtitleLanguage {
+            if let s = newValue.preferredSubtitleLanguages.first {
                 defaults.set(s, forKey: Keys.subLang)
             } else {
                 defaults.removeObject(forKey: Keys.subLang)

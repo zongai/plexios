@@ -164,30 +164,23 @@ struct SettingsTabView: View {
             Toggle(String(localized: "settings.subtitles_default"), isOn: $prefs.subtitlesEnabled)
                 .onChange(of: prefs.subtitlesEnabled) { _, _ in savePrefs() }
 
-            Picker(String(localized: "settings.default_audio"), selection: Binding(
-                get: { prefs.preferredAudioLanguage ?? "" },
-                set: {
-                    prefs.preferredAudioLanguage = $0.isEmpty ? nil : $0
-                    savePrefs()
-                }
-            )) {
-                ForEach(PlaybackPreferences.languageOptions, id: \.code) { opt in
-                    Text(String(localized: String.LocalizationValue(opt.labelKey))).tag(opt.code)
+            // Ordered language priority (1st → 2nd → 3rd)
+            ForEach(0..<3, id: \.self) { index in
+                Picker(String(format: String(localized: "settings.audio_priority"), index + 1), selection: audioLangBinding(at: index)) {
+                    ForEach(PlaybackPreferences.languageOptions, id: \.code) { opt in
+                        Text(String(localized: String.LocalizationValue(opt.labelKey))).tag(opt.code)
+                    }
                 }
             }
 
-            Picker(String(localized: "settings.default_subtitle"), selection: Binding(
-                get: { prefs.preferredSubtitleLanguage ?? "" },
-                set: {
-                    prefs.preferredSubtitleLanguage = $0.isEmpty ? nil : $0
-                    savePrefs()
+            ForEach(0..<3, id: \.self) { index in
+                Picker(String(format: String(localized: "settings.subtitle_priority"), index + 1), selection: subtitleLangBinding(at: index)) {
+                    ForEach(PlaybackPreferences.languageOptions, id: \.code) { opt in
+                        Text(String(localized: String.LocalizationValue(opt.labelKey))).tag(opt.code)
+                    }
                 }
-            )) {
-                ForEach(PlaybackPreferences.languageOptions, id: \.code) { opt in
-                    Text(String(localized: String.LocalizationValue(opt.labelKey))).tag(opt.code)
-                }
+                .disabled(!prefs.subtitlesEnabled)
             }
-            .disabled(!prefs.subtitlesEnabled)
 
             Toggle("Native Media Engine (experimental)", isOn: $prefs.allowNativeMediaEngine)
                 .onChange(of: prefs.allowNativeMediaEngine) { _, _ in savePrefs() }
@@ -303,6 +296,37 @@ struct SettingsTabView: View {
             get: { prefs.maxVideoBitrateKbps ?? 0 },
             set: { newValue in
                 prefs.maxVideoBitrateKbps = newValue == 0 ? nil : newValue
+                savePrefs()
+            }
+        )
+    }
+
+
+    private func audioLangBinding(at index: Int) -> Binding<String> {
+        languageListBinding(index: index, get: { prefs.preferredAudioLanguages }, set: { prefs.preferredAudioLanguages = $0 })
+    }
+
+    private func subtitleLangBinding(at index: Int) -> Binding<String> {
+        languageListBinding(index: index, get: { prefs.preferredSubtitleLanguages }, set: { prefs.preferredSubtitleLanguages = $0 })
+    }
+
+    private func languageListBinding(index: Int, get: @escaping () -> [String], set: @escaping ([String]) -> Void) -> Binding<String> {
+        Binding(
+            get: {
+                let list = get()
+                return index < list.count ? list[index] : ""
+            },
+            set: { newValue in
+                var list = get()
+                while list.count <= index { list.append("") }
+                list[index] = newValue
+                var ordered: [String] = []
+                for i in 0..<max(list.count, index + 1) {
+                    let v = i < list.count ? list[i] : ""
+                    if !v.isEmpty { ordered.append(v) }
+                }
+                var seen = Set<String>()
+                set(ordered.filter { seen.insert($0).inserted })
                 savePrefs()
             }
         )

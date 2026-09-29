@@ -35,45 +35,47 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // Native Media Engine → Metal; otherwise AVPlayer layer
-            if engine.isNativeBackendActive {
-                MetalVideoView(
-                    aspectMode: engine.aspectMode,
-                    sink: engine.nativeVideoFrameSink,
-                    presenter: engine.nativeVideoPresenter,
-                    frame: engine.nativeLatestVideoFrame
-                )
-                .ignoresSafeArea()
-                .onTapGesture { toggleControls() }
-            } else if engine.isVLCBackendActive, let vlc = engine.vlcBackend {
-                VLCPlayerContainer(backend: vlc, aspectMode: engine.aspectMode)
-                    .ignoresSafeArea()
-                    .onTapGesture { toggleControls() }
-            } else if let player = engine.player {
-                PlayerLayerView(player: player, aspectMode: engine.aspectMode) { active in
-                    isPiPActive = active
-                    if active {
-                        showControls = false
+            // Video surface — no hit testing; taps handled by clear layer above.
+            Group {
+                if engine.isNativeBackendActive {
+                    MetalVideoView(
+                        aspectMode: engine.aspectMode,
+                        sink: engine.nativeVideoFrameSink,
+                        presenter: engine.nativeVideoPresenter,
+                        frame: engine.nativeLatestVideoFrame
+                    )
+                } else if engine.isVLCBackendActive, let vlc = engine.vlcBackend {
+                    VLCPlayerContainer(backend: vlc, aspectMode: engine.aspectMode)
+                } else if let player = engine.player {
+                    PlayerLayerView(player: player, aspectMode: engine.aspectMode) { active in
+                        isPiPActive = active
+                        if active { showControls = false }
                     }
+                } else if engine.sessionState == .loading {
+                    ProgressView()
+                        .tint(.white)
+                        .accessibilityLabel(L10n.loadingPlayback)
+                } else if let error = localError ?? engine.errorMessage {
+                    VStack(spacing: AppSpacing.md) {
+                        Text(error)
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                        Button(L10n.close) { dismiss() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
                 }
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            // Full-screen tap target (works over VLC UIViewRepresentable).
+            Color.clear
+                .contentShape(Rectangle())
                 .ignoresSafeArea()
                 .onTapGesture { toggleControls() }
-            } else if engine.sessionState == .loading {
-                ProgressView()
-                    .tint(.white)
-                    .accessibilityLabel(L10n.loadingPlayback)
-            } else if let error = localError ?? engine.errorMessage {
-                VStack(spacing: AppSpacing.md) {
-                    Text(error)
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                    Button("Close") { dismiss() }
-                        .buttonStyle(.borderedProminent)
-                }
-                .padding()
-            }
+                .zIndex(5)
 
-            // Include VLC: previously only AVPlayer/Native, so VLC playback had no controls.
             if showControls && !isPiPActive && hasActiveVideoSurface {
                 controlsOverlay
                     .transition(.opacity)
@@ -84,10 +86,16 @@ struct PlayerView: View {
         .persistentSystemOverlays(.hidden)
         .task {
             OrientationLock.lockLandscape()
+            // Let rotation settle so overlay lays out in landscape bounds.
+            try? await Task.sleep(for: .milliseconds(250))
+            showControls = true
             await startPlayback()
+            bumpControls()
         }
         .onAppear {
             OrientationLock.lockLandscape()
+            showControls = true
+            bumpControls()
         }
         .onDisappear {
             // Keep playing if PiP is active; otherwise stop.
@@ -298,8 +306,10 @@ struct PlayerView: View {
                 .padding(.top, AppSpacing.xs)
             }
             .padding(.horizontal, AppSpacing.lg)
-            .padding(.bottom, AppSpacing.xl)
+            .padding(.bottom, AppSpacing.md)
+            .padding(.bottom, 8) // extra for landscape home indicator
         }
+        .padding(.top, 4)
         .background(
             LinearGradient(
                 colors: [.black.opacity(0.6), .clear, .black.opacity(0.7)],

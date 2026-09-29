@@ -58,7 +58,8 @@ final class VLCPlaybackBackend: NSObject {
         headers: [String: String],
         startPositionMs: Int64,
         externalSubtitles: [URL] = [],
-        preferredSubtitlePlexId: Int? = nil
+        preferredSubtitlePlexId: Int? = nil,
+        forceSoftwareDecode: Bool = false
     ) async throws {
         guard VLCKitImport.available else {
             throw PlaybackFailure(stage: .unknown, reason: "MobileVLCKit not linked", underlying: nil)
@@ -79,10 +80,14 @@ final class VLCPlaybackBackend: NSObject {
         var opts: [String: Any] = [
             "network-caching": 1500,
             "http-reconnect": true,
-            // Prefer showing text subs when available
             "sub-fps": 25,
             "freetype-rel-fontsize": 16
         ]
+        // VP9 / problematic HW paths: disable hardware decode to avoid green/artifact frames.
+        if forceSoftwareDecode {
+            opts["avcodec-hw"] = "none"
+            opts["no-videotoolbox"] = true
+        }
         if !headers.isEmpty {
             let headerLines = headers.map { "\($0.key): \($0.value)" }.joined(separator: "\r\n")
             opts["http-headers"] = headerLines

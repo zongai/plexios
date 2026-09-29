@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 /// Hosts the VLC drawable UIView inside SwiftUI.
+/// Interaction is disabled so PlayerView overlay/controls receive taps.
 struct VLCPlayerContainer: UIViewRepresentable {
     let backend: VLCPlaybackBackend
     var aspectMode: VideoAspectMode = .fit
@@ -9,23 +10,24 @@ struct VLCPlayerContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .black
-        // Let SwiftUI onTapGesture receive touches (VLC drawable does not need them).
-        container.isUserInteractionEnabled = true
+        container.isUserInteractionEnabled = false
         let drawable = backend.drawableView
         drawable.isUserInteractionEnabled = false
         drawable.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(drawable)
-        NSLayoutConstraint.activate([
-            drawable.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            drawable.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            drawable.topAnchor.constraint(equalTo: container.topAnchor),
-            drawable.bottomAnchor.constraint(equalTo: container.bottomAnchor)
-        ])
+        if drawable.superview !== container {
+            drawable.removeFromSuperview()
+            container.addSubview(drawable)
+            NSLayoutConstraint.activate([
+                drawable.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                drawable.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                drawable.topAnchor.constraint(equalTo: container.topAnchor),
+                drawable.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            ])
+        }
         return container
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        // VLC scales internally; aspect is best-effort via content mode on drawable.
         switch aspectMode {
         case .fit:
             backend.drawableView.contentMode = .scaleAspectFit
@@ -34,5 +36,9 @@ struct VLCPlayerContainer: UIViewRepresentable {
         case .stretch:
             backend.drawableView.contentMode = .scaleToFill
         }
+        // After rotation, force drawable to relayout (reduces glitches).
+        uiView.setNeedsLayout()
+        uiView.layoutIfNeeded()
+        backend.drawableView.setNeedsLayout()
     }
 }

@@ -9,7 +9,10 @@ struct VLCPlayerContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .black
+        // Let SwiftUI onTapGesture receive touches (VLC drawable does not need them).
+        container.isUserInteractionEnabled = true
         let drawable = backend.drawableView
+        drawable.isUserInteractionEnabled = false
         drawable.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(drawable)
         NSLayoutConstraint.activate([

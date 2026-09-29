@@ -61,9 +61,11 @@ struct PlayerView: View {
                 .padding()
             }
 
-            if showControls && !isPiPActive && (engine.player != nil || engine.isNativeBackendActive) {
+            // Include VLC: previously only AVPlayer/Native, so VLC playback had no controls.
+            if showControls && !isPiPActive && hasActiveVideoSurface {
                 controlsOverlay
                     .transition(.opacity)
+                    .zIndex(10)
             }
         }
         .statusBarHidden(true)
@@ -109,9 +111,7 @@ struct PlayerView: View {
                     .frame(width: 44, height: 44)
 
                 if let decision = engine.decision {
-                    Text(engine.isNativeBackendActive
-                           ? "native · \(decision.mode.rawValue)"
-                           : decision.mode.rawValue)
+                    Text(backendLabel(for: decision))
                         .font(AppTypography.caption2)
                         .foregroundStyle(.white.opacity(0.7))
                         .padding(.trailing, 8)
@@ -348,6 +348,12 @@ struct PlayerView: View {
         if engine.errorMessage == nil {
             bumpControls()
         }
+    }
+
+    private func backendLabel(for decision: PlaybackDecision) -> String {
+        if engine.isVLCBackendActive { return "vlc · \(decision.mode.rawValue)" }
+        if engine.isNativeBackendActive { return "native · \(decision.mode.rawValue)" }
+        return decision.mode.rawValue
     }
 
     private func toggleControls() {

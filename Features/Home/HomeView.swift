@@ -10,7 +10,17 @@ struct HomeView: View {
             content
                 .navigationTitle(environment.connectionManager.activeServer?.name ?? L10n.home)
                 .navigationBarTitleDisplayMode(.large)
-                                                .navigationDestination(for: MediaRoute.self) { route in
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        NavigationLink {
+                            SearchView()
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                        }
+                        .accessibilityLabel(L10n.search)
+                    }
+                }
+                .navigationDestination(for: MediaRoute.self) { route in
                     MediaDestinationView(route: route)
                 }
                 .refreshable {

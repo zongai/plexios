@@ -40,7 +40,7 @@ struct MusicLibraryView: View {
         isLoading = true
         defer { isLoading = false }
         guard let context = environment.serverContext else {
-            errorMessage = "No server connected"
+            errorMessage = L10n.noServer
             return
         }
         do {

@@ -243,5 +243,6 @@ actor FavoritesRepository {
 
     func setFavorite(_ isFavorite: Bool, key: String, context: ServerContext) async throws {
         try await api.rate(key: key, rating: isFavorite ? 10 : 0, baseURL: context.baseURL, token: context.token)
+        LibraryProgressEvents.postProgressDidChange(machineIdentifier: context.machineIdentifier)
     }
 }

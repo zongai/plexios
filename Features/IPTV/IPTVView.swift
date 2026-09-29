@@ -526,7 +526,7 @@ struct IPTVPlayerView: View {
                 if bufferingStarted == nil { bufferingStarted = Date() }
                 Task { await maybeAdaptiveDowngrade() }
             case .error:
-                diagnostics.markError(engine.errorMessage ?? "error")
+                diagnostics.markError(engine.errorMessage ?? String(localized: "common.error"))
                 Task { await tryNextSource() }
             default:
                 break

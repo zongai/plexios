@@ -80,7 +80,7 @@ final class LibraryGridViewModel {
 
     func load(context: ServerContext?, force: Bool = false) async {
         guard let context else {
-            state = .failed("No server connected")
+            state = .failed(L10n.noServer)
             return
         }
         if force {

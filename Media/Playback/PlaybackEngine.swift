@@ -708,6 +708,7 @@ final class PlaybackEngine {
         if report, session != nil, context != nil {
             await session?.updateState(.stopped)
             await reportTimeline(force: true)
+            LibraryProgressEvents.postProgressDidChange(machineIdentifier: context?.machineIdentifier)
         }
 
         player?.pause()
@@ -984,6 +985,7 @@ final class PlaybackEngine {
         } else {
             await timelineReporter.unscrobble(baseURL: context.baseURL, token: context.token, key: item.key)
         }
+        LibraryProgressEvents.postProgressDidChange(machineIdentifier: context.machineIdentifier)
     }
 
     func refreshNowPlaying() {
@@ -1140,6 +1142,7 @@ final class PlaybackEngine {
                 token: context.token,
                 key: item.key
             )
+            LibraryProgressEvents.postProgressDidChange(machineIdentifier: context.machineIdentifier)
         }
         nowPlaying.updateProgress(positionMs: durationMs, durationMs: durationMs, isPlaying: false)
 

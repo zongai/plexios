@@ -53,6 +53,17 @@ struct HomeView: View {
                 viewModel?.reapplyPreferences(libraries: libraries)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: LibraryProgressEvents.didChange)) { _ in
+            Task {
+                if let mid = environment.serverContext?.machineIdentifier {
+                    await environment.hubRepository.invalidate(machineIdentifier: mid)
+                }
+                await loadHome(force: true)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraryProgressEvents.popToRoot)) { _ in
+            path = NavigationPath()
+        }
     }
 
     @ViewBuilder

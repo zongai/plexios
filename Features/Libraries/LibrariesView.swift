@@ -33,6 +33,9 @@ struct LibrariesView: View {
                     await viewModel?.load(context: environment.serverContext, force: true)
                 }
         }
+        .onReceive(NotificationCenter.default.publisher(for: LibraryProgressEvents.popToRoot)) { _ in
+            path = NavigationPath()
+        }
         .task {
             if viewModel == nil {
                 viewModel = LibrariesViewModel(

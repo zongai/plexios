@@ -58,7 +58,7 @@ struct CollectionsView: View {
 
     private func load(force: Bool = false) async {
         guard let context = environment.serverContext else {
-            errorMessage = "No server connected"
+            errorMessage = L10n.noServer
             isLoading = false
             return
         }

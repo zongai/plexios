@@ -720,7 +720,7 @@ struct PlayerView: View {
 
     private func startPlayback() async {
         guard let context = environment.serverContext else {
-            localError = "No server connected"
+            localError = L10n.noServer
             return
         }
         localError = nil

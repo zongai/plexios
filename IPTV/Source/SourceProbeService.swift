@@ -43,7 +43,7 @@ actor SourceProbeService {
         guard let url = source.streamURL else {
             let r = ProbeResult(
                 ok: false, latencyMs: 0, mbps: nil,
-                errorDescription: "invalid URL", hardFailure: true
+                errorDescription: String(localized: "iptv.error.invalid_url"), hardFailure: true
             )
             updated = applyHardFailure(updated, prefs: prefs, result: r)
             return (updated, r)
@@ -166,7 +166,7 @@ actor SourceProbeService {
             }
             return ranged
         }
-        return ProbeResult(ok: false, latencyMs: 0, mbps: nil, errorDescription: "probe failed", hardFailure: true)
+        return ProbeResult(ok: false, latencyMs: 0, mbps: nil, errorDescription: String(localized: "iptv.probe_failed"), hardFailure: true)
     }
 
     private func runProbeOnce(url: URL, headers: [String: String], useRange: Bool) async -> ProbeResult? {

@@ -2,7 +2,7 @@ import Foundation
 
 /// Lightweight reachability / speed probe for IPTV sources.
 /// Does **not** download full streams — only a small byte range with short timeout.
-/// Results gate selection via `disabledUntil` so bad sources are skipped until the next allowed test.
+/// Hard failures gate selection via `disabledUntil`; slow-but-reachable sources stay selectable.
 actor SourceProbeService {
     static let shared = SourceProbeService()
 
@@ -19,6 +19,8 @@ actor SourceProbeService {
         var latencyMs: Int
         var mbps: Double?
         var errorDescription: String?
+        /// Transport / HTTP hard failure vs soft (slow, empty sample, cancelled).
+        var hardFailure: Bool = false
     }
 
     /// Whether this source is due for a probe given prefs (avoids frequent tests).
@@ -39,26 +41,50 @@ actor SourceProbeService {
     func probe(source: IPTVSource, prefs: IPTVPreferences) async -> (IPTVSource, ProbeResult) {
         var updated = source
         guard let url = source.streamURL else {
-            let r = ProbeResult(ok: false, latencyMs: 0, mbps: nil, errorDescription: "invalid URL")
-            updated = applyFailure(updated, prefs: prefs, result: r)
+            let r = ProbeResult(
+                ok: false, latencyMs: 0, mbps: nil,
+                errorDescription: "invalid URL", hardFailure: true
+            )
+            updated = applyHardFailure(updated, prefs: prefs, result: r)
             return (updated, r)
         }
         guard !inFlight.contains(source.id) else {
-            return (source, ProbeResult(ok: true, latencyMs: source.lastProbeLatencyMs ?? 0, mbps: source.lastProbeMbps, errorDescription: "in-flight"))
+            return (
+                source,
+                ProbeResult(
+                    ok: true,
+                    latencyMs: source.lastProbeLatencyMs ?? 0,
+                    mbps: source.lastProbeMbps,
+                    errorDescription: "in-flight",
+                    hardFailure: false
+                )
+            )
         }
         inFlight.insert(source.id)
         defer { inFlight.remove(source.id) }
 
         let result = await runProbe(url: url, headers: source.headers)
-        if result.ok, result.latencyMs <= prefs.probeMaxLatencyMs {
-            updated.lastProbeAt = Date()
-            updated.lastProbeLatencyMs = result.latencyMs
-            updated.lastProbeMbps = result.mbps
+        updated.lastProbeAt = Date()
+        updated.lastProbeLatencyMs = result.latencyMs
+        updated.lastProbeMbps = result.mbps
+
+        if result.ok {
+            // Reachable: always clear hard disable. Slow sources stay selectable but rank lower via latency.
             updated.disabledUntil = nil
             updated.successCount += 1
             updated.lastSuccess = Date()
+            if result.latencyMs > prefs.probeMaxLatencyMs {
+                // Soft: record high latency only — do not disable.
+                updated.lastFailure = nil
+            }
+        } else if result.hardFailure {
+            updated = applyHardFailure(updated, prefs: prefs, result: result)
         } else {
-            updated = applyFailure(updated, prefs: prefs, result: result)
+            // Soft failure (empty body, cancelled mid-read): short cooldown, still show metrics.
+            updated.failureCount += 1
+            updated.lastFailure = Date()
+            let softCooldown = min(300, max(30, prefs.probeFailureCooldownMinutes * 60 * 0.25))
+            updated.disabledUntil = Date().addingTimeInterval(softCooldown)
         }
         return (updated, result)
     }
@@ -90,14 +116,14 @@ actor SourceProbeService {
         var list = sources
         let concurrency = max(1, maxConcurrent)
         var nextIndex = 0
-        var inFlight = 0
+        var active = 0
 
         await withTaskGroup(of: (Int, IPTVSource).self) { group in
             func enqueue() {
-                while nextIndex < candidates.count, inFlight < concurrency {
+                while nextIndex < candidates.count, active < concurrency {
                     let item = candidates[nextIndex]
                     nextIndex += 1
-                    inFlight += 1
+                    active += 1
                     group.addTask {
                         let (updated, _) = await self.probe(source: item.source, prefs: prefs)
                         return (item.offset, updated)
@@ -106,7 +132,7 @@ actor SourceProbeService {
             }
             enqueue()
             for await (offset, updated) in group {
-                inFlight -= 1
+                active -= 1
                 if list.indices.contains(offset) {
                     list[offset] = updated
                 }
@@ -116,7 +142,7 @@ actor SourceProbeService {
         return list
     }
 
-    private func applyFailure(_ source: IPTVSource, prefs: IPTVPreferences, result: ProbeResult) -> IPTVSource {
+    private func applyHardFailure(_ source: IPTVSource, prefs: IPTVPreferences, result: ProbeResult) -> IPTVSource {
         var u = source
         u.lastProbeAt = Date()
         u.lastProbeLatencyMs = result.latencyMs
@@ -129,12 +155,28 @@ actor SourceProbeService {
     }
 
     private func runProbe(url: URL, headers: [String: String]) async -> ProbeResult {
+        // Try Range first for a small sample; fall back without Range if server rejects it.
+        if let ranged = await runProbeOnce(url: url, headers: headers, useRange: true) {
+            if ranged.ok { return ranged }
+            // 416 / some CDNs reject Range — retry full GET with early cancel after sampleBytes.
+            if let desc = ranged.errorDescription, desc.contains("HTTP 416") || desc.contains("HTTP 405") {
+                if let fallback = await runProbeOnce(url: url, headers: headers, useRange: false) {
+                    return fallback
+                }
+            }
+            return ranged
+        }
+        return ProbeResult(ok: false, latencyMs: 0, mbps: nil, errorDescription: "probe failed", hardFailure: true)
+    }
+
+    private func runProbeOnce(url: URL, headers: [String: String], useRange: Bool) async -> ProbeResult? {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = connectTimeout
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        // Prefer a small range when server supports it
-        request.setValue("bytes=0-\(sampleBytes - 1)", forHTTPHeaderField: "Range")
+        if useRange {
+            request.setValue("bytes=0-\(sampleBytes - 1)", forHTTPHeaderField: "Range")
+        }
         for (k, v) in headers {
             request.setValue(v, forHTTPHeaderField: k)
         }
@@ -146,14 +188,21 @@ actor SourceProbeService {
         do {
             let (bytes, response) = try await IPTVNetwork.session.bytes(for: request)
             if let http = response as? HTTPURLResponse {
-                // 2xx or 206 Partial Content is success
                 if !(200...299).contains(http.statusCode) {
-                    return ProbeResult(ok: false, latencyMs: ms(since: start), mbps: nil, errorDescription: "HTTP \(http.statusCode)")
+                    let hard = http.statusCode == 401 || http.statusCode == 403
+                        || http.statusCode == 404 || http.statusCode >= 500
+                    return ProbeResult(
+                        ok: false,
+                        latencyMs: ms(since: start),
+                        mbps: nil,
+                        errorDescription: "HTTP \(http.statusCode)",
+                        hardFailure: hard
+                    )
                 }
             }
             var received = 0
             let deadline = Date().addingTimeInterval(resourceTimeout)
-            for try await b in bytes {
+            for try await _ in bytes {
                 received += 1
                 if received >= sampleBytes { break }
                 if Date() > deadline { break }
@@ -161,19 +210,54 @@ actor SourceProbeService {
             let elapsed = Date().timeIntervalSince(start)
             let latency = ms(since: start)
             guard received > 0 else {
-                return ProbeResult(ok: false, latencyMs: latency, mbps: nil, errorDescription: "empty body")
+                return ProbeResult(
+                    ok: false,
+                    latencyMs: latency,
+                    mbps: nil,
+                    errorDescription: "empty body",
+                    hardFailure: false
+                )
             }
-            // Mbps from sample
             let mbps = elapsed > 0 ? (Double(received) * 8.0) / (elapsed * 1_000_000.0) : nil
-            return ProbeResult(ok: true, latencyMs: latency, mbps: mbps, errorDescription: nil)
-        } catch {
+            return ProbeResult(ok: true, latencyMs: latency, mbps: mbps, errorDescription: nil, hardFailure: false)
+        } catch is CancellationError {
             return ProbeResult(
                 ok: false,
                 latencyMs: ms(since: start),
                 mbps: nil,
-                errorDescription: IPTVNetwork.describe(error)
+                errorDescription: "cancelled",
+                hardFailure: false
+            )
+        } catch {
+            let desc = IPTVNetwork.describe(error)
+            let hard = isHardTransportError(error)
+            return ProbeResult(
+                ok: false,
+                latencyMs: ms(since: start),
+                mbps: nil,
+                errorDescription: desc,
+                hardFailure: hard
             )
         }
+    }
+
+    private func isHardTransportError(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain {
+            switch ns.code {
+            case NSURLErrorTimedOut,
+                 NSURLErrorCannotFindHost,
+                 NSURLErrorCannotConnectToHost,
+                 NSURLErrorNetworkConnectionLost,
+                 NSURLErrorDNSLookupFailed,
+                 NSURLErrorNotConnectedToInternet,
+                 NSURLErrorSecureConnectionFailed:
+                return true
+            default:
+                return false
+            }
+        }
+        return true
     }
 
     private func ms(since: Date) -> Int {

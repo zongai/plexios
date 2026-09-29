@@ -155,13 +155,16 @@ actor SearchRepository {
     func search(query: String, context: ServerContext) async throws -> [PlexHub] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
+        try Task.checkCancellation()
 
         let key = "q:\(context.machineIdentifier):\(trimmed.lowercased())"
         if let cached: [PlexHub] = await cache.value(forKey: key) {
+            try Task.checkCancellation()
             return cached
         }
 
         let hubs = try await api.search(query: trimmed, baseURL: context.baseURL, token: context.token)
+        try Task.checkCancellation()
         await cache.store(hubs, forKey: key, ttl: CacheTTL.search)
         return hubs
     }

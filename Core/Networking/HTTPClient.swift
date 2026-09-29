@@ -43,16 +43,20 @@ actor HTTPClient {
         var lastError: Error?
 
         while attempt <= retryCount {
+            try Task.checkCancellation()
+
             if attempt > 0 {
                 let delayMs = UInt64(200 * attempt)
                 logger.network.debug("Retry \(attempt)/\(retryCount) \(redacted)")
-                try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
+                try await Task.sleep(nanoseconds: delayMs * 1_000_000)
             }
             attempt += 1
 
             do {
                 logger.network.debug("→ \(request.httpMethod ?? "GET") \(redacted)")
+                // session.data(for:) is cancelled when the parent Task is cancelled.
                 let (data, response) = try await session.data(for: request)
+                try Task.checkCancellation()
 
                 guard let http = response as? HTTPURLResponse else {
                     throw HTTPClientError.nonHTTPResponse
@@ -70,12 +74,14 @@ actor HTTPClient {
                 }
 
                 return Response(data: data, httpResponse: http, statusCode: http.statusCode)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as URLError where error.code == .cancelled {
+                throw CancellationError()
             } catch let error as HTTPClientError {
                 if case .httpStatus = error { throw error }
                 lastError = error
                 if attempt > retryCount { throw error }
-            } catch is CancellationError {
-                throw CancellationError()
             } catch {
                 logger.network.error("Transport error: \(error.localizedDescription)")
                 lastError = HTTPClientError.transport(error)

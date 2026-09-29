@@ -101,6 +101,30 @@ struct IPTVSource: Identifiable, Codable, Hashable, Sendable {
         return until > Date()
     }
 
+    /// Human-readable probe result for source lists, e.g. "128 ms · 3.2 Mbps" / "失败".
+    var probeResultLabel: String? {
+        if isTemporarilyDisabled {
+            return String(localized: "iptv.probe_failed")
+        }
+        guard lastProbeAt != nil else { return nil }
+        var parts: [String] = []
+        if let ms = lastProbeLatencyMs {
+            if ms >= 1000 {
+                parts.append(String(format: "%.1f s", Double(ms) / 1000.0))
+            } else {
+                parts.append("\(ms) ms")
+            }
+        }
+        if let mbps = lastProbeMbps, mbps > 0 {
+            if mbps >= 10 {
+                parts.append(String(format: "%.0f Mbps", mbps))
+            } else {
+                parts.append(String(format: "%.1f Mbps", mbps))
+            }
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     var streamURL: URL? { IPTVNetwork.normalizeURL(from: streamURLString) }
 
     var protocolType: IPTVStreamProtocol {

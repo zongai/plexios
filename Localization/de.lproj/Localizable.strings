@@ -133,6 +133,8 @@
 "iptv.show_all" = "Alle anzeigen";
 "iptv.group_all" = "Alle Gruppen";
 "iptv.sources" = "Quellen";
+"iptv.probe_failed" = "Fehlgeschlagen";
+"iptv.probe_now" = "Geschwindigkeit testen";
 "iptv.playback" = "Wiedergabe";
 "iptv.default_quality" = "Standardqualität";
 "iptv.auto_switch" = "Bei Fehler automatisch Quelle wechseln";

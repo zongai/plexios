@@ -133,6 +133,8 @@
 "iptv.show_all" = "모두 표시";
 "iptv.group_all" = "모든 그룹";
 "iptv.sources" = "소스";
+"iptv.probe_failed" = "실패";
+"iptv.probe_now" = "속도 테스트";
 "iptv.playback" = "재생";
 "iptv.default_quality" = "기본 화질";
 "iptv.auto_switch" = "실패 시 소스 자동 전환";

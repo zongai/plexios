@@ -133,6 +133,8 @@
 "iptv.show_all" = "顯示全部";
 "iptv.group_all" = "全部分組";
 "iptv.sources" = "播放源";
+"iptv.probe_failed" = "失敗";
+"iptv.probe_now" = "測速";
 "iptv.playback" = "播放";
 "iptv.default_quality" = "預設畫質";
 "iptv.auto_switch" = "失敗時自動切換源";

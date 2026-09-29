@@ -386,6 +386,8 @@ struct IPTVPlayerView: View {
     /// Ordered list for previous / next channel (usually current filter).
     var channelList: [IPTVChannel]
     @State private var showSources = false
+    @State private var isProbingSources = false
+    @State private var probingSourceIds: Set<UUID> = []
     @State private var diagnostics = IPTVDiagnostics()
     @State private var bufferingStarted: Date?
     @State private var showControls = true
@@ -541,17 +543,31 @@ struct IPTVPlayerView: View {
                             diagnostics.markSourceSwitch(to: src)
                             Task { await playCurrent() }
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(src.name ?? src.quality.displayName)
-                                    Text(src.streamURL?.host ?? "")
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 6) {
+                                        Text(src.name ?? src.quality.displayName)
+                                            .font(AppTypography.body.weight(.medium))
+                                            .foregroundStyle(AppColors.primaryText)
+                                        if probingSourceIds.contains(src.id) {
+                                            ProgressView()
+                                                .controlSize(.mini)
+                                        } else if let result = src.probeResultLabel {
+                                            Text("· \(result)")
+                                                .font(AppTypography.caption.weight(.medium))
+                                                .foregroundStyle(src.isTemporarilyDisabled ? AppColors.destructive : AppColors.accent)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    Text(src.streamURL?.host ?? src.streamURLString)
                                         .font(AppTypography.caption)
                                         .foregroundStyle(AppColors.secondaryText)
                                         .lineLimit(1)
                                 }
-                                Spacer()
+                                Spacer(minLength: 4)
                                 if src.id == session.source.id {
                                     Image(systemName: "checkmark")
+                                        .foregroundStyle(AppColors.accent)
                                 }
                             }
                         }
@@ -562,9 +578,25 @@ struct IPTVPlayerView: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(L10n.close) { showSources = false }
                     }
+                    ToolbarItem(placement: .primaryAction) {
+                        if isProbingSources {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Button {
+                                Task { await probeAllSourcesInSheet() }
+                            } label: {
+                                Image(systemName: "speedometer")
+                            }
+                            .accessibilityLabel(String(localized: "iptv.probe_now"))
+                        }
+                    }
                 }
             }
             .presentationDetents([.medium, .large])
+            .task {
+                await probeAllSourcesInSheet()
+            }
         }
     }
 
@@ -584,6 +616,28 @@ struct IPTVPlayerView: View {
             withAnimation(.easeOut(duration: 0.25)) {
                 showControls = false
             }
+        }
+    }
+
+    /// Probe every source when the picker opens (or user taps speedometer) and refresh labels.
+    private func probeAllSourcesInSheet() async {
+        guard !isProbingSources else { return }
+        isProbingSources = true
+        probingSourceIds = Set(session.channel.sources.map(\.id))
+        defer {
+            isProbingSources = false
+            probingSourceIds = []
+        }
+        let limit = max(session.channel.sources.count, 8)
+        let updated = await IPTVRepository.shared.probeChannelSources(
+            session.channel,
+            limit: limit,
+            force: true
+        )
+        session.channel = updated
+        // Keep selected source object in sync if it was re-probed
+        if let fresh = updated.sources.first(where: { $0.id == session.source.id }) {
+            session.source = fresh
         }
     }
 

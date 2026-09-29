@@ -158,13 +158,18 @@ actor IPTVRepository {
     }
 
     /// Probe sources that are due; persist results. Returns updated channel.
-    func probeChannelSources(_ channel: IPTVChannel, limit: Int = 3) async -> IPTVChannel {
+    /// - Parameter force: re-probe candidates even if interval has not elapsed (source picker).
+    func probeChannelSources(_ channel: IPTVChannel, limit: Int = 3, force: Bool = false) async -> IPTVChannel {
         let prefs = preferences()
-        guard prefs.autoProbeSources else { return channel }
+        guard prefs.autoProbeSources || force else { return channel }
         var ch = channel
-        let updated = await SourceProbeService.shared.probeIfNeeded(sources: ch.sources, prefs: prefs, limit: limit)
+        let updated = await SourceProbeService.shared.probeIfNeeded(
+            sources: ch.sources,
+            prefs: prefs,
+            limit: limit,
+            force: force
+        )
         ch.sources = updated
-        // Persist each changed source
         for src in updated {
             applySourceUpdate(channelId: ch.id, source: src)
         }

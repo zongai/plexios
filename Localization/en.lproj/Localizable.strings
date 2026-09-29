@@ -156,6 +156,8 @@
 "iptv.show_all" = "Show all";
 "iptv.group_all" = "All groups";
 "iptv.sources" = "Sources";
+"iptv.probe_failed" = "Failed";
+"iptv.probe_now" = "Test speed";
 "iptv.playback" = "Playback";
 "iptv.default_quality" = "Default quality";
 "iptv.auto_switch" = "Auto-switch source on failure";

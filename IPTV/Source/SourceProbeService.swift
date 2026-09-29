@@ -64,17 +64,23 @@ actor SourceProbeService {
     }
 
     /// Probe candidates that need testing (at most `limit`), persist via callback.
+    /// - Parameter force: when true, re-probe even if interval has not elapsed (still respects in-flight).
     func probeIfNeeded(
         sources: [IPTVSource],
         prefs: IPTVPreferences,
-        limit: Int = 3
+        limit: Int = 3,
+        force: Bool = false
     ) async -> [IPTVSource] {
-        guard prefs.autoProbeSources else { return sources }
+        guard prefs.autoProbeSources || force else { return sources }
         var list = sources
         var probed = 0
         for i in list.indices {
             guard probed < limit else { break }
-            guard needsProbe(list[i], prefs: prefs) else { continue }
+            if !force {
+                guard needsProbe(list[i], prefs: prefs) else { continue }
+            } else {
+                guard list[i].streamURL != nil else { continue }
+            }
             let (u, _) = await probe(source: list[i], prefs: prefs)
             list[i] = u
             probed += 1

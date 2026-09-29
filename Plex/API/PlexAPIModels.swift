@@ -180,6 +180,8 @@ struct APIMetadata: Decodable {
     let writer: [APITag]?
     let role: [APIRole]?
     let media: [APIMedia]?
+    let librarySectionID: Int?
+    let librarySectionTitle: String?
 
     enum CodingKeys: String, CodingKey {
         case ratingKey, key, type, title, summary, year, contentRating
@@ -188,6 +190,7 @@ struct APIMetadata: Decodable {
         case parentThumb, grandparentThumb, parentTitle, grandparentTitle
         case parentRatingKey, grandparentRatingKey, index, parentIndex
         case leafCount, viewedLeafCount, childCount, studio, tagline
+        case librarySectionID, librarySectionTitle
         case genre = "Genre"
         case director = "Director"
         case writer = "Writer"

@@ -23,7 +23,7 @@ final class HomeViewModel {
         self.logger = logger
     }
 
-    func load(context: ServerContext?, force: Bool = false) async {
+    func load(context: ServerContext?, libraries: [PlexLibrary] = [], force: Bool = false) async {
         guard let context else {
             // Bootstrap still connecting — keep loading, do not flash an error.
             if case .loaded = state, !hubs.isEmpty { return }
@@ -39,7 +39,7 @@ final class HomeViewModel {
                 try await hubRepository.homeHubs(context: context, force: force)
             }
             let prefs = HomeSettingsStore.shared.preferences
-            hubs = prefs.filtered(result.filter { !$0.items.isEmpty })
+            hubs = prefs.filtered(result.filter { !$0.items.isEmpty }, libraries: libraries)
             state = hubs.isEmpty ? .empty : .loaded
         } catch is CancellationError {
             return

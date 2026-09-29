@@ -102,3 +102,5 @@
 "home.pref.other" = "Other rows";
 "home.pref.max_items" = "Items per row";
 "home.pref.footer" = "Choose which rows appear on Home. Changes apply the next time Home refreshes.";
+"home.pref.no_libraries" = "No libraries discovered yet.";
+"home.pref.footer_libraries" = "Toggle personal rows and each library from your server. Disabled libraries hide their Home shelves.";

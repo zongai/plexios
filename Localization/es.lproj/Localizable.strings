@@ -83,3 +83,5 @@
 "home.pref.other" = "Otras filas";
 "home.pref.max_items" = "Elementos por fila";
 "home.pref.footer" = "Elige qué filas aparecen en Inicio. Los cambios se aplican al actualizar Inicio.";
+"home.pref.no_libraries" = "Aún no hay bibliotecas.";
+"home.pref.footer_libraries" = "Activa filas personales y cada biblioteca del servidor. Las desactivadas no aparecen en Inicio.";

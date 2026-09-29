@@ -83,3 +83,5 @@
 "home.pref.other" = "其他列";
 "home.pref.max_items" = "每列筆數";
 "home.pref.footer" = "選擇主畫面顯示的內容列。變更後下拉重新整理首頁即可生效。";
+"home.pref.no_libraries" = "尚未發現媒體庫。";
+"home.pref.footer_libraries" = "可開關「繼續觀看」等個人列，以及伺服器上的每個媒體庫；關閉的庫不會出現在主畫面。";

@@ -49,7 +49,7 @@ final class MediaModelTests: XCTestCase {
             originallyAvailableAt: nil, thumb: nil, art: nil,
             parentThumb: nil, grandparentThumb: nil, parentTitle: "S1",
             grandparentTitle: "Show", parentRatingKey: nil, grandparentRatingKey: nil,
-            index: 1, parentIndex: 1, leafCount: nil, viewedLeafCount: nil,
+            index: 1, parentIndex: 1, librarySectionID: nil, librarySectionTitle: nil, leafCount: nil, viewedLeafCount: nil,
             childCount: nil, studio: nil, tagline: nil,
             genres: [], directors: [], writers: [], actors: [], media: []
         )
@@ -71,7 +71,7 @@ final class MediaModelTests: XCTestCase {
             originallyAvailableAt: nil, thumb: nil, art: nil,
             parentThumb: nil, grandparentThumb: nil, parentTitle: nil,
             grandparentTitle: nil, parentRatingKey: nil, grandparentRatingKey: nil,
-            index: nil, parentIndex: nil, leafCount: nil, viewedLeafCount: nil,
+            index: nil, parentIndex: nil, librarySectionID: nil, librarySectionTitle: nil, leafCount: nil, viewedLeafCount: nil,
             childCount: nil, studio: nil, tagline: nil,
             genres: [], directors: [], writers: [], actors: [], media: []
         )

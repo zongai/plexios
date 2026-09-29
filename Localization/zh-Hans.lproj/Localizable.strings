@@ -102,3 +102,5 @@
 "home.pref.other" = "其他行";
 "home.pref.max_items" = "每行条数";
 "home.pref.footer" = "选择主界面显示的内容行。更改后下拉刷新主页即可生效。";
+"home.pref.no_libraries" = "尚未发现媒体库。";
+"home.pref.footer_libraries" = "可开关「继续观看」等个人行，以及服务器上的每个媒体库；关闭的库不会出现在主界面。";

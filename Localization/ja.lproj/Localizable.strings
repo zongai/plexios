@@ -83,3 +83,5 @@
 "home.pref.other" = "その他";
 "home.pref.max_items" = "行あたりの件数";
 "home.pref.footer" = "ホームに表示する行を選択します。変更はホームを更新すると反映されます。";
+"home.pref.no_libraries" = "ライブラリがまだありません。";
+"home.pref.footer_libraries" = "続きからなどの個人行と、サーバー上の各ライブラリを切り替えます。オフにしたライブラリはホームに表示されません。";

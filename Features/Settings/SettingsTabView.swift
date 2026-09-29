@@ -4,6 +4,7 @@ struct SettingsTabView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var prefs = PlaybackSettingsStore.shared.preferences
     @State private var homePrefs = HomeSettingsStore.shared.preferences
+    @State private var homeLibraries: [PlexLibrary] = []
 
     var body: some View {
         NavigationStack {
@@ -22,6 +23,11 @@ struct SettingsTabView: View {
             .onAppear {
                 prefs = PlaybackSettingsStore.shared.preferences
                 homePrefs = HomeSettingsStore.shared.preferences
+            }
+            .task {
+                if let context = environment.serverContext {
+                    homeLibraries = (try? await environment.libraryRepository.libraries(context: context)) ?? []
+                }
             }
         }
     }
@@ -85,19 +91,41 @@ struct SettingsTabView: View {
 
     private var homeSection: some View {
         Section {
-            ForEach(HomeDisplayPreferences.Category.allCases) { category in
-                Toggle(category.title, isOn: Binding(
-                    get: { homePrefs.isEnabled(category) },
-                    set: { newValue in
-                        homePrefs.set(category, enabled: newValue)
-                        HomeSettingsStore.shared.preferences = homePrefs
-                    }
-                ))
+            Toggle(String(localized: "home.pref.continue"), isOn: Binding(
+                get: { homePrefs.showContinueWatching },
+                set: {
+                    homePrefs.showContinueWatching = $0
+                    HomeSettingsStore.shared.preferences = homePrefs
+                }
+            ))
+            Toggle(String(localized: "home.pref.recently_played"), isOn: Binding(
+                get: { homePrefs.showRecentlyPlayed },
+                set: {
+                    homePrefs.showRecentlyPlayed = $0
+                    HomeSettingsStore.shared.preferences = homePrefs
+                }
+            ))
+
+            if homeLibraries.isEmpty {
+                Text(String(localized: "home.pref.no_libraries"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(homeLibraries) { lib in
+                    Toggle(lib.title, isOn: Binding(
+                        get: { homePrefs.isLibraryEnabled(lib.key) },
+                        set: { enabled in
+                            homePrefs.setLibrary(lib.key, enabled: enabled)
+                            HomeSettingsStore.shared.preferences = homePrefs
+                        }
+                    ))
+                }
             }
+
             Picker(String(localized: "home.pref.max_items"), selection: Binding(
                 get: { homePrefs.maxItemsPerHub },
-                set: { newValue in
-                    homePrefs.maxItemsPerHub = newValue
+                set: {
+                    homePrefs.maxItemsPerHub = $0
                     HomeSettingsStore.shared.preferences = homePrefs
                 }
             )) {
@@ -110,7 +138,7 @@ struct SettingsTabView: View {
         } header: {
             Text(String(localized: "home.pref.section"))
         } footer: {
-            Text(String(localized: "home.pref.footer"))
+            Text(String(localized: "home.pref.footer_libraries"))
         }
     }
 

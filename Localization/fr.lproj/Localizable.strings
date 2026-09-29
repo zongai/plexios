@@ -83,3 +83,5 @@
 "home.pref.other" = "Autres rangées";
 "home.pref.max_items" = "Éléments par rangée";
 "home.pref.footer" = "Choisissez les rangées affichées sur l’accueil. Les changements s’appliquent au rafraîchissement.";
+"home.pref.no_libraries" = "Aucune bibliothèque pour l’instant.";
+"home.pref.footer_libraries" = "Activez les rangées personnelles et chaque bibliothèque du serveur. Les bibliothèques désactivées n’apparaissent pas sur l’accueil.";

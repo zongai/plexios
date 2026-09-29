@@ -9,11 +9,12 @@ struct HubRailView: View {
 
     /// Single style for the whole rail (never mix poster + landscape in one row).
     private var useWideCards: Bool {
-        let category = HomeDisplayPreferences.category(for: hub)
-        if category == .continueWatching || category == .recentlyPlayed {
+        switch HomeDisplayPreferences.personalKind(for: hub) {
+        case .continueWatching, .recentlyPlayed:
             return true
+        case .none:
+            break
         }
-        // If most items are episodes, use landscape for all.
         let episodes = hub.items.filter { $0.type == .episode }.count
         return !hub.items.isEmpty && episodes * 2 >= hub.items.count
     }

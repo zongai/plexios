@@ -83,3 +83,5 @@
 "home.pref.other" = "Andere Zeilen";
 "home.pref.max_items" = "Elemente pro Zeile";
 "home.pref.footer" = "Wählen Sie, welche Zeilen auf der Startseite erscheinen. Änderungen gelten nach Aktualisieren.";
+"home.pref.no_libraries" = "Noch keine Bibliotheken gefunden.";
+"home.pref.footer_libraries" = "Persönliche Zeilen und jede Bibliothek des Servers ein-/ausschalten. Deaktivierte Bibliotheken erscheinen nicht auf der Startseite.";

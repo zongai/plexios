@@ -45,7 +45,7 @@ final class PlaybackDecisionTests: XCTestCase {
             originallyAvailableAt: nil, thumb: nil, art: nil,
             parentThumb: nil, grandparentThumb: nil, parentTitle: nil,
             grandparentTitle: nil, parentRatingKey: nil, grandparentRatingKey: nil,
-            index: nil, parentIndex: nil, leafCount: nil, viewedLeafCount: nil,
+            index: nil, parentIndex: nil, librarySectionID: nil, librarySectionTitle: nil, leafCount: nil, viewedLeafCount: nil,
             childCount: nil, studio: nil, tagline: nil,
             genres: [], directors: [], writers: [], actors: [], media: [media]
         )

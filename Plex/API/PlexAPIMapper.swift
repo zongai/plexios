@@ -181,6 +181,8 @@ enum PlexAPIMapper {
             grandparentRatingKey: dto.grandparentRatingKey,
             index: dto.index,
             parentIndex: dto.parentIndex,
+            librarySectionID: dto.librarySectionID.map(String.init),
+            librarySectionTitle: dto.librarySectionTitle,
             leafCount: dto.leafCount,
             viewedLeafCount: dto.viewedLeafCount,
             childCount: dto.childCount,

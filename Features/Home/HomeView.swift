@@ -24,18 +24,18 @@ struct HomeView: View {
                     logger: environment.logger
                 )
             }
-            await viewModel?.load(context: environment.serverContext)
+            await loadHome()
         }
         .onChange(of: environment.connectionManager.activeServer?.machineIdentifier) { _, _ in
-            Task { await viewModel?.load(context: environment.serverContext, force: true) }
+            Task { await loadHome(force: true) }
         }
         .onChange(of: environment.serverContext?.baseURL.absoluteString) { _, newURL in
             guard newURL != nil else { return }
-            Task { await viewModel?.load(context: environment.serverContext, force: true) }
+            Task { await loadHome(force: true) }
         }
         .onAppear {
             // Re-apply home display preferences when returning from Settings
-            Task { await viewModel?.load(context: environment.serverContext, force: true) }
+            Task { await loadHome(force: true) }
         }
     }
 
@@ -58,12 +58,20 @@ struct HomeView: View {
             )
         case .failed(let message):
             ErrorStateView(message: message) {
-                Task { await viewModel?.load(context: environment.serverContext, force: true) }
+                Task { await loadHome(force: true) }
             }
         }
     }
 
     private var hubsEmpty: Bool { viewModel?.hubs.isEmpty ?? true }
+
+    private func loadHome(force: Bool = false) async {
+        var libraries: [PlexLibrary] = []
+        if let context = environment.serverContext {
+            libraries = (try? await environment.libraryRepository.libraries(context: context)) ?? []
+        }
+        await viewModel?.load(context: environment.serverContext, libraries: libraries, force: force)
+    }
 
     private var hubList: some View {
         ScrollView {

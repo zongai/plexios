@@ -169,6 +169,8 @@ struct PlexMetadata: Identifiable, Hashable, Sendable, Codable {
     let grandparentRatingKey: String?
     let index: Int?               // episode / season number
     let parentIndex: Int?
+    let librarySectionID: String?
+    let librarySectionTitle: String?
     let leafCount: Int?
     let viewedLeafCount: Int?
     let childCount: Int?

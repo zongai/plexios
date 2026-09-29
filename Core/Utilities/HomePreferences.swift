@@ -97,43 +97,93 @@ struct HomeDisplayPreferences: Sendable, Equatable {
         let enabledLibraries = libraries.filter { isLibraryEnabled($0.key) }
         let enabledKeys = Set(enabledLibraries.map(\.key))
 
-        return hubs.compactMap { hub in
+        // PMS often returns several Continue Watching / On Deck hubs (global + per library).
+        // Merge same personal kinds into one rail and dedupe items so Home is not repeated.
+        var continueItems: [PlexMetadata] = []
+        var continueHubTemplate: PlexHub?
+        var playedItems: [PlexMetadata] = []
+        var playedHubTemplate: PlexHub?
+        var other: [PlexHub] = []
+
+        for hub in hubs {
             switch Self.personalKind(for: hub) {
             case .continueWatching:
-                guard showContinueWatching else { return nil }
-            case .recentlyAdded:
-                // Library "Recently Added" shelves still respect library toggles below.
-                break
+                guard showContinueWatching else { continue }
+                if continueHubTemplate == nil { continueHubTemplate = hub }
+                continueItems.append(contentsOf: hub.items)
             case .recentlyPlayed:
-                guard showRecentlyPlayed else { return nil }
+                guard showRecentlyPlayed else { continue }
+                if playedHubTemplate == nil { playedHubTemplate = hub }
+                playedItems.append(contentsOf: hub.items)
+            case .recentlyAdded, .none:
+                other.append(hub)
+            }
+        }
+
+        var result: [PlexHub] = []
+
+        if var template = continueHubTemplate {
+            template.items = Self.dedupeItems(continueItems, enabledKeys: enabledKeys, max: maxItemsPerHub)
+            if !template.items.isEmpty {
+                result.append(template)
+            }
+        }
+
+        for hub in other {
+            switch Self.personalKind(for: hub) {
+            case .continueWatching, .recentlyPlayed:
+                continue
+            case .recentlyAdded:
+                break
             case .none:
-                if libraries.isEmpty {
-                    break
-                }
-                let sectionKeys = Self.sectionKeys(for: hub, libraries: libraries)
-                if !sectionKeys.isEmpty {
-                    guard !sectionKeys.isDisjoint(with: enabledKeys) else { return nil }
-                } else {
-                    let typeMatch = enabledLibraries.contains { Self.matchesLibraryType(hub, library: $0) }
-                    guard typeMatch else { return nil }
+                if !libraries.isEmpty {
+                    let sectionKeys = Self.sectionKeys(for: hub, libraries: libraries)
+                    if !sectionKeys.isEmpty {
+                        guard !sectionKeys.isDisjoint(with: enabledKeys) else { continue }
+                    } else {
+                        let typeMatch = enabledLibraries.contains { Self.matchesLibraryType(hub, library: $0) }
+                        guard typeMatch else { continue }
+                    }
                 }
             }
 
             var copy = hub
-            if maxItemsPerHub > 0, copy.items.count > maxItemsPerHub {
-                copy.items = Array(copy.items.prefix(maxItemsPerHub))
+            copy.items = Self.dedupeItems(copy.items, enabledKeys: enabledKeys, max: maxItemsPerHub)
+            if !copy.items.isEmpty {
+                result.append(copy)
             }
-            if !enabledKeys.isEmpty {
-                let filteredItems = copy.items.filter { item in
-                    guard let sid = item.librarySectionID else { return true }
-                    return enabledKeys.contains(sid)
-                }
-                if !filteredItems.isEmpty {
-                    copy.items = filteredItems
-                }
-            }
-            return copy.items.isEmpty ? nil : copy
         }
+
+        if var template = playedHubTemplate {
+            template.items = Self.dedupeItems(playedItems, enabledKeys: enabledKeys, max: maxItemsPerHub)
+            if !template.items.isEmpty {
+                result.append(template)
+            }
+        }
+
+        return result
+    }
+
+    /// Stable order, unique by ratingKey; optional library filter and max count.
+    private static func dedupeItems(
+        _ items: [PlexMetadata],
+        enabledKeys: Set<String>,
+        max: Int
+    ) -> [PlexMetadata] {
+        var seen = Set<String>()
+        var out: [PlexMetadata] = []
+        for item in items {
+            if !enabledKeys.isEmpty, let sid = item.librarySectionID, !enabledKeys.contains(sid) {
+                continue
+            }
+            // Episodes of the same show: keep each episode (different ratingKey).
+            // Identical ratingKey from multiple hubs is dropped.
+            if seen.contains(item.ratingKey) { continue }
+            seen.insert(item.ratingKey)
+            out.append(item)
+            if max > 0, out.count >= max { break }
+        }
+        return out
     }
 }
 

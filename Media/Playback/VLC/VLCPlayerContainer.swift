@@ -11,6 +11,7 @@ struct VLCPlayerContainer: UIViewRepresentable {
         Coordinator(backend: backend)
     }
 
+    @MainActor
     final class Coordinator: NSObject {
         let backend: VLCPlaybackBackend
         weak var container: AspectContainerView?
@@ -28,7 +29,6 @@ struct VLCPlayerContainer: UIViewRepresentable {
             ticks = 0
             sawVideoSize = backend.currentVideoSize.width > 1
             let link = CADisplayLink(target: self, selector: #selector(tick))
-            // ~10 Hz is enough to catch video size.
             if #available(iOS 15.0, *) {
                 link.preferredFrameRateRange = CAFrameRateRange(minimum: 5, maximum: 15, preferred: 10)
             }
@@ -43,18 +43,15 @@ struct VLCPlayerContainer: UIViewRepresentable {
 
         @objc private func tick() {
             ticks += 1
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let hasSize = self.backend.currentVideoSize.width > 1
-                if hasSize, !self.sawVideoSize {
-                    self.sawVideoSize = true
-                    self.container?.reapply(forceRebind: true)
-                } else {
-                    self.container?.reapply(forceRebind: false)
-                }
-                if self.ticks > 40 || (self.sawVideoSize && self.ticks > 15) {
-                    self.stopSizePolling()
-                }
+            let hasSize = backend.currentVideoSize.width > 1
+            if hasSize, !sawVideoSize {
+                sawVideoSize = true
+                container?.reapply(forceRebind: true)
+            } else {
+                container?.reapply(forceRebind: false)
+            }
+            if ticks > 40 || (sawVideoSize && ticks > 15) {
+                stopSizePolling()
             }
         }
 

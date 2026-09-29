@@ -62,18 +62,23 @@ final class VLCPlaybackBackend: NSObject {
 
     private var timeTimer: Timer?
     private var pendingSubtitlePlexId: Int?
+    private var pendingAudioPlexId: Int?
+    private var pendingAudioStream: PlexStream?
+    private var pendingAudioAll: [PlexStream] = []
     private var externalSubtitleURLs: [URL] = []
     private var httpHeaders: [String: String] = [:]
 
     /// - Parameters:
     ///   - externalSubtitles: Plex external subtitle file URLs (with token if needed).
     ///   - preferredSubtitlePlexId: Plex stream id to enable once tracks appear.
+    ///   - preferredAudioPlexId: Plex audio stream id to enable once tracks appear.
     func prepare(
         url: URL,
         headers: [String: String],
         startPositionMs: Int64,
         externalSubtitles: [URL] = [],
         preferredSubtitlePlexId: Int? = nil,
+        preferredAudioPlexId: Int? = nil,
         forceSoftwareDecode: Bool = false
     ) async throws {
         guard VLCKitImport.available else {
@@ -86,6 +91,7 @@ final class VLCPlaybackBackend: NSObject {
         httpHeaders = headers
         externalSubtitleURLs = externalSubtitles
         pendingSubtitlePlexId = preferredSubtitlePlexId
+        pendingAudioPlexId = preferredAudioPlexId
 
         let player = VLCMediaPlayer()
         player.delegate = self
@@ -185,6 +191,75 @@ final class VLCPlaybackBackend: NSObject {
         mediaPlayer?.currentAudioTrackIndex = Int32(index)
         selectedAudioIndex = index
 #endif
+    }
+
+    /// Select audio using Plex metadata (language / title / embedded order).
+    func applyPlexAudio(stream: PlexStream?, allAudioStreams: [PlexStream]) {
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+        pendingAudioStream = stream
+        pendingAudioAll = allAudioStreams
+        pendingAudioPlexId = stream?.id
+        refreshTracks()
+        guard let stream else { return }
+        if let idx = matchAudioTrack(for: stream, all: allAudioStreams) {
+            selectAudioIndex(idx)
+        }
+#endif
+    }
+
+    private func matchAudioTrack(for stream: PlexStream, all: [PlexStream]) -> Int? {
+        guard !audioTracks.isEmpty else { return nil }
+        let needles = Self.audioNeedles(for: stream)
+
+        // 1) Language / name overlap with VLC track name
+        if let hit = audioTracks.first(where: { track in
+            let name = track.name.lowercased()
+            return needles.contains { name.contains($0) }
+        }) {
+            return hit.index
+        }
+
+        // 2) Same order among embedded audio streams
+        let embedded = all.filter { $0.streamType == .audio }
+        if let order = embedded.firstIndex(where: { $0.id == stream.id }),
+           order < audioTracks.count {
+            return audioTracks[order].index
+        }
+
+        // 3) Prefer default/selected flag order
+        return nil
+    }
+
+    private static func audioNeedles(for stream: PlexStream) -> [String] {
+        var set = Set<String>()
+        for raw in [stream.languageCode, stream.language, stream.displayTitle, stream.title]
+            .compactMap({ $0?.lowercased() }) where !raw.isEmpty {
+            set.insert(raw)
+            let base = String(raw.prefix(while: { $0.isLetter }))
+            if base.count >= 2 { set.insert(base) }
+        }
+        let aliases: [String: [String]] = [
+            "zh": ["chi", "zho", "chinese", "cmn", "yue", "mandarin", "cantonese", "中文", "国语", "粤语"],
+            "en": ["eng", "english"],
+            "ja": ["jpn", "japanese", "日本語"],
+            "ko": ["kor", "korean", "한국어"],
+            "es": ["spa", "spanish"],
+            "fr": ["fre", "fra", "french"],
+            "de": ["ger", "deu", "german"],
+            "pt": ["por", "portuguese"],
+            "ru": ["rus", "russian"],
+        ]
+        for key in Array(set) {
+            let base = String(key.prefix(while: { $0.isLetter }))
+            if let list = aliases[base] {
+                list.forEach { set.insert($0) }
+            }
+            for (k, list) in aliases where list.contains(key) || list.contains(base) {
+                set.insert(k)
+                list.forEach { set.insert($0) }
+            }
+        }
+        return Array(set).filter { $0.count >= 2 }
     }
 
     func selectSubtitleIndex(_ index: Int?) {
@@ -359,12 +434,13 @@ final class VLCPlaybackBackend: NSObject {
 
     private func scheduleTrackRefreshAndApply() {
         Task { @MainActor in
-            for delay in [300, 800, 1500] as [UInt64] {
+            for delay in [300, 800, 1500, 2500] as [UInt64] {
                 try? await Task.sleep(for: .milliseconds(delay))
                 refreshTracks()
-                if let pending = pendingSubtitlePlexId, !subtitleTracks.isEmpty {
-                    // Caller should call applyPlexSubtitle; here just keep tracks fresh.
-                    _ = pending
+                if let stream = pendingAudioStream, !audioTracks.isEmpty {
+                    if let idx = matchAudioTrack(for: stream, all: pendingAudioAll) {
+                        selectAudioIndex(idx)
+                    }
                 }
             }
         }
@@ -383,6 +459,9 @@ final class VLCPlaybackBackend: NSObject {
         audioTracks = []
         subtitleTracks = []
         pendingSubtitlePlexId = nil
+        pendingAudioPlexId = nil
+        pendingAudioStream = nil
+        pendingAudioAll = []
         externalSubtitleURLs = []
     }
 

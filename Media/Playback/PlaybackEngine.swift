@@ -290,10 +290,22 @@ final class PlaybackEngine {
                     startPositionMs: startMs,
                     externalSubtitles: externalSubs,
                     preferredSubtitlePlexId: decision.selectedSubtitleStreamId,
+                    preferredAudioPlexId: decision.selectedAudioStreamId,
                     forceSoftwareDecode: false
                 )
                 vlc.setRate(playbackRate)
+                applyVLCAudioSelection(decision.selectedAudioStreamId)
                 applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
+                // Tracks often appear after a short delay — re-apply preferred audio/sub.
+                Task { @MainActor in
+                    for delay in [400, 1000, 2000] as [UInt64] {
+                        try? await Task.sleep(for: .milliseconds(delay))
+                        self.applyVLCAudioSelection(self.selectedAudioId)
+                        if let ctx = self.context {
+                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                        }
+                    }
+                }
                 activePlaybackBackend = .vlc
                 playerEngineRouter?.markActive(.vlc)
                 await newSession.updateState(.playing)
@@ -301,7 +313,9 @@ final class PlaybackEngine {
                 sessionState = .playing
                 startPeriodicReporting()
                 publishNowPlaying()
-                logger.playback.info("Playing via MobileVLCKit (subs=\(decision.selectedSubtitleStreamId.map(String.init) ?? "off"))")
+                logger.playback.info(
+                    "Playing via MobileVLCKit (audio=\(decision.selectedAudioStreamId.map(String.init) ?? "auto") subs=\(decision.selectedSubtitleStreamId.map(String.init) ?? "off"))"
+                )
                 return
             } catch {
                 logger.playback.info("VLC failed, trying other backends: \(error.localizedDescription)")
@@ -378,6 +392,12 @@ final class PlaybackEngine {
         isPlaying = true
         sessionState = .playing
         await newSession.updateState(.playing)
+        // Apply preferred audio / subtitle once media selection groups are ready.
+        let audioId = selectedAudioId
+        let subId = selectedSubtitleId
+        Task { @MainActor in
+            _ = await self.applyAVMediaSelection(audioStreamId: audioId, subtitleStreamId: subId)
+        }
         await reportTimeline(force: true)
         startPeriodicReporting()
         publishNowPlaying()
@@ -656,14 +676,8 @@ final class PlaybackEngine {
         selectedAudioId = streamId
         guard let metadata = currentItem, let context else { return }
 
-        if activePlaybackBackend == .vlc, let vlc = vlcBackend {
-            // Map Plex stream order to VLC indexes when possible
-            if let idx = audioStreams.firstIndex(where: { $0.id == streamId }),
-               idx < vlc.audioTracks.count {
-                vlc.selectAudioIndex(vlc.audioTracks[idx].index)
-                return
-            }
-            vlc.selectAudioIndex(streamId)
+        if activePlaybackBackend == .vlc {
+            applyVLCAudioSelection(streamId)
             return
         }
 
@@ -715,7 +729,13 @@ final class PlaybackEngine {
         }
     }
 
-    // MARK: - VLC subtitles
+    // MARK: - VLC audio / subtitles
+
+    private func applyVLCAudioSelection(_ streamId: Int?) {
+        guard let vlc = vlcBackend, let streamId else { return }
+        let stream = audioStreams.first { $0.id == streamId }
+        vlc.applyPlexAudio(stream: stream, allAudioStreams: audioStreams)
+    }
 
     private func applyVLCSubtitleSelection(_ streamId: Int?, context: ServerContext) {
         guard let vlc = vlcBackend else { return }
@@ -768,6 +788,61 @@ final class PlaybackEngine {
 
     /// Select audio/subtitle options on the current AVPlayerItem.
     /// Retries briefly — HLS often exposes legible groups only after the playlist loads.
+    /// Match AVMediaSelectionOption to a Plex stream language / title (with aliases).
+    private static func matchAVOption(
+        options: [AVMediaSelectionOption],
+        languageCode: String?,
+        languageName: String?,
+        title: String?
+    ) -> AVMediaSelectionOption? {
+        let needles = languageNeedles(code: languageCode, name: languageName)
+        let titleL = (title ?? "").lowercased()
+
+        if let exact = options.first(where: { opt in
+            let code = opt.locale?.language.languageCode?.identifier.lowercased() ?? ""
+            let display = opt.displayName.lowercased()
+            if needles.contains(where: { code == $0 || code.hasPrefix($0) || $0.hasPrefix(code) }) {
+                return true
+            }
+            if needles.contains(where: { display.contains($0) }) { return true }
+            return false
+        }) {
+            return exact
+        }
+        if !titleL.isEmpty {
+            return options.first { $0.displayName.lowercased().contains(titleL) }
+        }
+        return nil
+    }
+
+    private static func languageNeedles(code: String?, name: String?) -> [String] {
+        var set = Set<String>()
+        for raw in [code, name].compactMap({ $0?.lowercased() }) where !raw.isEmpty {
+            set.insert(raw)
+            let base = String(raw.prefix(while: { $0.isLetter }))
+            if !base.isEmpty { set.insert(base) }
+            let aliases: [String: [String]] = [
+                "zh": ["chi", "zho", "zh-cn", "zh-tw", "zh-hans", "zh-hant", "chinese", "cmn", "yue"],
+                "en": ["eng", "english"],
+                "ja": ["jpn", "japanese"],
+                "ko": ["kor", "korean"],
+                "es": ["spa", "spanish"],
+                "fr": ["fre", "fra", "french"],
+                "de": ["ger", "deu", "german"],
+                "pt": ["por", "portuguese"],
+                "ru": ["rus", "russian"],
+            ]
+            if let list = aliases[base] {
+                list.forEach { set.insert($0) }
+            }
+            for (k, list) in aliases where list.contains(raw) || list.contains(base) {
+                set.insert(k)
+                list.forEach { set.insert($0) }
+            }
+        }
+        return Array(set)
+    }
+
     private func applyAVMediaSelection(audioStreamId: Int?, subtitleStreamId: Int?) async -> Bool {
         for attempt in 0..<5 {
             if attempt > 0 {
@@ -792,18 +867,16 @@ final class PlaybackEngine {
                let group = try await asset.loadMediaSelectionGroup(for: .audible) {
                 let options = group.options
                 if let stream = audioStreams.first(where: { $0.id == audioStreamId }) {
-                    let lang = stream.languageCode ?? stream.language
-                    let title = (stream.displayTitle ?? "").lowercased()
-                    let match = options.first(where: { opt in
-                        if let lang, let code = opt.locale?.language.languageCode?.identifier {
-                            if code.lowercased() == lang.lowercased() { return true }
-                        }
-                        if !title.isEmpty, opt.displayName.lowercased().contains(title) { return true }
-                        return false
-                    }) ?? options.first
+                    let match = Self.matchAVOption(
+                        options: options,
+                        languageCode: stream.languageCode,
+                        languageName: stream.language,
+                        title: stream.displayTitle ?? stream.title
+                    )
                     if let match {
                         item.select(match, in: group)
                         applied = true
+                        logger.playback.info("Audio legible option: \(match.displayName)")
                     }
                 }
             }
@@ -812,18 +885,14 @@ final class PlaybackEngine {
                let group = try await asset.loadMediaSelectionGroup(for: .legible) {
                 if subtitleStreamId != nil {
                     let stream = subtitleStreams.first(where: { $0.id == subtitleStreamId })
-                    let lang = (stream?.languageCode ?? stream?.language)?.lowercased()
-                    let title = (stream?.displayTitle ?? stream?.title ?? "").lowercased()
-                    // Skip forced-only / "disabled" options when possible
                     let candidates = group.options.filter { !$0.displayName.lowercased().contains("disabled") }
                     let pool = candidates.isEmpty ? group.options : candidates
-                    let match = pool.first(where: { opt in
-                        if let lang, let code = opt.locale?.language.languageCode?.identifier {
-                            if code.lowercased() == lang { return true }
-                        }
-                        if !title.isEmpty, opt.displayName.lowercased().contains(title) { return true }
-                        return false
-                    }) ?? pool.first
+                    let match = Self.matchAVOption(
+                        options: pool,
+                        languageCode: stream?.languageCode,
+                        languageName: stream?.language,
+                        title: stream?.displayTitle ?? stream?.title
+                    ) ?? pool.first
                     if let match {
                         item.select(match, in: group)
                         applied = true

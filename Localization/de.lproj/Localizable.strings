@@ -209,7 +209,7 @@
 "iptv.error.connect" = "Verbindung zum Host fehlgeschlagen.";
 "iptv.error.ats" = "HTTP durch ATS blockiert.";
 "iptv.error.tls" = "TLS/SSL-Fehler.";
-"iptv.error.invalid_url" = "Ungültige URL.";
+"iptv.error.invalid_url" = "Ungültige URL";
 "iptv.channel_prev" = "Vorheriger Kanal";
 "iptv.channel_next" = "Nächster Kanal";
 "iptv.sources_count" = "%d Quellen";
@@ -226,3 +226,6 @@
 "iptv.probe_cd_90" = "1,5 Std.";
 "iptv.probe_cd_180" = "3 Std.";
 "iptv.merge_across_groups" = "Gleicher Name gruppenübergreifend";
+"iptv.error.encoding" = "Ungültige Kodierung";
+"iptv.error.empty" = "Playlist leer";
+"iptv.error.too_large" = "Playlist zu groß";

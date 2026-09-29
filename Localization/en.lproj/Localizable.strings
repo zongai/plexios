@@ -233,7 +233,7 @@
 "iptv.error.connect" = "Cannot connect to host (port closed or refused).";
 "iptv.error.ats" = "HTTP blocked by App Transport Security.";
 "iptv.error.tls" = "TLS/SSL error.";
-"iptv.error.invalid_url" = "Invalid playlist URL.";
+"iptv.error.invalid_url" = "Invalid URL";
 "iptv.channel_prev" = "Previous channel";
 "iptv.channel_next" = "Next channel";
 "iptv.sources_count" = "%d sources";
@@ -250,3 +250,6 @@
 "iptv.probe_cd_90" = "1.5 hours";
 "iptv.probe_cd_180" = "3 hours";
 "iptv.merge_across_groups" = "Merge same name across groups";
+"iptv.error.encoding" = "Invalid playlist encoding";
+"iptv.error.empty" = "Playlist is empty";
+"iptv.error.too_large" = "Playlist too large";

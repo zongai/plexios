@@ -209,7 +209,7 @@
 "iptv.error.connect" = "ホストに接続できません。";
 "iptv.error.ats" = "ATS により HTTP がブロックされました。";
 "iptv.error.tls" = "TLS/SSL エラー。";
-"iptv.error.invalid_url" = "無効な URL です。";
+"iptv.error.invalid_url" = "無効なURL";
 "iptv.channel_prev" = "前のチャンネル";
 "iptv.channel_next" = "次のチャンネル";
 "iptv.sources_count" = "%d ソース";
@@ -226,3 +226,6 @@
 "iptv.probe_cd_90" = "1.5時間";
 "iptv.probe_cd_180" = "3時間";
 "iptv.merge_across_groups" = "グループを跨いで同名を統合";
+"iptv.error.encoding" = "無効なエンコーディング";
+"iptv.error.empty" = "プレイリストが空です";
+"iptv.error.too_large" = "プレイリストが大きすぎます";

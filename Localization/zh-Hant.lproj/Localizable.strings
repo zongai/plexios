@@ -209,7 +209,7 @@
 "iptv.error.connect" = "無法連線主機（埠關閉或拒絕）。";
 "iptv.error.ats" = "HTTP 被系統安全原則阻擋。";
 "iptv.error.tls" = "TLS/SSL 錯誤。";
-"iptv.error.invalid_url" = "播放列表網址無效。";
+"iptv.error.invalid_url" = "無效地址";
 "iptv.channel_prev" = "上一頻道";
 "iptv.channel_next" = "下一頻道";
 "iptv.sources_count" = "%d 個源";
@@ -226,3 +226,6 @@
 "iptv.probe_cd_90" = "1.5 小時";
 "iptv.probe_cd_180" = "3 小時";
 "iptv.merge_across_groups" = "跨分組合併同名頻道";
+"iptv.error.encoding" = "播放列表編碼無效";
+"iptv.error.empty" = "播放列表為空";
+"iptv.error.too_large" = "播放列表過大";

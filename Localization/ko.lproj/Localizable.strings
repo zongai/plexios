@@ -209,7 +209,7 @@
 "iptv.error.connect" = "호스트에 연결할 수 없음.";
 "iptv.error.ats" = "ATS로 HTTP가 차단됨.";
 "iptv.error.tls" = "TLS/SSL 오류.";
-"iptv.error.invalid_url" = "잘못된 URL.";
+"iptv.error.invalid_url" = "잘못된 URL";
 "iptv.channel_prev" = "이전 채널";
 "iptv.channel_next" = "다음 채널";
 "iptv.sources_count" = "%d개 소스";
@@ -226,3 +226,6 @@
 "iptv.probe_cd_90" = "1.5시간";
 "iptv.probe_cd_180" = "3시간";
 "iptv.merge_across_groups" = "그룹 간 동일 이름 병합";
+"iptv.error.encoding" = "잘못된 인코딩";
+"iptv.error.empty" = "재생목록이 비어 있음";
+"iptv.error.too_large" = "재생목록이 너무 큼";

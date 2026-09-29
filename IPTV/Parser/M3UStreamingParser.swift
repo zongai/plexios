@@ -65,7 +65,7 @@ enum M3UStreamingParser {
             if trimmed.hasPrefix("#EXTM3U") {
                 let attrs = M3UParser.parseAttributesPublic(from: String(trimmed.dropFirst("#EXTM3U".count)))
                 if let u = attrs["url-tvg"] ?? attrs["x-tvg-url"] ?? attrs["tvg-url"] {
-                    epgURL = URL(string: u)
+                    epgURL = IPTVNetwork.normalizeURL(from: u)
                 }
                 return
             }
@@ -93,7 +93,7 @@ enum M3UStreamingParser {
             }
             if trimmed.hasPrefix("#") { return }
 
-            guard let url = URL(string: trimmed), url.scheme != nil else { return }
+            guard let url = IPTVNetwork.normalizeURL(from: trimmed) else { return }
             let info = pendingInfo
             let attrs = info?.attrs ?? [:]
             let name = (info?.name.isEmpty == false ? info!.name : (attrs["tvg-name"] ?? "Channel"))

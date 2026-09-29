@@ -77,7 +77,7 @@ enum M3UParser {
             if line.hasPrefix("#") { continue }
 
             // Stream URL line
-            guard let url = URL(string: line), url.scheme != nil else { continue }
+            guard let url = IPTVNetwork.normalizeURL(from: line) else { continue }
             let info = pendingInfo
             let attrs = info?.attrs ?? [:]
             let name = (info?.name.isEmpty == false ? info!.name : (attrs["tvg-name"] ?? "Channel"))

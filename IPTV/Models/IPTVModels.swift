@@ -12,8 +12,8 @@ struct IPTVPlaylist: Identifiable, Codable, Hashable, Sendable {
     var epgURLString: String?
     var autoRefreshHours: Int // 0 = manual only
 
-    var url: URL? { URL(string: urlString) }
-    var epgURL: URL? { epgURLString.flatMap(URL.init(string:)) }
+    var url: URL? { IPTVNetwork.normalizeURL(from: urlString) }
+    var epgURL: URL? { epgURLString.flatMap { IPTVNetwork.normalizeURL(from: $0) } }
 
     init(
         id: UUID = UUID(),
@@ -91,7 +91,7 @@ struct IPTVSource: Identifiable, Codable, Hashable, Sendable {
     var lastSuccess: Date?
     var lastFailure: Date?
 
-    var streamURL: URL? { URL(string: streamURLString) }
+    var streamURL: URL? { IPTVNetwork.normalizeURL(from: streamURLString) }
 
     var protocolType: IPTVStreamProtocol {
         guard let url = streamURL else { return .unknown }

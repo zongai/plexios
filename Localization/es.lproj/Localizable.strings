@@ -210,3 +210,6 @@
 "iptv.error.ats" = "HTTP bloqueado por ATS.";
 "iptv.error.tls" = "Error TLS/SSL.";
 "iptv.error.invalid_url" = "URL no válida.";
+"iptv.channel_prev" = "Canal anterior";
+"iptv.channel_next" = "Canal siguiente";
+"iptv.sources_count" = "%d fuentes";

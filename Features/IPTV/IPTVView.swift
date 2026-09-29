@@ -155,7 +155,7 @@ struct IPTVView: View {
                 Task { await refreshEPGLabels() }
             }
             .fullScreenCover(item: $playSession) { session in
-                IPTVPlayerView(session: session)
+                IPTVPlayerView(session: session, channelList: vm.filtered)
             }
             .sheet(isPresented: $showGuide) {
                 IPTVGuideTimelineView(channels: vm.filtered)
@@ -261,25 +261,41 @@ struct IPTVPlayerView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State var session: IPTVPlaySession
+    /// Ordered list for previous / next channel (usually current filter).
+    var channelList: [IPTVChannel]
     @State private var showSources = false
     @State private var diagnostics = IPTVDiagnostics()
     @State private var bufferingStarted: Date?
     @State private var showControls = true
+    @State private var hideControlsTask: Task<Void, Never>?
 
     private var engine: PlaybackEngine { environment.playbackEngine }
+
+    private var channelIndex: Int? {
+        channelList.firstIndex(where: { $0.id == session.channel.id })
+    }
+
+    private var canGoPrevious: Bool {
+        guard let i = channelIndex else { return false }
+        return i > 0
+    }
+
+    private var canGoNext: Bool {
+        guard let i = channelIndex else { return false }
+        return i + 1 < channelList.count
+    }
 
     var body: some View {
         @Bindable var engine = environment.playbackEngine
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // Video surface — must observe engine so VLC/AVPlayer layer appears after start.
             Group {
                 if engine.isVLCBackendActive, let vlc = engine.vlcBackend {
                     VLCPlayerContainer(backend: vlc, aspectMode: engine.aspectMode)
                 } else if let player = engine.player {
                     PlayerLayerView(player: player, aspectMode: engine.aspectMode) { _ in }
-                } else if engine.sessionState == .loading {
+                } else if engine.sessionState == .loading || engine.sessionState == .buffering {
                     ProgressView()
                         .tint(.white)
                 } else if let err = engine.errorMessage {
@@ -295,7 +311,7 @@ struct IPTVPlayerView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .ignoresSafeArea()
-                .onTapGesture { showControls.toggle() }
+                .onTapGesture { toggleControls() }
                 .zIndex(5)
 
             if showControls {
@@ -303,20 +319,32 @@ struct IPTVPlayerView: View {
                     title: session.channel.name,
                     sourceLabel: session.source.name ?? session.source.quality.displayName,
                     programTitle: currentProgramTitle,
+                    groupLabel: session.channel.group,
+                    isPlaying: engine.isPlaying,
+                    isBuffering: engine.sessionState == .buffering || engine.sessionState == .loading,
+                    canGoPrevious: canGoPrevious,
+                    canGoNext: canGoNext,
+                    sourceCount: session.channel.sources.count,
                     onClose: {
                         Task {
                             await engine.stop(report: false)
+                            OrientationLock.unlockAll()
                             dismiss()
                         }
                     },
                     onSources: { showSources = true },
-                    onPlayPause: { engine.togglePlayPause() },
+                    onPlayPause: {
+                        engine.togglePlayPause()
+                        bumpControls()
+                    },
+                    onPreviousChannel: { switchChannel(delta: -1) },
+                    onNextChannel: { switchChannel(delta: 1) },
                     onToggleHUD: {
                         diagnostics.isVisible.toggle()
-                    },
-                    isPlaying: engine.isPlaying
+                        bumpControls()
+                    }
                 )
-                .opacity(showControls ? 1 : 0)
+                .transition(.opacity)
                 .zIndex(10)
             }
 
@@ -328,6 +356,7 @@ struct IPTVPlayerView: View {
             }
         }
         .statusBarHidden(true)
+        .persistentSystemOverlays(.hidden)
         .background(Color.black)
         .task {
             OrientationLock.lockLandscape()
@@ -339,11 +368,12 @@ struct IPTVPlayerView: View {
                 backend: "…"
             )
             await playCurrent()
-            // Rebind after container has layout bounds.
             try? await Task.sleep(for: .milliseconds(200))
             engine.vlcBackend?.rebindDrawable()
+            bumpControls()
         }
         .onDisappear {
+            hideControlsTask?.cancel()
             Task { await engine.stop(report: false) }
             OrientationLock.unlockAll()
         }
@@ -411,10 +441,42 @@ struct IPTVPlayerView: View {
         }
     }
 
-    private var currentProgramTitle: String? {
-        guard let tvg = session.channel.tvgID else { return nil }
-        // Snapshot from last EPG index via async would lag; omit live bind here
-        return nil
+    private var currentProgramTitle: String? { nil }
+
+    private func toggleControls() {
+        showControls.toggle()
+        if showControls { bumpControls() }
+    }
+
+    private func bumpControls() {
+        showControls = true
+        hideControlsTask?.cancel()
+        hideControlsTask = Task {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                showControls = false
+            }
+        }
+    }
+
+    private func switchChannel(delta: Int) {
+        guard let i = channelIndex else { return }
+        let next = i + delta
+        guard channelList.indices.contains(next) else { return }
+        let ch = channelList[next]
+        guard let source = SourceSelectionEngine.select(
+            from: ch.sources,
+            preferred: .unknown,
+            excluding: [],
+            estimatedThroughputMbps: nil
+        ) ?? ch.sources.first else { return }
+        session.channel = ch
+        session.source = source
+        session.tried = [source.id]
+        diagnostics.reset(channel: ch.name, source: source, backend: "…")
+        bumpControls()
+        Task { await playCurrent() }
     }
 
     private func playCurrent() async {
@@ -478,61 +540,154 @@ struct IPTVPlayerView: View {
     }
 }
 
+/// Plex-style live player chrome: gradient edges, icon-only controls, channel ±.
 private struct IPTVPlayerChrome: View {
     let title: String
     let sourceLabel: String
     let programTitle: String?
+    let groupLabel: String?
+    let isPlaying: Bool
+    let isBuffering: Bool
+    let canGoPrevious: Bool
+    let canGoNext: Bool
+    let sourceCount: Int
     let onClose: () -> Void
     let onSources: () -> Void
     let onPlayPause: () -> Void
+    let onPreviousChannel: () -> Void
+    let onNextChannel: () -> Void
     let onToggleHUD: () -> Void
-    let isPlaying: Bool
 
     var body: some View {
-        VStack {
-            HStack {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .foregroundStyle(.white)
-                        .padding(12)
-                }
+        ZStack {
+            // Top + bottom scrims (Plex-like)
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [.black.opacity(0.75), .black.opacity(0.0)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 120)
                 Spacer()
-                VStack(spacing: 2) {
-                    Text(title)
-                        .font(AppTypography.headline)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    if let programTitle {
-                        Text(programTitle)
-                            .font(AppTypography.caption2)
-                            .foregroundStyle(.white.opacity(0.8))
+                LinearGradient(
+                    colors: [.black.opacity(0.0), .black.opacity(0.8)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 160)
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            VStack(spacing: 0) {
+                topBar
+                Spacer()
+                centerTransport
+                Spacer()
+                bottomBar
+            }
+            .padding(.horizontal, AppSpacing.md)
+            .padding(.vertical, AppSpacing.sm)
+        }
+    }
+
+    private var topBar: some View {
+        HStack(spacing: AppSpacing.md) {
+            chromeIcon("xmark", label: L10n.playerClose, action: onClose)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(AppTypography.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    if let groupLabel, !groupLabel.isEmpty {
+                        Text(groupLabel)
                             .lineLimit(1)
                     }
-                    Text(sourceLabel)
-                        .font(AppTypography.caption2)
-                        .foregroundStyle(.white.opacity(0.7))
+                    if let programTitle {
+                        if groupLabel != nil { Text("·") }
+                        Text(programTitle)
+                            .lineLimit(1)
+                    }
                 }
-                Spacer()
-                Button(action: onToggleHUD) {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.white)
-                        .padding(8)
-                }
-                Button(action: onSources) {
-                    Image(systemName: "list.bullet")
-                        .foregroundStyle(.white)
-                        .padding(12)
-                }
+                .font(AppTypography.caption)
+                .foregroundStyle(.white.opacity(0.75))
             }
-            .padding(.horizontal)
-            Spacer()
-            Button(action: onPlayPause) {
-                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.white)
+
+            Spacer(minLength: 8)
+
+            if sourceCount > 1 {
+                chromeIcon("rectangle.stack", label: String(localized: "iptv.sources"), action: onSources)
             }
-            .padding(.bottom, 40)
+            chromeIcon("info.circle", label: String(localized: "iptv.diagnostics_hud"), action: onToggleHUD)
         }
+        .padding(.top, AppSpacing.xs)
+    }
+
+    private var centerTransport: some View {
+        HStack(spacing: 44) {
+            chromeIcon("backward.end.fill", label: String(localized: "iptv.channel_prev"), size: 28, enabled: canGoPrevious, action: onPreviousChannel)
+
+            Button(action: onPlayPause) {
+                ZStack {
+                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(.white)
+                        .symbolRenderingMode(.hierarchical)
+                    if isBuffering {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.2)
+                    }
+                }
+            }
+            .accessibilityLabel(isPlaying ? L10n.playerPause : L10n.playerPlay)
+
+            chromeIcon("forward.end.fill", label: String(localized: "iptv.channel_next"), size: 28, enabled: canGoNext, action: onNextChannel)
+        }
+    }
+
+    private var bottomBar: some View {
+        HStack(spacing: AppSpacing.md) {
+            Circle()
+                .fill(Color.red)
+                .frame(width: 8, height: 8)
+            Text("LIVE")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text(sourceLabel)
+                .font(AppTypography.caption)
+                .foregroundStyle(.white.opacity(0.8))
+                .lineLimit(1)
+            Spacer()
+            if sourceCount > 1 {
+                Text(String(format: String(localized: "iptv.sources_count"), sourceCount))
+                    .font(AppTypography.caption2)
+                    .foregroundStyle(.white.opacity(0.65))
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.bottom, AppSpacing.sm)
+    }
+
+    private func chromeIcon(
+        _ systemName: String,
+        label: String,
+        size: CGFloat = 20,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(.white.opacity(enabled ? 1 : 0.35))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+        .buttonStyle(.plain)
     }
 }
 

@@ -234,3 +234,6 @@
 "iptv.error.ats" = "HTTP blocked by App Transport Security.";
 "iptv.error.tls" = "TLS/SSL error.";
 "iptv.error.invalid_url" = "Invalid playlist URL.";
+"iptv.channel_prev" = "Previous channel";
+"iptv.channel_next" = "Next channel";
+"iptv.sources_count" = "%d sources";

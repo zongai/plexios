@@ -210,3 +210,6 @@
 "iptv.error.ats" = "HTTP 被系统安全策略拦截。";
 "iptv.error.tls" = "TLS/SSL 错误。";
 "iptv.error.invalid_url" = "播放列表地址无效。";
+"iptv.channel_prev" = "上一频道";
+"iptv.channel_next" = "下一频道";
+"iptv.sources_count" = "%d 个源";

@@ -210,3 +210,6 @@
 "iptv.error.ats" = "HTTP 被系統安全原則阻擋。";
 "iptv.error.tls" = "TLS/SSL 錯誤。";
 "iptv.error.invalid_url" = "播放列表網址無效。";
+"iptv.channel_prev" = "上一頻道";
+"iptv.channel_next" = "下一頻道";
+"iptv.sources_count" = "%d 個源";

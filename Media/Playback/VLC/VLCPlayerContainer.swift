@@ -43,16 +43,18 @@ struct VLCPlayerContainer: UIViewRepresentable {
 
         @objc private func tick() {
             ticks += 1
-            let hasSize = backend.currentVideoSize.width > 1
-            if hasSize, !sawVideoSize {
-                sawVideoSize = true
-                container?.reapply(forceRebind: true)
-            } else {
-                container?.reapply(forceRebind: false)
-            }
-            // Stop after ~4s or shortly after size is known.
-            if ticks > 40 || (sawVideoSize && ticks > 15) {
-                stopSizePolling()
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let hasSize = self.backend.currentVideoSize.width > 1
+                if hasSize, !self.sawVideoSize {
+                    self.sawVideoSize = true
+                    self.container?.reapply(forceRebind: true)
+                } else {
+                    self.container?.reapply(forceRebind: false)
+                }
+                if self.ticks > 40 || (self.sawVideoSize && self.ticks > 15) {
+                    self.stopSizePolling()
+                }
             }
         }
 

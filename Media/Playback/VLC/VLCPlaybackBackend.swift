@@ -111,6 +111,8 @@ final class VLCPlaybackBackend: NSObject {
     }
 
 
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+    /// MobileVLCKit exposes `char *` properties. Always `strdup` so the buffer outlives the call.
     private func applyVLCStringProperty(_ value: String?, to player: VLCMediaPlayer, crop: Bool) {
         if let value {
             let ptr = strdup(value)

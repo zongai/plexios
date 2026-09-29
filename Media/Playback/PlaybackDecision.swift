@@ -232,11 +232,13 @@ struct PlaybackDecisionEngine: Sendable {
 
     private func selectAudio(_ streams: [PlexStream], forced: Int?) -> Int? {
         if let forced, streams.contains(where: { $0.id == forced }) { return forced }
+        // 1) User priority list
         for pref in preferences.preferredAudioLanguages where !pref.isEmpty {
             if let match = streams.first(where: { matchesLanguage($0, pref: pref) }) {
                 return match.id
             }
         }
+        // 2) Video / server default
         if let selected = streams.first(where: \.isSelected) { return selected.id }
         if let def = streams.first(where: \.isDefault) { return def.id }
         return streams.first?.id
@@ -252,27 +254,31 @@ struct PlaybackDecisionEngine: Sendable {
                 return (forced, capabilities.requiresBurnIn(stream))
             }
         }
+        // 1) User priority list
         for pref in preferences.preferredSubtitleLanguages where !pref.isEmpty {
             if let match = streams.first(where: { matchesLanguage($0, pref: pref) }) {
                 return (match.id, capabilities.requiresBurnIn(match))
             }
         }
-        if let forcedTrack = streams.first(where: \.isForced) {
-            return (forcedTrack.id, capabilities.requiresBurnIn(forcedTrack))
-        }
+        // 2) Video / server default (selected or default flag from PMS)
         if let selected = streams.first(where: \.isSelected) {
             return (selected.id, capabilities.requiresBurnIn(selected))
         }
-        // Prefer a soft (text) track when subtitles are enabled — previously
-        // returned nil unless PMS marked a track selected/forced (WEBVTT/SRT silent).
-        if let text = streams.first(where: {
-            capabilities.supportsSubtitleNatively($0) && !capabilities.requiresBurnIn($0)
-        }) {
-            return (text.id, false)
+        if let def = streams.first(where: \.isDefault) {
+            return (def.id, capabilities.requiresBurnIn(def))
         }
-        if let any = streams.first {
-            return (any.id, capabilities.requiresBurnIn(any))
+        // 3) Only when user did not set a language list: mild heuristics
+        if preferences.preferredSubtitleLanguages.isEmpty {
+            if let forcedTrack = streams.first(where: \.isForced) {
+                return (forcedTrack.id, capabilities.requiresBurnIn(forcedTrack))
+            }
+            if let text = streams.first(where: {
+                capabilities.supportsSubtitleNatively($0) && !capabilities.requiresBurnIn($0)
+            }) {
+                return (text.id, false)
+            }
         }
+        // Preferences set but no match and no server default → leave off
         return (nil, false)
     }
 

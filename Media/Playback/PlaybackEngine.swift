@@ -299,6 +299,7 @@ final class PlaybackEngine {
                     forceSoftwareDecode: false
                 )
                 vlc.setRate(playbackRate)
+                vlc.setAspectMode(aspectMode)
                 applyVLCAudioSelection(decision.selectedAudioStreamId)
                 applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
                 // Tracks often appear only after playing — retry for several seconds.
@@ -429,6 +430,10 @@ final class PlaybackEngine {
 
     func setAspectMode(_ mode: VideoAspectMode) {
         aspectMode = mode
+        // AVPlayer path reacts via PlayerLayerView(aspectMode:); VLC needs an explicit call.
+        if activePlaybackBackend == .vlc {
+            vlcBackend?.setAspectMode(mode)
+        }
     }
 
     /// Linear volume 0…1 applied to the active player (not system volume).
@@ -596,6 +601,7 @@ final class PlaybackEngine {
                 )
                 vlc.rebindDrawable()
                 vlc.setVolume(volume)
+                vlc.setAspectMode(aspectMode)
                 isPlaying = true
                 sessionState = .playing
                 nowPlaying.updateTitle(title, subtitle: "IPTV")

@@ -45,6 +45,9 @@ final class VLCPlaybackBackend: NSObject {
     private(set) var estimatedThroughputMbps: Double?
     private var throughputSamples: [Double] = []
 
+    /// Last requested aspect mode (re-applied after rebind / when video size is known).
+    private(set) var aspectMode: VideoAspectMode = .fit
+
     /// Call after rotation / container layout so VLC uses non-zero landscape bounds.
     func rebindDrawable() {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
@@ -53,6 +56,66 @@ final class VLCPlaybackBackend: NSObject {
         drawableView.layoutIfNeeded()
         mediaPlayer.drawable = nil
         mediaPlayer.drawable = drawableView
+        applyAspectMode(aspectMode)
+#endif
+    }
+
+    /// Fit / fill / stretch. VLC ignores UIView.contentMode — use crop + aspect ratio APIs.
+    func setAspectMode(_ mode: VideoAspectMode) {
+        aspectMode = mode
+        applyAspectMode(mode)
+    }
+
+    private func applyAspectMode(_ mode: VideoAspectMode) {
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+        guard let mediaPlayer else { return }
+        drawableView.setNeedsLayout()
+        drawableView.layoutIfNeeded()
+
+        mediaPlayer.scaleFactor = 0
+        // Reset crop / forced ratio (strdup ownership transferred to VLC).
+        mediaPlayer.videoCropGeometry = nil
+        mediaPlayer.videoAspectRatio = nil
+
+        let viewSize = drawableView.bounds.size
+        let videoSize = mediaPlayer.videoSize
+        let hasVideo = videoSize.width > 1 && videoSize.height > 1
+        let hasView = viewSize.width > 1 && viewSize.height > 1
+
+        switch mode {
+        case .fit:
+            break
+        case .stretch:
+            if hasView {
+                let w = max(1, Int(viewSize.width.rounded()))
+                let h = max(1, Int(viewSize.height.rounded()))
+                mediaPlayer.videoAspectRatio = strdup("\(w):\(h)")
+            }
+        case .fill:
+            if hasVideo, hasView {
+                let vW = CGFloat(videoSize.width)
+                let vH = CGFloat(videoSize.height)
+                let viewAspect = viewSize.width / viewSize.height
+                let videoAspect = vW / vH
+                if viewAspect > videoAspect {
+                    let newH = vW / viewAspect
+                    let y = max(0, (vH - newH) / 2)
+                    mediaPlayer.videoCropGeometry = strdup(
+                        "0+\(Int(y.rounded()))+\(Int(vW.rounded()))x\(Int(newH.rounded()))"
+                    )
+                } else {
+                    let newW = vH * viewAspect
+                    let x = max(0, (vW - newW) / 2)
+                    mediaPlayer.videoCropGeometry = strdup(
+                        "\(Int(x.rounded()))+0+\(Int(newW.rounded()))x\(Int(vH.rounded()))"
+                    )
+                }
+            } else if hasView {
+                let w = max(1, Int(viewSize.width.rounded()))
+                let h = max(1, Int(viewSize.height.rounded()))
+                mediaPlayer.videoAspectRatio = strdup("\(w):\(h)")
+            }
+        }
 #endif
     }
 
@@ -649,6 +712,8 @@ extension VLCPlaybackBackend: VLCMediaPlayerDelegate {
                 state = .playing
                 onStateChange?(.playing)
                 refreshTracks()
+                // Video size is often 0 until playing — re-apply fill/stretch crop.
+                applyAspectMode(aspectMode)
             case .paused:
                 state = .paused
                 onStateChange?(.paused)

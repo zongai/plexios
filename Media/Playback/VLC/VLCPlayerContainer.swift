@@ -13,12 +13,14 @@ struct VLCPlayerContainer: UIViewRepresentable {
 
     final class Coordinator {
         var lastSize: CGSize = .zero
+        var lastAspect: VideoAspectMode?
     }
 
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.backgroundColor = .black
         container.isUserInteractionEnabled = false
+        container.clipsToBounds = true
         let drawable = backend.drawableView
         drawable.isUserInteractionEnabled = false
         drawable.translatesAutoresizingMaskIntoConstraints = false
@@ -36,28 +38,27 @@ struct VLCPlayerContainer: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        switch aspectMode {
-        case .fit:
-            backend.drawableView.contentMode = .scaleAspectFit
-        case .fill:
-            backend.drawableView.contentMode = .scaleAspectFill
-        case .stretch:
-            backend.drawableView.contentMode = .scaleToFill
-        }
+        uiView.clipsToBounds = true
         uiView.setNeedsLayout()
         uiView.layoutIfNeeded()
         backend.drawableView.setNeedsLayout()
         backend.drawableView.layoutIfNeeded()
 
         let size = uiView.bounds.size
-        // Rebind when we gain a real landscape-sized frame (or any significant size change).
+        let aspectChanged = context.coordinator.lastAspect != aspectMode
+        var sizeChanged = false
         if size.width > 32, size.height > 32 {
             let prev = context.coordinator.lastSize
-            let changed = abs(prev.width - size.width) > 8 || abs(prev.height - size.height) > 8
-            if changed {
+            sizeChanged = abs(prev.width - size.width) > 8 || abs(prev.height - size.height) > 8
+            if sizeChanged {
                 context.coordinator.lastSize = size
                 backend.rebindDrawable()
             }
+        }
+
+        if aspectChanged || sizeChanged {
+            context.coordinator.lastAspect = aspectMode
+            backend.setAspectMode(aspectMode)
         }
     }
 }

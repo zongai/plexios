@@ -405,7 +405,7 @@ final class PlaybackEngine {
             await avPlayer.seek(to: time)
         }
 
-        avPlayer.volume = volume
+        avPlayer.volume = min(1, max(0, volume))
         avPlayer.play()
         applyRateToPlayer()
         isPlaying = true
@@ -623,7 +623,7 @@ final class PlaybackEngine {
         activePlaybackBackend = .avPlayer
         observe(player: avPlayer, item: item)
         startAccessLogMonitoring(item: item)
-        avPlayer.volume = volume
+        avPlayer.volume = min(1, max(0, volume))
         avPlayer.play()
         isPlaying = true
         sessionState = .playing

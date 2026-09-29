@@ -73,7 +73,7 @@ final class VLCPlaybackBackend: NSObject {
         drawableView.layoutIfNeeded()
 
         mediaPlayer.scaleFactor = 0
-        // MobileVLCKit ObjC setters free previous + strdup input — pass transient C strings only.
+        // Always clear previous crop/ratio first.
         applyVLCStringProperty(nil, to: mediaPlayer, crop: true)
         applyVLCStringProperty(nil, to: mediaPlayer, crop: false)
 
@@ -84,6 +84,7 @@ final class VLCPlaybackBackend: NSObject {
 
         switch mode {
         case .fit:
+            // Default letterbox — no forced geometry (safest path).
             break
         case .stretch:
             if hasView {
@@ -124,16 +125,16 @@ final class VLCPlaybackBackend: NSObject {
     }
 
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-    /// Setter copies the C string; do not strdup on the caller side (avoids leaks / double-free).
+    /// MobileVLCKit exposes `char *` properties. Some bindings store the pointer without copying;
+    /// `withCString` would leave a dangling pointer and crash during playback. Always `strdup`
+    /// so the buffer outlives the call. If the ObjC setter also strdup's, we only leak a few bytes.
     private func applyVLCStringProperty(_ value: String?, to player: VLCMediaPlayer, crop: Bool) {
         if let value {
-            value.withCString { cStr in
-                let ptr = UnsafeMutablePointer(mutating: cStr)
-                if crop {
-                    player.videoCropGeometry = ptr
-                } else {
-                    player.videoAspectRatio = ptr
-                }
+            let ptr = strdup(value)
+            if crop {
+                player.videoCropGeometry = ptr
+            } else {
+                player.videoAspectRatio = ptr
             }
         } else if crop {
             player.videoCropGeometry = nil

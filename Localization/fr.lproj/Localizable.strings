@@ -213,3 +213,4 @@
 "iptv.channel_prev" = "Chaîne précédente";
 "iptv.channel_next" = "Chaîne suivante";
 "iptv.sources_count" = "%d sources";
+"iptv.group_other" = "Autres";

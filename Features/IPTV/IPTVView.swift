@@ -102,16 +102,36 @@ struct IPTVView: View {
     @State private var epgTick = Date()
     @State private var showGuide = false
 
+    /// Grouped channels for Plex-style section rails.
+    private var groupedChannels: [(group: String, channels: [IPTVChannel])] {
+        let list = vm.filtered
+        if let only = vm.selectedGroup {
+            return [(only, list)]
+        }
+        var order: [String] = []
+        var buckets: [String: [IPTVChannel]] = [:]
+        for ch in list {
+            let g = (ch.group?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+                ?? String(localized: "iptv.group_other")
+            if buckets[g] == nil {
+                order.append(g)
+                buckets[g] = []
+            }
+            buckets[g]?.append(ch)
+        }
+        return order.map { ($0, buckets[$0] ?? []) }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
                 if vm.isLoading && vm.channels.isEmpty {
-                    ProgressView()
+                    LoadingStateView()
                 } else if vm.filtered.isEmpty {
-                    ContentUnavailableView(
-                        String(localized: "iptv.empty_title"),
+                    EmptyStateView(
+                        title: String(localized: "iptv.empty_title"),
                         systemImage: "tv",
-                        description: Text(String(localized: "iptv.empty"))
+                        subtitle: String(localized: "iptv.empty")
                     )
                 } else {
                     channelList
@@ -145,6 +165,7 @@ struct IPTVView: View {
                     }
                 }
             }
+            .background(PlexColors.background)
             .task {
                 await vm.reload()
                 await refreshEPGLabels()
@@ -164,44 +185,39 @@ struct IPTVView: View {
     }
 
     private var channelList: some View {
-        List(vm.filtered) { channel in
-            Button {
-                startPlay(channel)
-            } label: {
-                HStack(spacing: AppSpacing.md) {
-                    channelLogo(channel)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(channel.name)
-                            .font(AppTypography.body)
-                            .foregroundStyle(AppColors.primaryText)
-                            .lineLimit(1)
-                        if let prog = programTitle(for: channel) {
-                            Text(prog)
-                                .font(AppTypography.caption)
-                                .foregroundStyle(AppColors.secondaryText)
-                                .lineLimit(1)
-                            ProgressView(value: programProgress(for: channel))
-                                .tint(PlexColors.accent)
-                        } else if let g = channel.group {
-                            Text(g)
-                                .font(AppTypography.caption2)
-                                .foregroundStyle(AppColors.secondaryText)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: AppSpacing.lg, pinnedViews: [.sectionHeaders]) {
+                ForEach(groupedChannels, id: \.group) { section in
+                    Section {
+                        LazyVStack(spacing: AppSpacing.xs) {
+                            ForEach(section.channels) { channel in
+                                IPTVChannelRow(
+                                    channel: channel,
+                                    programTitle: programTitle(for: channel),
+                                    programProgress: programProgress(for: channel),
+                                    isFavorite: vm.favoriteIds.contains(channel.id),
+                                    onPlay: { startPlay(channel) },
+                                    onToggleFavorite: {
+                                        Task { await vm.toggleFavorite(channel.id) }
+                                    }
+                                )
+                            }
                         }
+                        .padding(.horizontal, AppSpacing.md)
+                    } header: {
+                        Text(section.group)
+                            .font(AppTypography.headline.weight(.semibold))
+                            .foregroundStyle(PlexColors.primaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, AppSpacing.md)
+                            .padding(.vertical, AppSpacing.sm)
+                            .background(PlexColors.background.opacity(0.92))
                     }
-                    Spacer()
-                    Button {
-                        Task { await vm.toggleFavorite(channel.id) }
-                    } label: {
-                        Image(systemName: vm.favoriteIds.contains(channel.id) ? "heart.fill" : "heart")
-                            .foregroundStyle(vm.favoriteIds.contains(channel.id) ? PlexColors.accent : AppColors.secondaryText)
-                    }
-                    .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, AppSpacing.sm)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(AppColors.background)
+        .background(PlexColors.background)
     }
 
     private func programTitle(for channel: IPTVChannel) -> String? {
@@ -219,34 +235,104 @@ struct IPTVView: View {
         vm.applyEPGIndex(index)
     }
 
-    private func channelLogo(_ channel: IPTVChannel) -> some View {
-        Group {
-            if let url = channel.logoURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFit()
-                    default:
-                        placeholder
-                    }
-                }
-            } else {
-                placeholder
-            }
-        }
-        .frame(width: 48, height: 48)
-        .background(AppColors.secondaryBackground)
-        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.sm))
-    }
-
-    private var placeholder: some View {
-        Image(systemName: "tv")
-            .foregroundStyle(AppColors.tertiaryText)
-    }
-
     private func startPlay(_ channel: IPTVChannel) {
         guard let source = vm.bestSource(for: channel) else { return }
         playSession = IPTVPlaySession(channel: channel, source: source, tried: [source.id])
+    }
+}
+
+// MARK: - Channel row (Plex visual language)
+
+private struct IPTVChannelRow: View {
+    let channel: IPTVChannel
+    let programTitle: String?
+    let programProgress: Double
+    let isFavorite: Bool
+    let onPlay: () -> Void
+    let onToggleFavorite: () -> Void
+
+    var body: some View {
+        Button(action: onPlay) {
+            HStack(spacing: AppSpacing.md) {
+                logo
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(channel.name)
+                        .font(AppTypography.body.weight(.semibold))
+                        .foregroundStyle(PlexColors.primaryText)
+                        .lineLimit(1)
+
+                    if let programTitle, !programTitle.isEmpty {
+                        Text(programTitle)
+                            .font(AppTypography.caption)
+                            .foregroundStyle(PlexColors.secondaryText)
+                            .lineLimit(1)
+
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(PlexColors.surfaceElevated)
+                                Capsule()
+                                    .fill(PlexColors.accent)
+                                    .frame(width: max(4, geo.size.width * programProgress))
+                            }
+                        }
+                        .frame(height: 3)
+                        .padding(.top, 2)
+                    } else if channel.sources.count > 1 {
+                        Text(String(format: String(localized: "iptv.sources_count"), channel.sources.count))
+                            .font(AppTypography.caption2)
+                            .foregroundStyle(PlexColors.tertiaryText)
+                    }
+                }
+
+                Spacer(minLength: 4)
+
+                Button(action: onToggleFavorite) {
+                    Image(systemName: isFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isFavorite ? PlexColors.accent : PlexColors.secondaryText)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(PlexColors.accent)
+                    .symbolRenderingMode(.hierarchical)
+            }
+            .padding(.horizontal, AppSpacing.md)
+            .padding(.vertical, AppSpacing.sm)
+            .background(PlexColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: PlexRadius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var logo: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: PlexRadius.sm, style: .continuous)
+                .fill(PlexColors.surfaceElevated)
+            if channel.logoURL != nil {
+                PlexImage(
+                    url: channel.logoURL,
+                    pointSize: CGSize(width: 56, height: 56),
+                    contentMode: .fit
+                )
+                .padding(6)
+            } else {
+                Image(systemName: "tv")
+                    .font(.title3)
+                    .foregroundStyle(PlexColors.tertiaryText)
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: PlexRadius.sm, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: PlexRadius.sm, style: .continuous)
+                .strokeBorder(PlexColors.separator.opacity(0.35), lineWidth: 0.5)
+        )
     }
 }
 

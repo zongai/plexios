@@ -139,7 +139,7 @@ struct IPTVChannel: Identifiable, Codable, Hashable, Sendable {
     var sources: [IPTVSource]
     var playlistId: UUID
 
-    var logoURL: URL? { logoURLString.flatMap(URL.init(string:)) }
+    var logoURL: URL? { logoURLString.flatMap { IPTVNetwork.normalizeURL(from: $0) } }
 
     init(
         id: String,

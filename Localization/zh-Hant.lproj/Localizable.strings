@@ -213,3 +213,4 @@
 "iptv.channel_prev" = "上一頻道";
 "iptv.channel_next" = "下一頻道";
 "iptv.sources_count" = "%d 個源";
+"iptv.group_other" = "其他";

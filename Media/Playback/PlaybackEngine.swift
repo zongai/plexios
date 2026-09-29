@@ -259,15 +259,27 @@ final class PlaybackEngine {
                 }
                 var headers = identityHeaders
                 headers["X-Plex-Token"] = context.token
-                try await vlc.prepare(url: url, headers: headers, startPositionMs: startMs)
+                let externalSubs = Self.externalSubtitleURLs(
+                    streams: subtitleStreams,
+                    baseURL: context.baseURL,
+                    token: context.token
+                )
+                try await vlc.prepare(
+                    url: url,
+                    headers: headers,
+                    startPositionMs: startMs,
+                    externalSubtitles: externalSubs,
+                    preferredSubtitlePlexId: decision.selectedSubtitleStreamId
+                )
                 vlc.setRate(playbackRate)
+                applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
                 activePlaybackBackend = .vlc
                 playerEngineRouter?.markActive(.vlc)
                 await newSession.updateState(.playing)
                 sessionState = .playing
                 startPeriodicReporting()
                 publishNowPlaying()
-                logger.playback.info("Playing via MobileVLCKit")
+                logger.playback.info("Playing via MobileVLCKit (subs=\(decision.selectedSubtitleStreamId.map(String.init) ?? "off"))")
                 return
             } catch {
                 logger.playback.info("VLC failed, trying other backends: \(error.localizedDescription)")
@@ -514,18 +526,8 @@ final class PlaybackEngine {
         selectedSubtitleId = streamId
         guard let metadata = currentItem, let context else { return }
 
-        if activePlaybackBackend == .vlc, let vlc = vlcBackend {
-            if streamId == nil {
-                vlc.selectSubtitleIndex(nil)
-                return
-            }
-            if let sid = streamId,
-               let idx = subtitleStreams.firstIndex(where: { $0.id == sid }),
-               idx < vlc.subtitleTracks.count {
-                vlc.selectSubtitleIndex(vlc.subtitleTracks[idx].index)
-                return
-            }
-            vlc.selectSubtitleIndex(streamId)
+        if activePlaybackBackend == .vlc {
+            applyVLCSubtitleSelection(streamId, context: context)
             return
         }
 
@@ -546,6 +548,37 @@ final class PlaybackEngine {
         if resumeFrom > 0 {
             await seek(toMs: resumeFrom)
         }
+    }
+
+    // MARK: - VLC subtitles
+
+    private func applyVLCSubtitleSelection(_ streamId: Int?, context: ServerContext) {
+        guard let vlc = vlcBackend else { return }
+        let stream = streamId.flatMap { id in subtitleStreams.first { $0.id == id } }
+        vlc.applyPlexSubtitle(stream: stream, allSubtitleStreams: subtitleStreams) { s in
+            Self.externalSubtitleURL(stream: s, baseURL: context.baseURL, token: context.token)
+        }
+    }
+
+    private static func externalSubtitleURLs(streams: [PlexStream], baseURL: URL, token: String) -> [URL] {
+        streams.filter(\.isExternal).compactMap { externalSubtitleURL(stream: $0, baseURL: baseURL, token: token) }
+    }
+
+    private static func externalSubtitleURL(stream: PlexStream, baseURL: URL, token: String) -> URL? {
+        guard let key = stream.key, !key.isEmpty else { return nil }
+        if key.hasPrefix("http://") || key.hasPrefix("https://") {
+            var c = URLComponents(string: key)
+            var items = c?.queryItems ?? []
+            if items.contains(where: { $0.name == "X-Plex-Token" }) != true {
+                items.append(URLQueryItem(name: "X-Plex-Token", value: token))
+            }
+            c?.queryItems = items
+            return c?.url
+        }
+        let path = key.hasPrefix("/") ? String(key.dropFirst()) : key
+        return PlexURL.join(baseURL, path: path, query: [
+            URLQueryItem(name: "X-Plex-Token", value: token)
+        ])
     }
 
     /// Select audio/subtitle options on the current AVPlayerItem.

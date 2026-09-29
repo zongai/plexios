@@ -22,7 +22,6 @@ final class VLCPlaybackBackend: NSObject {
     private(set) var durationMs: Int64 = 0
     private(set) var rate: Float = 1.0
 
-    /// Host view for `mediaPlayer.drawable` (owned by UIViewRepresentable).
     private(set) var drawableView: UIView = {
         let v = UIView()
         v.backgroundColor = .black
@@ -39,14 +38,28 @@ final class VLCPlaybackBackend: NSObject {
     var onTimeChange: ((Int64, Int64) -> Void)?
     var onEnded: (() -> Void)?
     var onError: ((String) -> Void)?
+    /// Fired after track lists refresh (UI can rebind menus).
+    var onTracksUpdated: (() -> Void)?
 
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
     private var mediaPlayer: VLCMediaPlayer?
 #endif
 
     private var timeTimer: Timer?
+    private var pendingSubtitlePlexId: Int?
+    private var externalSubtitleURLs: [URL] = []
+    private var httpHeaders: [String: String] = [:]
 
-    func prepare(url: URL, headers: [String: String], startPositionMs: Int64) async throws {
+    /// - Parameters:
+    ///   - externalSubtitles: Plex external subtitle file URLs (with token if needed).
+    ///   - preferredSubtitlePlexId: Plex stream id to enable once tracks appear.
+    func prepare(
+        url: URL,
+        headers: [String: String],
+        startPositionMs: Int64,
+        externalSubtitles: [URL] = [],
+        preferredSubtitlePlexId: Int? = nil
+    ) async throws {
         guard VLCKitImport.available else {
             throw PlaybackFailure(stage: .unknown, reason: "MobileVLCKit not linked", underlying: nil)
         }
@@ -54,16 +67,21 @@ final class VLCPlaybackBackend: NSObject {
         stopInternal()
         state = .loading
         onStateChange?(.loading)
+        httpHeaders = headers
+        externalSubtitleURLs = externalSubtitles
+        pendingSubtitlePlexId = preferredSubtitlePlexId
 
         let player = VLCMediaPlayer()
         player.delegate = self
         player.drawable = drawableView
 
         let media = VLCMedia(url: url)
-        // Network / HTTP headers for Plex token etc.
         var opts: [String: Any] = [
             "network-caching": 1500,
-            "http-reconnect": true
+            "http-reconnect": true,
+            // Prefer showing text subs when available
+            "sub-fps": 25,
+            "freetype-rel-fontsize": 16
         ]
         if !headers.isEmpty {
             let headerLines = headers.map { "\($0.key): \($0.value)" }.joined(separator: "\r\n")
@@ -74,16 +92,23 @@ final class VLCPlaybackBackend: NSObject {
         self.mediaPlayer = player
 
         player.play()
+
+        // Attach external (sidecar) subtitles as slaves — required for Plex isExternal streams.
+        for (i, subURL) in externalSubtitles.enumerated() {
+            player.addPlaybackSlave(subURL, type: .subtitle, enforce: i == 0 && preferredSubtitlePlexId != nil)
+        }
+
         if startPositionMs > 0 {
-            // VLC time is milliseconds via VLCTime
-            let t = VLCTime(int: Int32(clamping: startPositionMs))
-            player.time = t
+            player.time = VLCTime(int: Int32(clamping: startPositionMs))
         }
 
         startTimePolling()
         rate = 1.0
         state = .playing
         onStateChange?(.playing)
+
+        // Tracks often appear slightly after play starts.
+        scheduleTrackRefreshAndApply()
 #else
         throw PlaybackFailure(stage: .unknown, reason: "MobileVLCKit not linked", underlying: nil)
 #endif
@@ -127,7 +152,6 @@ final class VLCPlaybackBackend: NSObject {
 #endif
     }
 
-    /// `streamId` is the VLC track **index** (not Plex stream id) when using VLC-native lists.
     func selectAudioIndex(_ index: Int) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         mediaPlayer?.currentAudioTrackIndex = Int32(index)
@@ -140,11 +164,92 @@ final class VLCPlaybackBackend: NSObject {
         if let index {
             mediaPlayer?.currentVideoSubTitleIndex = Int32(index)
             selectedSubtitleIndex = index
+            pendingSubtitlePlexId = nil
         } else {
             mediaPlayer?.currentVideoSubTitleIndex = -1
             selectedSubtitleIndex = -1
+            pendingSubtitlePlexId = nil
         }
 #endif
+    }
+
+    /// Select subtitle using Plex metadata (language / order / external URL).
+    func applyPlexSubtitle(
+        stream: PlexStream?,
+        allSubtitleStreams: [PlexStream],
+        resolveExternalURL: (PlexStream) -> URL?
+    ) {
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+        guard let mediaPlayer else { return }
+        refreshTracks()
+
+        guard let stream else {
+            selectSubtitleIndex(nil)
+            return
+        }
+
+        pendingSubtitlePlexId = stream.id
+
+        // External sidecar → slave
+        if stream.isExternal {
+            if let url = resolveExternalURL(stream) {
+                mediaPlayer.addPlaybackSlave(url, type: .subtitle, enforce: true)
+                // Give VLC a moment then pick last / matching track
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    self.refreshTracks()
+                    if let last = self.subtitleTracks.last {
+                        self.selectSubtitleIndex(last.index)
+                    }
+                }
+            }
+            return
+        }
+
+        // Embedded: match by language code / name, else by order among embedded streams
+        if let matched = matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
+            selectSubtitleIndex(matched)
+            return
+        }
+
+        // Retry shortly — tracks may not be enumerated yet
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            self.refreshTracks()
+            if let matched = self.matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
+                self.selectSubtitleIndex(matched)
+            } else if let first = self.subtitleTracks.first {
+                // Last resort: first available text track
+                self.selectSubtitleIndex(first.index)
+            }
+        }
+#endif
+    }
+
+    private func matchEmbeddedTrack(for stream: PlexStream, all: [PlexStream]) -> Int? {
+        let needles: [String] = [
+            stream.languageCode,
+            stream.language,
+            stream.displayTitle,
+            stream.extendedDisplayTitle,
+            stream.title
+        ]
+        .compactMap { $0?.lowercased() }
+        .filter { !$0.isEmpty }
+
+        for track in subtitleTracks {
+            let name = track.name.lowercased()
+            for n in needles where name.contains(n) {
+                return track.index
+            }
+        }
+
+        let embedded = all.filter { !$0.isExternal }
+        if let order = embedded.firstIndex(where: { $0.id == stream.id }),
+           order < subtitleTracks.count {
+            return subtitleTracks[order].index
+        }
+        return nil
     }
 
     func refreshTracks() {
@@ -175,7 +280,21 @@ final class VLCPlaybackBackend: NSObject {
         }
         subtitleTracks = subs
         selectedSubtitleIndex = Int(mediaPlayer.currentVideoSubTitleIndex)
+        onTracksUpdated?()
 #endif
+    }
+
+    private func scheduleTrackRefreshAndApply() {
+        Task { @MainActor in
+            for delay in [300, 800, 1500] as [UInt64] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                refreshTracks()
+                if let pending = pendingSubtitlePlexId, !subtitleTracks.isEmpty {
+                    // Caller should call applyPlexSubtitle; here just keep tracks fresh.
+                    _ = pending
+                }
+            }
+        }
     }
 
     private func stopInternal() {
@@ -188,6 +307,10 @@ final class VLCPlaybackBackend: NSObject {
 #endif
         positionMs = 0
         durationMs = 0
+        audioTracks = []
+        subtitleTracks = []
+        pendingSubtitlePlexId = nil
+        externalSubtitleURLs = []
     }
 
     private func startTimePolling() {

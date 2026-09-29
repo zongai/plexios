@@ -268,7 +268,30 @@ struct PlaybackPreferences: Sendable {
     )
 
     static let rateOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+
+    /// Common BCP-47 / ISO language codes used by Plex streams.
+    /// Empty string = Auto (server / stream default).
+    static let languageOptions: [(code: String, labelKey: String)] = [
+        ("", "lang.auto"),
+        ("en", "lang.en"),
+        ("zh", "lang.zh"),
+        ("zh-CN", "lang.zh_hans"),
+        ("zh-TW", "lang.zh_hant"),
+        ("ja", "lang.ja"),
+        ("ko", "lang.ko"),
+        ("es", "lang.es"),
+        ("fr", "lang.fr"),
+        ("de", "lang.de"),
+        ("pt", "lang.pt"),
+        ("ru", "lang.ru"),
+        ("it", "lang.it"),
+        ("ar", "lang.ar"),
+        ("hi", "lang.hi"),
+        ("th", "lang.th"),
+        ("vi", "lang.vi"),
+    ]
 }
+
 
 /// Persists user playback defaults (not secrets — UserDefaults is fine).
 @MainActor

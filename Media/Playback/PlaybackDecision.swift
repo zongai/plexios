@@ -201,13 +201,41 @@ struct PlaybackDecisionEngine: Sendable {
 
     // MARK: - Stream selection
 
+    private func matchesLanguage(_ stream: PlexStream, pref: String) -> Bool {
+        let p = pref.lowercased()
+        guard !p.isEmpty else { return false }
+        let code = (stream.languageCode ?? "").lowercased()
+        let name = (stream.language ?? "").lowercased()
+        if code == p || name == p { return true }
+        // Prefix match: "zh" matches "zh-cn", "zh-hans", "chi"
+        if !code.isEmpty, code.hasPrefix(p) || p.hasPrefix(code) { return true }
+        // Common aliases
+        let aliases: [String: [String]] = [
+            "zh": ["chi", "zho", "zh-cn", "zh-tw", "zh-hans", "zh-hant", "chinese"],
+            "zh-cn": ["zh", "chi", "zh-hans", "cmn"],
+            "zh-tw": ["zh", "chi", "zh-hant", "cht"],
+            "en": ["eng", "english"],
+            "ja": ["jpn", "japanese"],
+            "ko": ["kor", "korean"],
+            "es": ["spa", "spanish"],
+            "fr": ["fre", "fra", "french"],
+            "de": ["ger", "deu", "german"],
+            "pt": ["por", "portuguese"],
+            "ru": ["rus", "russian"],
+        ]
+        if let list = aliases[p] {
+            if list.contains(code) || list.contains(name) { return true }
+            if list.contains(where: { code.hasPrefix($0) || name.contains($0) }) { return true }
+        }
+        return name.contains(p)
+    }
+
     private func selectAudio(_ streams: [PlexStream], forced: Int?) -> Int? {
         if let forced, streams.contains(where: { $0.id == forced }) { return forced }
-        if let pref = preferences.preferredAudioLanguage {
-            if let match = streams.first(where: {
-                $0.languageCode?.lowercased() == pref.lowercased()
-                    || $0.language?.lowercased() == pref.lowercased()
-            }) { return match.id }
+        if let pref = preferences.preferredAudioLanguage, !pref.isEmpty {
+            if let match = streams.first(where: { matchesLanguage($0, pref: pref) }) {
+                return match.id
+            }
         }
         if let selected = streams.first(where: \.isSelected) { return selected.id }
         if let def = streams.first(where: \.isDefault) { return def.id }
@@ -224,11 +252,8 @@ struct PlaybackDecisionEngine: Sendable {
                 return (forced, capabilities.requiresBurnIn(stream))
             }
         }
-        if let pref = preferences.preferredSubtitleLanguage {
-            if let match = streams.first(where: {
-                $0.languageCode?.lowercased() == pref.lowercased()
-                    || $0.language?.lowercased() == pref.lowercased()
-            }) {
+        if let pref = preferences.preferredSubtitleLanguage, !pref.isEmpty {
+            if let match = streams.first(where: { matchesLanguage($0, pref: pref) }) {
                 return (match.id, capabilities.requiresBurnIn(match))
             }
         }

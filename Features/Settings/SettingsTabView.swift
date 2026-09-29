@@ -161,8 +161,33 @@ struct SettingsTabView: View {
             }
             .onChange(of: prefs.defaultAspectMode) { _, _ in savePrefs() }
 
-            Toggle("Subtitles on by default", isOn: $prefs.subtitlesEnabled)
+            Toggle(String(localized: "settings.subtitles_default"), isOn: $prefs.subtitlesEnabled)
                 .onChange(of: prefs.subtitlesEnabled) { _, _ in savePrefs() }
+
+            Picker(String(localized: "settings.default_audio"), selection: Binding(
+                get: { prefs.preferredAudioLanguage ?? "" },
+                set: {
+                    prefs.preferredAudioLanguage = $0.isEmpty ? nil : $0
+                    savePrefs()
+                }
+            )) {
+                ForEach(PlaybackPreferences.languageOptions, id: \.code) { opt in
+                    Text(String(localized: String.LocalizationValue(opt.labelKey))).tag(opt.code)
+                }
+            }
+
+            Picker(String(localized: "settings.default_subtitle"), selection: Binding(
+                get: { prefs.preferredSubtitleLanguage ?? "" },
+                set: {
+                    prefs.preferredSubtitleLanguage = $0.isEmpty ? nil : $0
+                    savePrefs()
+                }
+            )) {
+                ForEach(PlaybackPreferences.languageOptions, id: \.code) { opt in
+                    Text(String(localized: String.LocalizationValue(opt.labelKey))).tag(opt.code)
+                }
+            }
+            .disabled(!prefs.subtitlesEnabled)
 
             Toggle("Native Media Engine (experimental)", isOn: $prefs.allowNativeMediaEngine)
                 .onChange(of: prefs.allowNativeMediaEngine) { _, _ in savePrefs() }

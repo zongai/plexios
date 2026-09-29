@@ -25,7 +25,12 @@ struct HomeView: View {
             }
             await viewModel?.load(context: environment.serverContext)
         }
+        // Reload when server identity **or** preferred connection URL changes (LAN vs relay).
         .onChange(of: environment.connectionManager.activeServer?.machineIdentifier) { _, _ in
+            Task { await viewModel?.load(context: environment.serverContext, force: true) }
+        }
+        .onChange(of: environment.serverContext?.baseURL?.absoluteString) { _, newURL in
+            guard newURL != nil else { return }
             Task { await viewModel?.load(context: environment.serverContext, force: true) }
         }
     }

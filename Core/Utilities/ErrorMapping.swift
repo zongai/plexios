@@ -27,6 +27,8 @@ enum ErrorMapping {
             case 401, 403:
                 return .authentication(.tokenInvalid)
             case 404:
+                // Used for missing metadata items; hub/section 404s also land here.
+                // Prefer a neutral message — UI can still say "not available".
                 return .mediaUnavailable
             case 408, 504:
                 return .network(.timeout)

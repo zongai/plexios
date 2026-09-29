@@ -32,7 +32,7 @@ enum PlexError: Error, LocalizedError, Sendable {
         case .transcoding(let e):
             return e.localizedDescription
         case .mediaUnavailable:
-            return "This media is not available"
+            return "This content is not available right now"
         case .permission:
             return "You do not have permission to access this content"
         case .cancelled:

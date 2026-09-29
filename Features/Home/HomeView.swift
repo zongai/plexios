@@ -29,7 +29,7 @@ struct HomeView: View {
         .onChange(of: environment.connectionManager.activeServer?.machineIdentifier) { _, _ in
             Task { await viewModel?.load(context: environment.serverContext, force: true) }
         }
-        .onChange(of: environment.serverContext?.baseURL?.absoluteString) { _, newURL in
+        .onChange(of: environment.serverContext?.baseURL.absoluteString) { _, newURL in
             guard newURL != nil else { return }
             Task { await viewModel?.load(context: environment.serverContext, force: true) }
         }

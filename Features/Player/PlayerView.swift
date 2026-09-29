@@ -19,6 +19,16 @@ struct PlayerView: View {
     /// Always prefer the engine's current item (updates on autoplay / track switch).
     private var activeItem: PlexMetadata { engine.currentItem ?? metadata }
 
+    /// True when any backend is presenting video (controls may be shown).
+    private var hasActiveVideoSurface: Bool {
+        engine.player != nil
+            || engine.isNativeBackendActive
+            || engine.isVLCBackendActive
+            || engine.sessionState == .playing
+            || engine.sessionState == .paused
+            || engine.sessionState == .buffering
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()

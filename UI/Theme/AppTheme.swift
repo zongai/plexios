@@ -1,26 +1,28 @@
 import SwiftUI
 
-// MARK: - Colors (Infuse-inspired cinema palette)
+// MARK: - Colors (system light / dark adaptive)
 
 enum AppColors {
-    /// Near-black stage used by Infuse-style shelves and detail.
-    static let background = Color(red: 0.06, green: 0.06, blue: 0.07)
-    static let secondaryBackground = Color(red: 0.11, green: 0.11, blue: 0.13)
-    static let tertiaryBackground = Color(red: 0.16, green: 0.16, blue: 0.18)
+    static let background = Color(.systemBackground)
+    static let secondaryBackground = Color(.secondarySystemBackground)
+    static let tertiaryBackground = Color(.tertiarySystemBackground)
 
-    static let primaryText = Color.white
-    static let secondaryText = Color.white.opacity(0.72)
-    static let tertiaryText = Color.white.opacity(0.48)
+    static let primaryText = Color(.label)
+    static let secondaryText = Color(.secondaryLabel)
+    static let tertiaryText = Color(.tertiaryLabel)
 
-    /// Infuse-like cool blue accent.
-    static let accent = Color(red: 0.28, green: 0.56, blue: 0.98)
-    static let destructive = Color(red: 0.95, green: 0.35, blue: 0.35)
+    static let accent = Color.accentColor
+    static let destructive = Color.red
 
-    static let mediaCardBackground = Color(red: 0.12, green: 0.12, blue: 0.14)
-    static let posterPlaceholder = Color(red: 0.18, green: 0.18, blue: 0.20)
+    static let mediaCardBackground = Color(.secondarySystemBackground)
+    static let posterPlaceholder = Color(.tertiarySystemFill)
 
-    static let chipBackground = Color.white.opacity(0.12)
-    static let progressTrack = Color.white.opacity(0.22)
+    static let chipBackground = Color(.tertiarySystemFill)
+    static let progressTrack = Color(.tertiarySystemFill)
+
+    /// Overlay text on hero artwork (always light for contrast on backdrops).
+    static let onMediaPrimary = Color.white
+    static let onMediaSecondary = Color.white.opacity(0.85)
 }
 
 // MARK: - Typography

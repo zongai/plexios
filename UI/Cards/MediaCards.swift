@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Poster Card (Infuse-style)
+// MARK: - Poster Card
 
 struct PosterCard: View {
     let title: String
@@ -11,6 +11,7 @@ struct PosterCard: View {
     let token: String?
 
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.colorScheme) private var colorScheme
 
     private var cardWidth: CGFloat { AppLayout.posterWidth(for: sizeClass) }
     private var cardHeight: CGFloat { cardWidth / AppLayout.posterAspect }
@@ -32,9 +33,12 @@ struct PosterCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06), lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.45), radius: 10, y: 6)
+                .shadow(
+                    color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12),
+                    radius: 8, y: 4
+                )
 
                 if let progress, progress > 0, progress < 1 {
                     VStack {
@@ -76,7 +80,7 @@ struct PosterCard: View {
     }
 }
 
-// MARK: - Episode / Continue Watching card (wide landscape)
+// MARK: - Landscape / episode card
 
 struct EpisodeCard: View {
     let title: String
@@ -87,6 +91,7 @@ struct EpisodeCard: View {
     let token: String?
 
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.colorScheme) private var colorScheme
 
     private var cardWidth: CGFloat { AppLayout.continueWatchingWidth(for: sizeClass) }
     private var cardHeight: CGFloat { cardWidth / AppLayout.backdropAspect }
@@ -108,33 +113,36 @@ struct EpisodeCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06), lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.45), radius: 10, y: 6)
+                .shadow(
+                    color: .black.opacity(colorScheme == .dark ? 0.35 : 0.12),
+                    radius: 8, y: 4
+                )
 
                 LinearGradient(
-                    colors: [.clear, .black.opacity(0.75)],
+                    colors: [.clear, .black.opacity(0.72)],
                     startPoint: .center,
                     endPoint: .bottom
                 )
                 .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Spacer()
+                    Spacer(minLength: 0)
                     Text(title)
                         .font(AppTypography.caption.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppColors.onMediaPrimary)
                         .lineLimit(1)
                     if let subtitle {
                         Text(subtitle)
                             .font(AppTypography.caption2)
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(AppColors.onMediaSecondary)
                             .lineLimit(1)
                     }
                     if let progress, progress > 0, progress < 1 {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
-                                Capsule().fill(AppColors.progressTrack)
+                                Capsule().fill(Color.white.opacity(0.25))
                                 Capsule()
                                     .fill(AppColors.accent)
                                     .frame(width: max(4, geo.size.width * progress))

@@ -152,6 +152,7 @@ struct MovieDetailView: View {
         }
         .background(AppColors.background.ignoresSafeArea())
         .scrollIndicators(.hidden)
+        .clipped()
     }
 
     private func flowTags(title: String, tags: [String]) -> some View {

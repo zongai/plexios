@@ -10,9 +10,7 @@ struct HomeView: View {
             content
                 .navigationTitle(environment.connectionManager.activeServer?.name ?? L10n.home)
                 .navigationBarTitleDisplayMode(.large)
-                .toolbarBackground(AppColors.background, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .navigationDestination(for: MediaRoute.self) { route in
+                                                .navigationDestination(for: MediaRoute.self) { route in
                     MediaDestinationView(route: route)
                 }
                 .refreshable {

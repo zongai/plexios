@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shared Infuse-style hero + action chrome for movie / show detail.
+/// Adaptive hero for movie / show / episode detail — portrait vs landscape.
 struct MediaDetailHero: View {
     let title: String
     let artPath: String?
@@ -16,109 +16,153 @@ struct MediaDetailHero: View {
     var onPlay: (() -> Void)?
     var secondaryActions: (() -> AnyView)? = nil
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    /// Compact when phone is landscape (short height).
+    private var isCompactHeight: Bool {
+        verticalSizeClass == .compact
+    }
+
+    private var heroHeight: CGFloat {
+        if isCompactHeight { return 160 }
+        return sizeClass == .regular ? 320 : 240
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            PlexImage(
-                url: PlexImageURL.resolve(
-                    path: artPath ?? thumbPath,
-                    baseURL: baseURL,
-                    token: token,
-                    width: 1600,
-                    height: 900
-                ),
-                pointSize: CGSize(width: 420, height: 240)
-            )
-            .frame(height: 280)
-            .frame(maxWidth: .infinity)
-            .clipped()
-
-            LinearGradient(
-                colors: [
-                    .clear,
-                    AppColors.background.opacity(0.55),
-                    AppColors.background
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 200)
-
-            VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                Text(title)
-                    .font(AppTypography.largeTitle)
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.6), radius: 8, y: 2)
-                    .lineLimit(3)
-                    .accessibilityAddTraits(.isHeader)
-
-                metaChips
-
-                if let progress, progress > 0, progress < 1 {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(AppColors.progressTrack)
-                            Capsule()
-                                .fill(AppColors.accent)
-                                .frame(width: max(6, geo.size.width * progress))
-                        }
-                    }
-                    .frame(height: 4)
-                    .padding(.top, 2)
+        GeometryReader { geo in
+            let width = geo.size.width
+            ZStack(alignment: .bottomLeading) {
+                PlexImage(
+                    url: PlexImageURL.resolve(
+                        path: artPath ?? thumbPath,
+                        baseURL: baseURL,
+                        token: token,
+                        width: 1600,
+                        height: 900
+                    ),
+                    pointSize: CGSize(width: min(width, 600), height: heroHeight)
+                )
+                .frame(width: width, height: heroHeight)
+                .clipped()
+                .overlay(alignment: .bottom) {
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            Color.black.opacity(0.45),
+                            Color.black.opacity(0.75)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: min(heroHeight * 0.75, 180))
                 }
 
-                HStack(spacing: AppSpacing.md) {
-                    if let onPlay {
-                        Button(action: onPlay) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "play.fill")
-                                Text(isInProgress ? L10n.resume : L10n.play)
-                                    .fontWeight(.semibold)
-                            }
-                            .font(AppTypography.headline)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 28)
-                            .padding(.vertical, 12)
-                            .background(AppColors.accent, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(isInProgress ? L10n.resume : L10n.play)
-                    }
-
-                    if let secondaryActions {
-                        secondaryActions()
-                    }
-                }
-                .padding(.top, AppSpacing.xs)
+                contentBlock(maxWidth: width - AppSpacing.lg * 2)
+                    .padding(.horizontal, AppSpacing.lg)
+                    .padding(.bottom, isCompactHeight ? AppSpacing.sm : AppSpacing.md)
             }
-            .padding(.horizontal, AppSpacing.lg)
-            .padding(.bottom, AppSpacing.lg)
+            .frame(width: width, height: heroHeight)
+        }
+        .frame(height: heroHeight)
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func contentBlock(maxWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 4 : AppSpacing.sm) {
+            Text(title)
+                .font(isCompactHeight ? AppTypography.title3 : AppTypography.largeTitle)
+                .foregroundStyle(AppColors.onMediaPrimary)
+                .shadow(color: .black.opacity(0.5), radius: 6, y: 2)
+                .lineLimit(isCompactHeight ? 1 : 2)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: maxWidth, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+
+            if !isCompactHeight {
+                metaChips
+                    .frame(maxWidth: maxWidth, alignment: .leading)
+            }
+
+            if let progress, progress > 0, progress < 1, !isCompactHeight {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.25))
+                        Capsule()
+                            .fill(AppColors.accent)
+                            .frame(width: max(6, geo.size.width * progress))
+                    }
+                }
+                .frame(height: 4)
+                .frame(maxWidth: min(maxWidth, 280))
+            }
+
+            HStack(spacing: AppSpacing.sm) {
+                if let onPlay {
+                    Button(action: onPlay) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.fill")
+                            Text(isInProgress ? L10n.resume : L10n.play)
+                                .fontWeight(.semibold)
+                        }
+                        .font(isCompactHeight ? AppTypography.subheadline : AppTypography.headline)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, isCompactHeight ? 16 : 24)
+                        .padding(.vertical, isCompactHeight ? 8 : 12)
+                        .background(AppColors.accent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isInProgress ? L10n.resume : L10n.play)
+                }
+
+                if let secondaryActions {
+                    secondaryActions()
+                }
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: maxWidth)
         }
     }
 
     private var metaChips: some View {
-        HStack(spacing: 8) {
-            if let year {
-                chip(String(year))
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                chipViews
             }
-            if let contentRating {
-                chip(contentRating)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    chipViews
+                }
             }
-            if let durationLabel {
-                chip(durationLabel)
-            }
-            if let rating {
-                chip(String(format: "★ %.1f", rating))
-            }
+        }
+    }
+
+    @ViewBuilder
+    private var chipViews: some View {
+        if let year {
+            chip(String(year))
+        }
+        if let contentRating {
+            chip(contentRating)
+        }
+        if let durationLabel {
+            chip(durationLabel)
+        }
+        if let rating {
+            chip(String(format: "★ %.1f", rating))
         }
     }
 
     private func chip(_ text: String) -> some View {
         Text(text)
             .font(AppTypography.caption.weight(.medium))
-            .foregroundStyle(AppColors.secondaryText)
+            .foregroundStyle(AppColors.onMediaSecondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(AppColors.chipBackground, in: Capsule())
+            .background(Color.white.opacity(0.18), in: Capsule())
+            .lineLimit(1)
     }
 }
 
@@ -132,9 +176,9 @@ struct MediaDetailIconButton: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(isOn ? AppColors.accent : .white)
-                .frame(width: 44, height: 44)
-                .background(AppColors.chipBackground, in: Circle())
+                .foregroundStyle(isOn ? AppColors.accent : AppColors.onMediaPrimary)
+                .frame(width: 40, height: 40)
+                .background(Color.white.opacity(0.18), in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

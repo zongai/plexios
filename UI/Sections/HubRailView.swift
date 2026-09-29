@@ -1,17 +1,21 @@
 import SwiftUI
 
-/// Horizontal media rail — Infuse-style section title + poster shelf.
+/// Horizontal media rail — one card style for the entire row.
 struct HubRailView: View {
     let hub: PlexHub
     let baseURL: URL?
     let token: String?
     var onSelect: (PlexMetadata) -> Void
 
-    /// Continue Watching / On Deck prefer wide episode cards.
-    private var prefersWideCards: Bool {
-        let t = hub.title.lowercased()
-        return t.contains("continue") || t.contains("on deck") || t.contains("recently")
-            || hub.items.first?.type == .episode
+    /// Single style for the whole rail (never mix poster + landscape in one row).
+    private var useWideCards: Bool {
+        let category = HomeDisplayPreferences.category(for: hub)
+        if category == .continueWatching || category == .recentlyPlayed {
+            return true
+        }
+        // If most items are episodes, use landscape for all.
+        let episodes = hub.items.filter { $0.type == .episode }.count
+        return !hub.items.isEmpty && episodes * 2 >= hub.items.count
     }
 
     var body: some View {
@@ -40,7 +44,7 @@ struct HubRailView: View {
 
     @ViewBuilder
     private func card(for item: PlexMetadata) -> some View {
-        if prefersWideCards || item.type == .episode {
+        if useWideCards {
             EpisodeCard(
                 title: item.type == .episode
                     ? (item.grandparentTitle ?? item.title)
@@ -48,7 +52,9 @@ struct HubRailView: View {
                 subtitle: item.type == .episode
                     ? (item.cardSubtitle().map { "\($0) · \(item.title)" } ?? item.title)
                     : item.cardSubtitle(),
-                imagePath: item.type == .episode ? item.episodeThumbPath() : (item.art ?? item.posterPath()),
+                imagePath: item.type == .episode
+                    ? item.episodeThumbPath()
+                    : (item.art ?? item.posterPath()),
                 progress: item.isInProgress ? item.progressFraction : nil,
                 baseURL: baseURL,
                 token: token

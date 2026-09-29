@@ -73,3 +73,13 @@
 "settings.version" = "版本";
 "playlists.title" = "播放列表";
 "collections.title" = "合集";
+"home.pref.section" = "主畫面";
+"home.pref.continue" = "繼續觀看";
+"home.pref.recently_added" = "最近新增";
+"home.pref.recently_played" = "最近播放";
+"home.pref.movies" = "電影";
+"home.pref.tv" = "劇集";
+"home.pref.music" = "音樂";
+"home.pref.other" = "其他列";
+"home.pref.max_items" = "每列筆數";
+"home.pref.footer" = "選擇主畫面顯示的內容列。變更後下拉重新整理首頁即可生效。";

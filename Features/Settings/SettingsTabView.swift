@@ -3,12 +3,14 @@ import SwiftUI
 struct SettingsTabView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var prefs = PlaybackSettingsStore.shared.preferences
+    @State private var homePrefs = HomeSettingsStore.shared.preferences
 
     var body: some View {
         NavigationStack {
             List {
                 accountSection
                 serverSection
+                homeSection
                 playbackSection
                 playerEngineSection
                 codecsSection
@@ -19,6 +21,7 @@ struct SettingsTabView: View {
             .navigationTitle("Settings")
             .onAppear {
                 prefs = PlaybackSettingsStore.shared.preferences
+                homePrefs = HomeSettingsStore.shared.preferences
             }
         }
     }
@@ -76,6 +79,38 @@ struct SettingsTabView: View {
                     }
                 }
             }
+        }
+    }
+
+
+    private var homeSection: some View {
+        Section {
+            ForEach(HomeDisplayPreferences.Category.allCases) { category in
+                Toggle(category.title, isOn: Binding(
+                    get: { homePrefs.isEnabled(category) },
+                    set: { newValue in
+                        homePrefs.set(category, enabled: newValue)
+                        HomeSettingsStore.shared.preferences = homePrefs
+                    }
+                ))
+            }
+            Picker(String(localized: "home.pref.max_items"), selection: Binding(
+                get: { homePrefs.maxItemsPerHub },
+                set: { newValue in
+                    homePrefs.maxItemsPerHub = newValue
+                    HomeSettingsStore.shared.preferences = homePrefs
+                }
+            )) {
+                Text("10").tag(10)
+                Text("15").tag(15)
+                Text("20").tag(20)
+                Text("30").tag(30)
+                Text("50").tag(50)
+            }
+        } header: {
+            Text(String(localized: "home.pref.section"))
+        } footer: {
+            Text(String(localized: "home.pref.footer"))
         }
     }
 

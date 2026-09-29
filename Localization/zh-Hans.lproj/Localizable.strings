@@ -92,3 +92,13 @@
 /* Playlists / Collections */
 "playlists.title" = "播放列表";
 "collections.title" = "合集";
+"home.pref.section" = "主界面";
+"home.pref.continue" = "继续观看";
+"home.pref.recently_added" = "最近添加";
+"home.pref.recently_played" = "最近播放";
+"home.pref.movies" = "电影";
+"home.pref.tv" = "剧集";
+"home.pref.music" = "音乐";
+"home.pref.other" = "其他行";
+"home.pref.max_items" = "每行条数";
+"home.pref.footer" = "选择主界面显示的内容行。更改后下拉刷新主页即可生效。";

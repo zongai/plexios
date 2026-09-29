@@ -35,6 +35,10 @@ struct HomeView: View {
             guard newURL != nil else { return }
             Task { await viewModel?.load(context: environment.serverContext, force: true) }
         }
+        .onAppear {
+            // Re-apply home display preferences when returning from Settings
+            Task { await viewModel?.load(context: environment.serverContext, force: true) }
+        }
     }
 
     @ViewBuilder

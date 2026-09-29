@@ -92,3 +92,13 @@
 /* Playlists / Collections */
 "playlists.title" = "Playlists";
 "collections.title" = "Collections";
+"home.pref.section" = "Home screen";
+"home.pref.continue" = "Continue Watching";
+"home.pref.recently_added" = "Recently Added";
+"home.pref.recently_played" = "Recently Played";
+"home.pref.movies" = "Movies";
+"home.pref.tv" = "TV Shows";
+"home.pref.music" = "Music";
+"home.pref.other" = "Other rows";
+"home.pref.max_items" = "Items per row";
+"home.pref.footer" = "Choose which rows appear on Home. Changes apply the next time Home refreshes.";

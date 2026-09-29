@@ -73,3 +73,13 @@
 "settings.version" = "Version";
 "playlists.title" = "Playlists";
 "collections.title" = "Sammlungen";
+"home.pref.section" = "Startbildschirm";
+"home.pref.continue" = "Weiterschauen";
+"home.pref.recently_added" = "Kürzlich hinzugefügt";
+"home.pref.recently_played" = "Kürzlich abgespielt";
+"home.pref.movies" = "Filme";
+"home.pref.tv" = "Serien";
+"home.pref.music" = "Musik";
+"home.pref.other" = "Andere Zeilen";
+"home.pref.max_items" = "Elemente pro Zeile";
+"home.pref.footer" = "Wählen Sie, welche Zeilen auf der Startseite erscheinen. Änderungen gelten nach Aktualisieren.";

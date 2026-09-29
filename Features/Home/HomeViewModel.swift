@@ -38,7 +38,8 @@ final class HomeViewModel {
             let result = try await PerformanceSignpost.measure("home.load", logger: logger) {
                 try await hubRepository.homeHubs(context: context, force: force)
             }
-            hubs = result.filter { !$0.items.isEmpty }
+            let prefs = HomeSettingsStore.shared.preferences
+            hubs = prefs.filtered(result.filter { !$0.items.isEmpty })
             state = hubs.isEmpty ? .empty : .loaded
         } catch is CancellationError {
             return

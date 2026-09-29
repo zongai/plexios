@@ -73,3 +73,13 @@
 "settings.version" = "バージョン";
 "playlists.title" = "プレイリスト";
 "collections.title" = "コレクション";
+"home.pref.section" = "ホーム画面";
+"home.pref.continue" = "続きから";
+"home.pref.recently_added" = "最近追加";
+"home.pref.recently_played" = "最近再生";
+"home.pref.movies" = "映画";
+"home.pref.tv" = "テレビ番組";
+"home.pref.music" = "音楽";
+"home.pref.other" = "その他";
+"home.pref.max_items" = "行あたりの件数";
+"home.pref.footer" = "ホームに表示する行を選択します。変更はホームを更新すると反映されます。";

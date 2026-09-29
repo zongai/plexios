@@ -73,3 +73,13 @@
 "settings.version" = "버전";
 "playlists.title" = "재생목록";
 "collections.title" = "컬렉션";
+"home.pref.section" = "홈 화면";
+"home.pref.continue" = "이어보기";
+"home.pref.recently_added" = "최근 추가";
+"home.pref.recently_played" = "최근 재생";
+"home.pref.movies" = "영화";
+"home.pref.tv" = "TV 프로그램";
+"home.pref.music" = "음악";
+"home.pref.other" = "기타";
+"home.pref.max_items" = "행당 항목 수";
+"home.pref.footer" = "홈에 표시할 행을 선택하세요. 변경 사항은 홈을 새로고침하면 적용됩니다.";

@@ -73,3 +73,13 @@
 "settings.version" = "Versión";
 "playlists.title" = "Listas";
 "collections.title" = "Colecciones";
+"home.pref.section" = "Pantalla de inicio";
+"home.pref.continue" = "Seguir viendo";
+"home.pref.recently_added" = "Añadido recientemente";
+"home.pref.recently_played" = "Reproducido recientemente";
+"home.pref.movies" = "Películas";
+"home.pref.tv" = "Series";
+"home.pref.music" = "Música";
+"home.pref.other" = "Otras filas";
+"home.pref.max_items" = "Elementos por fila";
+"home.pref.footer" = "Elige qué filas aparecen en Inicio. Los cambios se aplican al actualizar Inicio.";

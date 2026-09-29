@@ -76,10 +76,10 @@ enum AppLayout {
     }
 
     static func continueWatchingWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
-        // ~10% larger landscape cards for Continue Watching / Recently Played.
+        // Landscape cards for Continue Watching / Recently Played (+20% from prior size).
         switch horizontalSizeClass {
-        case .regular: return 308
-        default: return 242
+        case .regular: return 370
+        default: return 290
         }
     }
 

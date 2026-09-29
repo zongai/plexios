@@ -255,3 +255,6 @@
 "media.episode_count" = "%d 集";
 "media.season_n" = "第%d季";
 "media.episode_n" = "第%d集";
+"player.more_tools" = "更多控件";
+"player.volume" = "音量";
+"player.episodes" = "选集";

@@ -255,3 +255,6 @@
 "media.episode_count" = "%d Folgen";
 "media.season_n" = "Staffel %d";
 "media.episode_n" = "Folge %d";
+"player.more_tools" = "Weitere Steuerelemente";
+"player.volume" = "Lautstärke";
+"player.episodes" = "Folgen";

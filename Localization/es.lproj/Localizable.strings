@@ -255,3 +255,6 @@
 "media.episode_count" = "%d episodios";
 "media.season_n" = "Temporada %d";
 "media.episode_n" = "Episodio %d";
+"player.more_tools" = "Más controles";
+"player.volume" = "Volumen";
+"player.episodes" = "Episodios";

@@ -255,3 +255,6 @@
 "media.episode_count" = "%d 話";
 "media.season_n" = "シーズン%d";
 "media.episode_n" = "第%d話";
+"player.more_tools" = "その他の操作";
+"player.volume" = "音量";
+"player.episodes" = "エピソード";

@@ -413,6 +413,19 @@ final class PlaybackEngine {
         aspectMode = mode
     }
 
+    /// Linear volume 0…1 applied to the active player (not system volume).
+    private(set) var volume: Float = 1
+
+    func setVolume(_ value: Float) {
+        let v = min(1, max(0, value))
+        volume = v
+        if activePlaybackBackend == .vlc {
+            vlcBackend?.setVolume(v)
+            return
+        }
+        player?.volume = v
+    }
+
     private func applyRateToPlayer() {
         if activePlaybackBackend == .vlc {
             vlcBackend?.setRate(playbackRate)

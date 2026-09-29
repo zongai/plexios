@@ -179,6 +179,12 @@ final class VLCPlaybackBackend: NSObject {
 #endif
     }
 
+    func setVolume(_ linear: Float) {
+        // VLC uses 0…100
+        let v = Int(min(1, max(0, linear)) * 100)
+        mediaPlayer.audio?.volume = Int32(v)
+    }
+
     func setRate(_ rate: Float) {
         self.rate = rate
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)

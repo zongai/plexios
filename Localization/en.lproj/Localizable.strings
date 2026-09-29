@@ -279,3 +279,6 @@
 "media.episode_count" = "%d episodes";
 "media.season_n" = "Season %d";
 "media.episode_n" = "Episode %d";
+"player.more_tools" = "More controls";
+"player.volume" = "Volume";
+"player.episodes" = "Episodes";

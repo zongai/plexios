@@ -582,12 +582,32 @@ final class PlaybackEngine {
         }
     }
 
+    /// Sidecar text subs from PMS (SRT/ASS/VTT) — by flag, codec, or /library/streams key.
+    static func isSidecarSubtitle(_ stream: PlexStream) -> Bool {
+        guard stream.streamType == .subtitle else { return false }
+        if stream.isExternal { return true }
+        let codec = (stream.codec ?? stream.format ?? "").lowercased()
+        if ["srt", "ass", "ssa", "vtt", "subrip", "webvtt", "mov_text"].contains(codec) {
+            return true
+        }
+        if let key = stream.key, key.contains("/streams/") || key.contains("subtitle") {
+            return true
+        }
+        return false
+    }
+
     private static func externalSubtitleURLs(streams: [PlexStream], baseURL: URL, token: String) -> [URL] {
-        streams.filter(\.isExternal).compactMap { externalSubtitleURL(stream: $0, baseURL: baseURL, token: token) }
+        streams.filter(isSidecarSubtitle).compactMap { externalSubtitleURL(stream: $0, baseURL: baseURL, token: token) }
     }
 
     private static func externalSubtitleURL(stream: PlexStream, baseURL: URL, token: String) -> URL? {
-        guard let key = stream.key, !key.isEmpty else { return nil }
+        // Prefer explicit key; fallback to /library/streams/{id} (Plex standard for external).
+        let key: String
+        if let k = stream.key, !k.isEmpty {
+            key = k
+        } else {
+            key = "/library/streams/" + String(stream.id)
+        }
         if key.hasPrefix("http://") || key.hasPrefix("https://") {
             var c = URLComponents(string: key)
             var items = c?.queryItems ?? []

@@ -1,4 +1,3 @@
-/* Tabs & sections */
 "tab.home" = "首页";
 "tab.libraries" = "媒体库";
 "tab.collections" = "合集";
@@ -6,8 +5,7 @@
 "tab.search" = "搜索";
 "tab.settings" = "设置";
 "tab.more" = "更多";
-
-/* Common */
+"tab.iptv" = "IPTV";
 "common.ok" = "好";
 "common.cancel" = "取消";
 "common.close" = "关闭";
@@ -15,42 +13,54 @@
 "common.loading" = "加载中…";
 "common.starting" = "正在启动…";
 "common.refresh" = "刷新";
-"common.off" = "关闭";
+"common.off" = "关";
 "common.error" = "出了点问题";
 "common.not_found" = "未找到";
 "common.no_server" = "未连接服务器";
-
-/* Home */
-"home.empty.title" = "这里还是空的";
-"home.empty.subtitle" = "在 Plex 服务器上播放内容后，首页会显示相关条目。";
+"common.items_count" = "%d 项";
+"common.offline_banner" = "当前离线 — 在可用时显示缓存内容";
+"common.offline_a11y" = "离线。在可用时显示缓存内容。";
+"home.empty.title" = "这里还没有内容";
+"home.empty.subtitle" = "在 Plex 服务器上播放内容后，首页会显示相关推荐。";
 "home.connecting" = "正在连接服务器…";
-"home.finding_connection" = "正在查找可用连接…";
+"home.finding_connection" = "正在寻找可用连接…";
 "home.no_servers.title" = "未找到服务器";
-"home.no_servers.subtitle" = "请在 plex.tv 登录，并确认 Plex Media Server 在线。";
-
-/* Sign-in */
+"home.no_servers.subtitle" = "请在 plex.tv 登录，并确保 Plex Media Server 在线。";
+"home.pref.section" = "主界面";
+"home.pref.continue" = "继续观看";
+"home.pref.recently_added" = "最近添加";
+"home.pref.recently_played" = "最近播放";
+"home.pref.movies" = "电影";
+"home.pref.tv" = "剧集";
+"home.pref.music" = "音乐";
+"home.pref.other" = "其他行";
+"home.pref.max_items" = "每行条目数";
+"home.pref.footer" = "选择主页显示的内容行。下次刷新主页时生效。";
+"home.pref.no_libraries" = "尚未发现媒体库。";
+"home.pref.footer_libraries" = "可开关个人行与服务器上的每个媒体库。关闭后对应货架会隐藏。";
 "signin.title" = "登录 Plex";
-"signin.subtitle" = "将此应用与你的 Plex 账号关联";
-"signin.code_hint" = "在 plex.tv/link 输入以下验证码";
-"signin.copy_code" = "复制验证码";
+"signin.subtitle" = "将本应用与 Plex 账户关联";
+"signin.authorize_hint" = "你将在 plex.tv 上授权此设备";
+"signin.code_hint" = "在 plex.tv/link 输入此代码";
+"signin.enter_code_at" = "在此输入代码";
+"signin.copy_code" = "复制代码";
+"signin.tap_to_copy" = "点按复制";
 "signin.copied" = "已复制";
 "signin.open_link" = "打开 plex.tv/link";
-"signin.waiting" = "等待确认…";
-"signin.expired" = "验证码已过期 — 请重新获取";
-"signin.generate" = "获取验证码";
-
-/* Libraries */
+"signin.continue" = "使用 Plex 继续";
+"signin.waiting" = "等待批准…";
+"signin.waiting_auth" = "等待授权…";
+"signin.expired" = "代码已过期 — 请重新获取";
+"signin.generate" = "获取代码";
+"signin.copy_a11y_hint" = "将代码复制到剪贴板";
 "libraries.title" = "媒体库";
-"libraries.empty" = "暂无媒体库";
-
-/* Search */
+"libraries.empty" = "没有媒体库";
+"libraries.empty_library" = "媒体库为空";
 "search.title" = "搜索";
 "search.placeholder" = "搜索电影、剧集、音乐…";
 "search.no_results" = "无结果";
-
-/* Detail */
 "detail.play" = "播放";
-"detail.resume" = "继续播放";
+"detail.resume" = "继续";
 "detail.watched" = "标记已看";
 "detail.favorite" = "收藏";
 "detail.unfavorite" = "取消收藏";
@@ -61,10 +71,8 @@
 "detail.director" = "导演";
 "detail.writers" = "编剧";
 "detail.cast" = "演员";
-"detail.media" = "媒体信息";
-"detail.no_episodes" = "暂无剧集";
-
-/* Player */
+"detail.media" = "媒体";
+"detail.no_episodes" = "没有剧集";
 "player.play" = "播放";
 "player.pause" = "暂停";
 "player.close" = "关闭";
@@ -76,37 +84,25 @@
 "player.back_10" = "后退 10 秒";
 "player.forward_10" = "前进 10 秒";
 "player.loading" = "正在加载播放";
-"player.position" = "播放进度";
-
-/* Settings */
+"player.position" = "播放位置";
 "settings.title" = "设置";
 "settings.playback" = "播放";
 "settings.cache" = "缓存";
 "settings.about" = "关于";
 "settings.clear_cache" = "清除响应与图片缓存";
-"settings.prefer_system_player" = "优先使用系统播放器";
+"settings.prefer_system_player" = "优先系统播放器";
 "settings.allow_vlc" = "允许 MobileVLCKit";
-"settings.language_note" = "语言跟随系统设置。";
+"settings.language_note" = "语言跟随系统语言。";
 "settings.version" = "版本";
-
-/* Playlists / Collections */
-"playlists.title" = "播放列表";
-"collections.title" = "合集";
-"home.pref.section" = "主界面";
-"home.pref.continue" = "继续观看";
-"home.pref.recently_added" = "最近添加";
-"home.pref.recently_played" = "最近播放";
-"home.pref.movies" = "电影";
-"home.pref.tv" = "剧集";
-"home.pref.music" = "音乐";
-"home.pref.other" = "其他行";
-"home.pref.max_items" = "每行条数";
-"home.pref.footer" = "选择主界面显示的内容行。更改后下拉刷新主页即可生效。";
-"home.pref.no_libraries" = "尚未发现媒体库。";
-"home.pref.footer_libraries" = "可开关「继续观看」等个人行，以及服务器上的每个媒体库；关闭的库不会出现在主界面。";
 "settings.subtitles_default" = "默认开启字幕";
 "settings.default_audio" = "默认音轨语言";
 "settings.default_subtitle" = "默认字幕语言";
+"settings.audio_priority" = "音轨优先 %d";
+"settings.subtitle_priority" = "字幕优先 %d";
+"settings.no_servers" = "未发现服务器";
+"settings.sign_out" = "退出登录";
+"playlists.title" = "播放列表";
+"collections.title" = "合集";
 "lang.auto" = "自动";
 "lang.en" = "英语";
 "lang.zh" = "中文";
@@ -124,8 +120,6 @@
 "lang.hi" = "印地语";
 "lang.th" = "泰语";
 "lang.vi" = "越南语";
-"settings.audio_priority" = "音轨优先 %d";
-"settings.subtitle_priority" = "字幕优先 %d";
 "iptv.title" = "IPTV";
 "iptv.playlists" = "播放列表";
 "iptv.add_playlist" = "添加播放列表";
@@ -133,7 +127,7 @@
 "iptv.playlist_url" = "M3U 地址";
 "iptv.refresh" = "刷新";
 "iptv.empty" = "请在 设置 → IPTV 中添加 M3U 播放列表。";
-"iptv.empty_title" = "暂无频道";
+"iptv.empty_title" = "没有频道";
 "iptv.search" = "搜索频道";
 "iptv.favorites" = "仅收藏";
 "iptv.show_all" = "显示全部";
@@ -141,9 +135,9 @@
 "iptv.sources" = "播放源";
 "iptv.playback" = "播放";
 "iptv.default_quality" = "默认画质";
-"iptv.auto_switch" = "失败时自动切换播放源";
-
+"iptv.auto_switch" = "失败时自动切换源";
 "iptv.guide" = "节目单";
+"iptv.guide_now" = "现在";
 "iptv.no_epg" = "暂无节目信息";
 "iptv.next" = "下一节目";
 "iptv.epg" = "电子节目单";
@@ -151,3 +145,4 @@
 "iptv.refresh_epg" = "刷新节目单";
 "iptv.adaptive_quality" = "根据网速自适应画质";
 "iptv.diagnostics_hud" = "显示播放诊断信息";
+"iptv.channels_count" = "%d 个频道";

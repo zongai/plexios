@@ -6,6 +6,7 @@
 "tab.search" = "Search";
 "tab.settings" = "Settings";
 "tab.more" = "More";
+"tab.iptv" = "IPTV";
 
 /* Common */
 "common.ok" = "OK";
@@ -19,6 +20,9 @@
 "common.error" = "Something went wrong";
 "common.not_found" = "Not found";
 "common.no_server" = "No server connected";
+"common.items_count" = "%d items";
+"common.offline_banner" = "You’re offline — showing cached content when available";
+"common.offline_a11y" = "Offline. Showing cached content when available.";
 
 /* Home */
 "home.empty.title" = "Nothing here yet";
@@ -27,21 +31,40 @@
 "home.finding_connection" = "Finding a working connection…";
 "home.no_servers.title" = "No servers found";
 "home.no_servers.subtitle" = "Sign in on plex.tv and make sure your Plex Media Server is online.";
+"home.pref.section" = "Home screen";
+"home.pref.continue" = "Continue Watching";
+"home.pref.recently_added" = "Recently Added";
+"home.pref.recently_played" = "Recently Played";
+"home.pref.movies" = "Movies";
+"home.pref.tv" = "TV Shows";
+"home.pref.music" = "Music";
+"home.pref.other" = "Other rows";
+"home.pref.max_items" = "Items per row";
+"home.pref.footer" = "Choose which rows appear on Home. Changes apply the next time Home refreshes.";
+"home.pref.no_libraries" = "No libraries discovered yet.";
+"home.pref.footer_libraries" = "Toggle personal rows and each library from your server. Disabled libraries hide their Home shelves.";
 
 /* Sign-in */
 "signin.title" = "Sign in to Plex";
 "signin.subtitle" = "Link this app with your Plex account";
+"signin.authorize_hint" = "You’ll authorize this device on plex.tv";
 "signin.code_hint" = "Enter this code at plex.tv/link";
+"signin.enter_code_at" = "Enter this code at";
 "signin.copy_code" = "Copy code";
+"signin.tap_to_copy" = "Tap to copy";
 "signin.copied" = "Copied";
 "signin.open_link" = "Open plex.tv/link";
+"signin.continue" = "Continue with Plex";
 "signin.waiting" = "Waiting for approval…";
+"signin.waiting_auth" = "Waiting for authorization…";
 "signin.expired" = "Code expired — generate a new one";
 "signin.generate" = "Get code";
+"signin.copy_a11y_hint" = "Copies the code to the clipboard";
 
 /* Libraries */
 "libraries.title" = "Libraries";
 "libraries.empty" = "No libraries";
+"libraries.empty_library" = "Empty library";
 
 /* Search */
 "search.title" = "Search";
@@ -88,25 +111,19 @@
 "settings.allow_vlc" = "Allow MobileVLCKit";
 "settings.language_note" = "Language follows the system language.";
 "settings.version" = "Version";
+"settings.subtitles_default" = "Subtitles on by default";
+"settings.default_audio" = "Default audio language";
+"settings.default_subtitle" = "Default subtitle language";
+"settings.audio_priority" = "Audio priority %d";
+"settings.subtitle_priority" = "Subtitle priority %d";
+"settings.no_servers" = "No servers discovered";
+"settings.sign_out" = "Sign out";
 
 /* Playlists / Collections */
 "playlists.title" = "Playlists";
 "collections.title" = "Collections";
-"home.pref.section" = "Home screen";
-"home.pref.continue" = "Continue Watching";
-"home.pref.recently_added" = "Recently Added";
-"home.pref.recently_played" = "Recently Played";
-"home.pref.movies" = "Movies";
-"home.pref.tv" = "TV Shows";
-"home.pref.music" = "Music";
-"home.pref.other" = "Other rows";
-"home.pref.max_items" = "Items per row";
-"home.pref.footer" = "Choose which rows appear on Home. Changes apply the next time Home refreshes.";
-"home.pref.no_libraries" = "No libraries discovered yet.";
-"home.pref.footer_libraries" = "Toggle personal rows and each library from your server. Disabled libraries hide their Home shelves.";
-"settings.subtitles_default" = "Subtitles on by default";
-"settings.default_audio" = "Default audio language";
-"settings.default_subtitle" = "Default subtitle language";
+
+/* Languages */
 "lang.auto" = "Auto";
 "lang.en" = "English";
 "lang.zh" = "Chinese";
@@ -124,8 +141,8 @@
 "lang.hi" = "Hindi";
 "lang.th" = "Thai";
 "lang.vi" = "Vietnamese";
-"settings.audio_priority" = "Audio priority %d";
-"settings.subtitle_priority" = "Subtitle priority %d";
+
+/* IPTV */
 "iptv.title" = "IPTV";
 "iptv.playlists" = "Playlists";
 "iptv.add_playlist" = "Add playlist";
@@ -142,8 +159,8 @@
 "iptv.playback" = "Playback";
 "iptv.default_quality" = "Default quality";
 "iptv.auto_switch" = "Auto-switch source on failure";
-
 "iptv.guide" = "Program guide";
+"iptv.guide_now" = "Now";
 "iptv.no_epg" = "No EPG data";
 "iptv.next" = "Next";
 "iptv.epg" = "EPG";
@@ -151,3 +168,4 @@
 "iptv.refresh_epg" = "Refresh EPG";
 "iptv.adaptive_quality" = "Adaptive quality (throughput)";
 "iptv.diagnostics_hud" = "Show diagnostics HUD";
+"iptv.channels_count" = "%d channels";

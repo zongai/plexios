@@ -42,7 +42,7 @@ struct SettingsTabView: View {
             if case .signedIn = environment.authenticationService.state {
                 LabeledContent("Status", value: "Signed in")
             }
-            Button("Sign Out", role: .destructive) {
+            Button(String(localized: "settings.sign_out"), role: .destructive) {
                 Task {
                     await environment.authenticationService.signOut()
                     environment.connectionManager.reset()
@@ -54,7 +54,7 @@ struct SettingsTabView: View {
     private var serverSection: some View {
         Section("Server") {
             if environment.connectionManager.servers.isEmpty {
-                Text("No servers discovered")
+                Text(String(localized: "settings.no_servers"))
                     .foregroundStyle(AppColors.secondaryText)
             } else {
                 ForEach(environment.connectionManager.servers) { server in

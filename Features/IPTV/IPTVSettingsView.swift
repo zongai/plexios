@@ -26,7 +26,7 @@ struct IPTVSettingsView: View {
                             .foregroundStyle(AppColors.secondaryText)
                             .lineLimit(2)
                         HStack {
-                            Text("\(pl.channelCount) channels")
+                            Text(String(format: String(localized: "iptv.channels_count"), pl.channelCount))
                                 .font(AppTypography.caption)
                                 .foregroundStyle(AppColors.tertiaryText)
                             if let d = pl.lastUpdated {

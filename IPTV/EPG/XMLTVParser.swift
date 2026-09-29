@@ -1,11 +1,18 @@
 import Foundation
-import Compression
 
-/// XMLTV parser using Foundation XMLParser. Supports plain XML; gzip payloads
-/// are decompressed when the gzip magic header is present.
+/// XMLTV parser using Foundation XMLParser. Uses zlib-based gzip/zlib inflate.
 enum XMLTVParser {
     static func parse(data: Data) throws -> [EPGProgram] {
-        let payload = decompressIfNeeded(data)
+        let payload = GzipDecompressor.decompressIfNeeded(data)
+        // Sanity: must look like XML
+        if let head = String(data: payload.prefix(64), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !head.isEmpty,
+           !head.hasPrefix("<"),
+           !head.hasPrefix("<?xml") {
+            throw IPTVError.downloadFailed("EPG payload is not XML after decompress")
+        }
+
         let delegate = XMLTVDelegate()
         let parser = XMLParser(data: payload)
         parser.delegate = delegate
@@ -14,59 +21,6 @@ enum XMLTVParser {
             throw IPTVError.downloadFailed(parser.parserError?.localizedDescription ?? "XMLTV parse failed")
         }
         return delegate.programs
-    }
-
-    private static func decompressIfNeeded(_ data: Data) -> Data {
-        guard data.count > 10, data[0] == 0x1f, data[1] == 0x8b else {
-            return data
-        }
-        if let inflated = simpleGunzip(data) {
-            return inflated
-        }
-        return data
-    }
-
-    private static func simpleGunzip(_ data: Data) -> Data? {
-        guard data.count > 18 else { return nil }
-        var offset = 10
-        let flags = data[3]
-        if flags & 0x04 != 0 {
-            guard offset + 2 <= data.count else { return nil }
-            let xlen = Int(data[offset]) | (Int(data[offset + 1]) << 8)
-            offset += 2 + xlen
-        }
-        if flags & 0x08 != 0 {
-            while offset < data.count && data[offset] != 0 { offset += 1 }
-            offset += 1
-        }
-        if flags & 0x10 != 0 {
-            while offset < data.count && data[offset] != 0 { offset += 1 }
-            offset += 1
-        }
-        if flags & 0x02 != 0 {
-            offset += 2
-        }
-        guard offset + 8 < data.count else { return nil }
-        let deflate = data.subdata(in: offset..<(data.count - 8))
-        return inflateRaw(deflate)
-    }
-
-    private static func inflateRaw(_ data: Data) -> Data? {
-        data.withUnsafeBytes { srcPtr -> Data? in
-            guard let base = srcPtr.bindMemory(to: UInt8.self).baseAddress else { return nil }
-            let dstCapacity = max(data.count * 16, 256 * 1024)
-            var dst = [UInt8](repeating: 0, count: dstCapacity)
-            let written = compression_decode_buffer(
-                &dst,
-                dstCapacity,
-                base,
-                data.count,
-                nil,
-                COMPRESSION_ZLIB
-            )
-            guard written > 0 else { return nil }
-            return Data(dst.prefix(written))
-        }
     }
 }
 

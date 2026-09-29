@@ -8,7 +8,7 @@ struct OfflineBanner: View {
         if !environment.networkMonitor.isSatisfied {
             HStack(spacing: AppSpacing.sm) {
                 Image(systemName: "wifi.slash")
-                Text("You’re offline — showing cached content when available")
+                Text(String(localized: "common.offline_banner"))
                     .font(AppTypography.caption)
             }
             .foregroundStyle(.white)
@@ -17,7 +17,7 @@ struct OfflineBanner: View {
             .frame(maxWidth: .infinity)
             .background(Color.orange.opacity(0.95))
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Offline. Showing cached content when available.")
+            .accessibilityLabel(String(localized: "common.offline_a11y"))
         }
     }
 }

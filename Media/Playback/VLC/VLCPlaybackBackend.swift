@@ -40,6 +40,10 @@ final class VLCPlaybackBackend: NSObject {
     var onError: ((String) -> Void)?
     /// Fired after track lists refresh (UI can rebind menus).
     var onTracksUpdated: (() -> Void)?
+    /// Estimated throughput in Mbps (from VLC media stats when available).
+    var onThroughputMbps: ((Double) -> Void)?
+    private(set) var estimatedThroughputMbps: Double?
+    private var throughputSamples: [Double] = []
 
     /// Call after rotation / container layout so VLC uses non-zero landscape bounds.
     func rebindDrawable() {
@@ -404,10 +408,42 @@ final class VLCPlaybackBackend: NSObject {
             if len > 0 {
                 durationMs = Int64(len)
             }
+            sampleThroughput(from: media)
         }
         onTimeChange?(positionMs, durationMs)
 #endif
     }
+
+#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+    private func sampleThroughput(from media: VLCMedia) {
+        let stats = media.statistics as NSObject
+        func number(for key: String) -> Double? {
+            if let d = stats.value(forKey: key) as? Double { return d }
+            if let f = stats.value(forKey: key) as? Float { return Double(f) }
+            if let n = stats.value(forKey: key) as? NSNumber { return n.doubleValue }
+            return nil
+        }
+        guard let raw = number(for: "demuxBitrate") ?? number(for: "inputBitrate"), raw > 0 else {
+            return
+        }
+        let mbps: Double
+        if raw > 100_000 {
+            mbps = raw / 1_000_000
+        } else if raw > 50 {
+            mbps = (raw * 8) / 1_000_000
+        } else {
+            mbps = raw
+        }
+        guard mbps > 0.05, mbps < 500 else { return }
+        throughputSamples.append(mbps)
+        if throughputSamples.count > 10 {
+            throughputSamples.removeFirst(throughputSamples.count - 10)
+        }
+        let avg = throughputSamples.reduce(0, +) / Double(throughputSamples.count)
+        estimatedThroughputMbps = avg
+        onThroughputMbps?(avg)
+    }
+#endif
 }
 
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)

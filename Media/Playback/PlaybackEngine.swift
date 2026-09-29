@@ -496,6 +496,9 @@ final class PlaybackEngine {
                     self.positionMs = pos
                     if dur > 0 { self.durationMs = dur }
                 }
+                vlc.onThroughputMbps = { [weak self] mbps in
+                    self?.recordThroughputSample(mbps)
+                }
                 vlc.onEnded = { [weak self] in
                     Task { await self?.handlePlaybackEnded() }
                 }
@@ -575,7 +578,11 @@ final class PlaybackEngine {
         // observedBitrate is bits/s
         let bps = event.observedBitrate
         guard bps > 0 else { return }
-        let mbps = bps / 1_000_000
+        recordThroughputSample(bps / 1_000_000)
+    }
+
+    private func recordThroughputSample(_ mbps: Double) {
+        guard mbps > 0.05, mbps < 500 else { return }
         throughputSamples.append(mbps)
         if throughputSamples.count > 12 {
             throughputSamples.removeFirst(throughputSamples.count - 12)

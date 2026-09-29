@@ -21,7 +21,7 @@ struct SignInView: View {
                 .foregroundStyle(AppColors.primaryText)
                 .accessibilityAddTraits(.isHeader)
 
-            Text("You’ll authorize this device on plex.tv")
+            Text(String(localized: "signin.authorize_hint"))
                 .font(AppTypography.subheadline)
                 .foregroundStyle(AppColors.secondaryText)
                 .multilineTextAlignment(.center)
@@ -62,7 +62,7 @@ struct SignInView: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Text("Continue with Plex")
+                    Text(String(localized: "signin.continue"))
                         .fontWeight(.semibold)
                 }
             }
@@ -75,7 +75,7 @@ struct SignInView: View {
 
     private func pinContent(code: String) -> some View {
         VStack(spacing: AppSpacing.lg) {
-            Text("Enter this code at")
+            Text(String(localized: "signin.enter_code_at"))
                 .font(AppTypography.subheadline)
                 .foregroundStyle(AppColors.secondaryText)
 
@@ -96,7 +96,7 @@ struct SignInView: View {
                         .foregroundStyle(AppColors.primaryText)
                         .textSelection(.enabled)
                     Label(
-                        didCopyCode ? L10n.copied : "Tap to copy",
+                        didCopyCode ? L10n.copied : String(localized: "signin.tap_to_copy"),
                         systemImage: didCopyCode ? "checkmark.circle.fill" : "doc.on.doc"
                     )
                     .font(AppTypography.caption)
@@ -109,14 +109,14 @@ struct SignInView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Link code \(Array(code).map(String.init).joined(separator: " "))")
-            .accessibilityHint("Copies the code to the clipboard")
+            .accessibilityHint(String(localized: "signin.copy_a11y_hint"))
             .accessibilityAddTraits(.isButton)
 
-            ProgressView("Waiting for authorization…")
+            ProgressView(String(localized: "signin.waiting_auth"))
                 .font(AppTypography.caption)
-                .accessibilityLabel("Waiting for authorization")
+                .accessibilityLabel(String(localized: "signin.waiting_auth"))
 
-            Button("Cancel") {
+            Button(L10n.cancel) {
                 auth.cancelSignIn()
             }
             .font(AppTypography.subheadline)

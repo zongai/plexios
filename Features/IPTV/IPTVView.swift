@@ -158,7 +158,7 @@ struct IPTVView: View {
                 IPTVPlayerView(session: session)
             }
             .sheet(isPresented: $showGuide) {
-                IPTVGuideView(channels: vm.filtered)
+                IPTVGuideTimelineView(channels: vm.filtered)
             }
         }
     }
@@ -568,62 +568,3 @@ private struct IPTVDiagnosticsHUD: View {
     }
 }
 
-// MARK: - Program guide
-
-struct IPTVGuideView: View {
-    let channels: [IPTVChannel]
-    @Environment(\.dismiss) private var dismiss
-    @State private var rows: [(IPTVChannel, EPGProgram?, EPGProgram?)] = []
-
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(rows, id: \.0.id) { channel, current, next in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(channel.name)
-                            .font(AppTypography.headline)
-                        if let current {
-                            Text(current.title)
-                                .font(AppTypography.body)
-                            ProgressView(value: current.progress())
-                                .tint(PlexColors.accent)
-                            Text(timeRange(current))
-                                .font(AppTypography.caption2)
-                                .foregroundStyle(AppColors.secondaryText)
-                        } else {
-                            Text(String(localized: "iptv.no_epg"))
-                                .font(AppTypography.caption)
-                                .foregroundStyle(AppColors.tertiaryText)
-                        }
-                        if let next {
-                            Text(String(localized: "iptv.next") + ": " + next.title)
-                                .font(AppTypography.caption)
-                                .foregroundStyle(AppColors.secondaryText)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-            .navigationTitle(String(localized: "iptv.guide"))
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.close) { dismiss() }
-                }
-            }
-            .task { await load() }
-        }
-    }
-
-    private func load() async {
-        let index = await EPGRepository.shared.index()
-        rows = channels.prefix(200).map { ch in
-            let id = ch.tvgID ?? ""
-            return (ch, index.current(channelID: id), index.next(channelID: id))
-        }
-    }
-
-    private func timeRange(_ p: EPGProgram) -> String {
-        let f = Date.FormatStyle(date: .omitted, time: .shortened)
-        return "\(p.startTime.formatted(f)) – \(p.endTime.formatted(f))"
-    }
-}

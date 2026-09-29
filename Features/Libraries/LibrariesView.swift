@@ -8,7 +8,7 @@ struct LibrariesView: View {
     var body: some View {
         NavigationStack(path: $path) {
             content
-                .navigationTitle("Libraries")
+                .navigationTitle(String(localized: "libraries.title"))
                 .navigationDestination(for: PlexLibrary.self) { library in
                     if library.type == .artist {
                         MusicLibraryView(library: library)
@@ -47,7 +47,7 @@ struct LibrariesView: View {
             }
             .listStyle(.insetGrouped)
         case .empty:
-            EmptyStateView(title: "No libraries", systemImage: "books.vertical")
+            EmptyStateView(title: String(localized: "libraries.empty"), systemImage: "books.vertical")
         case .failed(let message):
             ErrorStateView(message: message) {
                 Task { await viewModel?.load(context: environment.serverContext, force: true) }
@@ -69,7 +69,7 @@ struct LibraryRow: View {
                 Text(library.title)
                     .font(AppTypography.headline)
                 if let count = library.count {
-                    Text("\(count) items")
+                    Text(String(format: String(localized: "common.items_count"), count))
                         .font(AppTypography.caption)
                         .foregroundStyle(AppColors.secondaryText)
                 }
@@ -155,7 +155,7 @@ struct LibraryGridView: View {
                 }
             }
         case .empty:
-            EmptyStateView(title: "Empty library", systemImage: "tray")
+            EmptyStateView(title: String(localized: "libraries.empty_library"), systemImage: "tray")
         case .failed(let message):
             ErrorStateView(message: message) {
                 Task { await viewModel?.load(context: environment.serverContext, force: true) }

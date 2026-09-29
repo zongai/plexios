@@ -202,11 +202,9 @@ final class VLCPlaybackBackend: NSObject {
     private func pollTime() {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         guard let mediaPlayer else { return }
-        if let time = mediaPlayer.time {
-            positionMs = Int64(time.intValue)
-        }
+        positionMs = Int64(mediaPlayer.time.intValue)
         if let media = mediaPlayer.media {
-            let len = media.length.intValue
+            let len = Int(media.length.intValue)
             if len > 0 {
                 durationMs = Int64(len)
             }

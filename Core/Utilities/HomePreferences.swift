@@ -93,49 +93,15 @@ struct HomeDisplayPreferences: Sendable, Equatable {
         }
     }
 
-    /// Bucket for merging "Recently Added" shelves (keep movie / TV / music separate).
-    enum RecentlyAddedCategory: Hashable {
-        case movie
-        case show
-        case music
-        case other
-    }
-
-    static func recentlyAddedCategory(for hub: PlexHub) -> RecentlyAddedCategory {
-        let type = (hub.type ?? "").lowercased()
-        if type == "movie" || hub.items.contains(where: { $0.type == .movie }) {
-            return .movie
-        }
-        if type == "show" || type == "episode" || type == "season"
-            || hub.items.contains(where: { [.show, .episode, .season].contains($0.type) }) {
-            return .show
-        }
-        if type == "artist" || type == "album" || type == "track"
-            || hub.items.contains(where: { [.artist, .album, .track].contains($0.type) }) {
-            return .music
-        }
-        let blob = ((hub.hubIdentifier ?? hub.key) + " " + hub.title).lowercased()
-        if blob.contains("movie") || blob.contains("film") { return .movie }
-        if blob.contains("show") || blob.contains("tv") || blob.contains("series")
-            || blob.contains("episode") { return .show }
-        if blob.contains("music") || blob.contains("artist") || blob.contains("album") {
-            return .music
-        }
-        return .other
-    }
-
     func filtered(_ hubs: [PlexHub], libraries: [PlexLibrary]) -> [PlexHub] {
         let enabledLibraries = libraries.filter { isLibraryEnabled($0.key) }
         let enabledKeys = Set(enabledLibraries.map(\.key))
 
-        // PMS often returns several Continue Watching / Recently Added hubs (global + per library).
-        // Merge same personal kinds (and Recently Added by media category) + dedupe items.
+        // Merge Continue Watching / Recently Played only. Recently Added stays per-library shelf.
         var continueItems: [PlexMetadata] = []
         var continueHubTemplate: PlexHub?
         var playedItems: [PlexMetadata] = []
         var playedHubTemplate: PlexHub?
-        var recentlyByCategory: [RecentlyAddedCategory: (template: PlexHub, items: [PlexMetadata])] = [:]
-        var recentlyOrder: [RecentlyAddedCategory] = []
         var other: [PlexHub] = []
 
         for hub in hubs {
@@ -148,22 +114,7 @@ struct HomeDisplayPreferences: Sendable, Equatable {
                 guard showRecentlyPlayed else { continue }
                 if playedHubTemplate == nil { playedHubTemplate = hub }
                 playedItems.append(contentsOf: hub.items)
-            case .recentlyAdded:
-                // Drop shelves that only belong to disabled libraries.
-                if !libraries.isEmpty {
-                    let sectionKeys = Self.sectionKeys(for: hub, libraries: libraries)
-                    if !sectionKeys.isEmpty, sectionKeys.isDisjoint(with: enabledKeys) {
-                        continue
-                    }
-                }
-                let cat = Self.recentlyAddedCategory(for: hub)
-                if recentlyByCategory[cat] == nil {
-                    recentlyByCategory[cat] = (hub, hub.items)
-                    recentlyOrder.append(cat)
-                } else {
-                    recentlyByCategory[cat]?.items.append(contentsOf: hub.items)
-                }
-            case .none:
+            case .recentlyAdded, .none:
                 other.append(hub)
             }
         }
@@ -177,26 +128,27 @@ struct HomeDisplayPreferences: Sendable, Equatable {
             }
         }
 
-        for cat in recentlyOrder {
-            guard var entry = recentlyByCategory[cat] else { continue }
-            entry.template.items = Self.dedupeItems(
-                entry.items,
-                enabledKeys: enabledKeys,
-                max: maxItemsPerHub
-            )
-            if !entry.template.items.isEmpty {
-                result.append(entry.template)
-            }
-        }
-
         for hub in other {
-            if !libraries.isEmpty {
-                let sectionKeys = Self.sectionKeys(for: hub, libraries: libraries)
-                if !sectionKeys.isEmpty {
-                    guard !sectionKeys.isDisjoint(with: enabledKeys) else { continue }
-                } else {
-                    let typeMatch = enabledLibraries.contains { Self.matchesLibraryType(hub, library: $0) }
-                    guard typeMatch else { continue }
+            switch Self.personalKind(for: hub) {
+            case .continueWatching, .recentlyPlayed:
+                continue
+            case .recentlyAdded:
+                // Keep each Recently Added shelf; still respect library toggles.
+                if !libraries.isEmpty {
+                    let sectionKeys = Self.sectionKeys(for: hub, libraries: libraries)
+                    if !sectionKeys.isEmpty {
+                        guard !sectionKeys.isDisjoint(with: enabledKeys) else { continue }
+                    }
+                }
+            case .none:
+                if !libraries.isEmpty {
+                    let sectionKeys = Self.sectionKeys(for: hub, libraries: libraries)
+                    if !sectionKeys.isEmpty {
+                        guard !sectionKeys.isDisjoint(with: enabledKeys) else { continue }
+                    } else {
+                        let typeMatch = enabledLibraries.contains { Self.matchesLibraryType(hub, library: $0) }
+                        guard typeMatch else { continue }
+                    }
                 }
             }
 

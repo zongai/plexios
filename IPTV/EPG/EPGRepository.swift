@@ -55,7 +55,7 @@ actor EPGRepository {
         request.timeoutInterval = 60
         request.setValue("application/xml, text/xml, application/gzip, */*", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await IPTVNetwork.session.data(for: request)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw IPTVError.downloadFailed("EPG HTTP \(http.statusCode)")
         }

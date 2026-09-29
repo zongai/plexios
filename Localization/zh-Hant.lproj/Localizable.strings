@@ -203,3 +203,10 @@
 "settings.lang_priority_order" = "優先順序";
 "settings.lang_list_empty" = "未新增語言 — 將使用伺服器預設。";
 "settings.add_language" = "新增語言";
+"iptv.error.no_route" = "無法存取播放列表。請確認同一 Wi‑Fi、在 設定→PlexiOS 允許「本機網路」，且服務在線。";
+"iptv.error.timeout" = "請求逾時。";
+"iptv.error.host" = "找不到主機。";
+"iptv.error.connect" = "無法連線主機（埠關閉或拒絕）。";
+"iptv.error.ats" = "HTTP 被系統安全原則阻擋。";
+"iptv.error.tls" = "TLS/SSL 錯誤。";
+"iptv.error.invalid_url" = "播放列表網址無效。";

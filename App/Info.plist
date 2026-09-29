@@ -51,10 +51,17 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Plex iOS discovers and connects to your Plex Media Server on the local network.</string>
+	<string>PlexiOS needs local network access to reach your Plex Media Server and IPTV playlists (e.g. http://192.168.x.x).</string>
+	<!-- Declaring Bonjour services ensures iOS shows the Local Network permission prompt for LAN HTTP. -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp.</string>
+		<string>_https._tcp.</string>
+		<string>_plexmediasvr._tcp.</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- IPTV M3U / live streams frequently use plain http:// -->
+		<!-- IPTV M3U / live streams frequently use plain http:// on LAN and WAN -->
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 		<key>NSAllowsLocalNetworking</key>

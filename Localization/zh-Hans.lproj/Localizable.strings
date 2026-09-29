@@ -203,3 +203,10 @@
 "settings.lang_priority_order" = "优先顺序";
 "settings.lang_list_empty" = "未添加语言 — 将使用服务器默认。";
 "settings.add_language" = "添加语言";
+"iptv.error.no_route" = "无法访问播放列表。请确认已连同一 Wi‑Fi、在 设置→PlexiOS 中允许「本地网络」，且 http://192.168.x.x 服务在线。";
+"iptv.error.timeout" = "请求超时。";
+"iptv.error.host" = "找不到主机。";
+"iptv.error.connect" = "无法连接主机（端口关闭或拒绝）。";
+"iptv.error.ats" = "HTTP 被系统安全策略拦截。";
+"iptv.error.tls" = "TLS/SSL 错误。";
+"iptv.error.invalid_url" = "播放列表地址无效。";

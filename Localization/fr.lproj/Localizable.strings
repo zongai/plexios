@@ -203,3 +203,10 @@
 "settings.lang_priority_order" = "Ordre de priorité";
 "settings.lang_list_empty" = "Aucune langue — défaut du serveur.";
 "settings.add_language" = "Ajouter une langue";
+"iptv.error.no_route" = "Impossible d’atteindre la liste. Vérifiez le Wi‑Fi, l’accès au réseau local et le serveur.";
+"iptv.error.timeout" = "Délai dépassé.";
+"iptv.error.host" = "Hôte introuvable.";
+"iptv.error.connect" = "Connexion refusée.";
+"iptv.error.ats" = "HTTP bloqué par ATS.";
+"iptv.error.tls" = "Erreur TLS/SSL.";
+"iptv.error.invalid_url" = "URL invalide.";

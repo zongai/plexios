@@ -162,8 +162,15 @@ struct IPTVSettingsView: View {
 
     private func addPlaylist() async {
         let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let url = newURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        var pl = IPTVPlaylist(name: name.isEmpty ? "IPTV" : name, urlString: url)
+        let raw = newURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalized = IPTVNetwork.normalizeURL(from: raw) else {
+            errorMessage = String(localized: "iptv.error.invalid_url")
+            return
+        }
+        let pl = IPTVPlaylist(
+            name: name.isEmpty ? "IPTV" : name,
+            urlString: normalized.absoluteString
+        )
         await IPTVRepository.shared.addPlaylist(pl)
         showAdd = false
         newName = ""
@@ -180,7 +187,8 @@ struct IPTVSettingsView: View {
             _ = try await IPTVRepository.shared.refreshPlaylist(pl)
             await load()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = (error as? IPTVError)?.errorDescription
+                ?? IPTVNetwork.describe(error)
         }
     }
 }

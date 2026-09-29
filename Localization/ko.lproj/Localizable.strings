@@ -203,3 +203,10 @@
 "settings.lang_priority_order" = "우선순위";
 "settings.lang_list_empty" = "언어 없음 — 서버 기본값 사용.";
 "settings.add_language" = "언어 추가";
+"iptv.error.no_route" = "재생목록에 연결할 수 없습니다. 같은 Wi‑Fi, 로컬 네트워크 권한, 서버 상태를 확인하세요.";
+"iptv.error.timeout" = "요청 시간 초과.";
+"iptv.error.host" = "호스트를 찾을 수 없음.";
+"iptv.error.connect" = "호스트에 연결할 수 없음.";
+"iptv.error.ats" = "ATS로 HTTP가 차단됨.";
+"iptv.error.tls" = "TLS/SSL 오류.";
+"iptv.error.invalid_url" = "잘못된 URL.";

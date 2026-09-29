@@ -16,27 +16,35 @@ enum M3UStreamingParser {
     }
 
     /// Download with size cap and parse.
-    static func downloadAndParse(url: URL, session: URLSession = .shared) async throws -> M3UParseResult {
+    /// Uses `IPTVNetwork.session` so LAN `http://192.168.x.x` works without WAN Internet.
+    static func downloadAndParse(url: URL, session: URLSession = IPTVNetwork.session) async throws -> M3UParseResult {
         var request = URLRequest(url: url)
         request.timeoutInterval = 60
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue(
             "application/vnd.apple.mpegurl, audio/mpegurl, application/x-mpegURL, text/plain, */*",
             forHTTPHeaderField: "Accept"
         )
-        let (bytes, response) = try await session.bytes(for: request)
-        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            throw IPTVError.downloadFailed("HTTP \(http.statusCode)")
-        }
-
-        var data = Data()
-        data.reserveCapacity(min(2 * 1024 * 1024, maxBytes))
-        for try await b in bytes {
-            data.append(b)
-            if data.count > maxBytes {
-                throw IPTVError.playlistTooLarge
+        do {
+            let (bytes, response) = try await session.bytes(for: request)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                throw IPTVError.downloadFailed("HTTP \(http.statusCode)")
             }
+
+            var data = Data()
+            data.reserveCapacity(min(2 * 1024 * 1024, maxBytes))
+            for try await b in bytes {
+                data.append(b)
+                if data.count > maxBytes {
+                    throw IPTVError.playlistTooLarge
+                }
+            }
+            return try parse(data: data)
+        } catch let error as IPTVError {
+            throw error
+        } catch {
+            throw IPTVError.downloadFailed(IPTVNetwork.describe(error))
         }
-        return try parse(data: data)
     }
 
     static func parseLines(_ text: String) -> M3UParseResult {

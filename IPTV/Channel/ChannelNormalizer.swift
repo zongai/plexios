@@ -1,27 +1,30 @@
 import Foundation
 
 enum ChannelNormalizer {
-    /// Build a stable channel id and merge entries that clearly belong together.
+    /// Build channels: entries with the same exact `tvg-name` become one channel with multiple sources.
     static func channels(from entries: [M3UEntry], playlistId: UUID) -> [IPTVChannel] {
         var map: [String: IPTVChannel] = [:]
         var order: [String] = []
 
         for entry in entries {
             let identity = identityKey(for: entry)
-            let quality = inferQuality(from: entry)
-            let source = IPTVSource(
+            var source = IPTVSource(
                 streamURLString: entry.streamURL.absoluteString,
-                name: entry.name,
-                quality: quality,
+                name: sourceLabel(for: entry),
+                quality: inferQuality(from: entry),
                 headers: entry.headers
             )
 
             if var existing = map[identity] {
-                // Avoid duplicate identical stream URLs
                 if !existing.sources.contains(where: { $0.streamURLString == source.streamURLString }) {
+                    // When becoming multi-source, label by host index
+                    if existing.sources.count == 1,
+                       let firstURL = URL(string: existing.sources[0].streamURLString) {
+                        existing.sources[0].name = "源1 · \(firstURL.host ?? existing.sources[0].streamURLString)"
+                    }
+                    source.name = sourceLabel(for: entry, index: existing.sources.count + 1)
                     existing.sources.append(source)
                 }
-                // Prefer richer metadata
                 if existing.logoURLString == nil { existing.logoURLString = entry.tvgLogo }
                 if existing.group == nil { existing.group = entry.groupTitle }
                 if existing.tvgID == nil { existing.tvgID = entry.tvgID }
@@ -48,41 +51,41 @@ enum ChannelNormalizer {
         return order.compactMap { map[$0] }
     }
 
-    /// Prefer tvg-id; else normalized tvg-name; else normalized display name.
-    /// Do not merge on weak prefixes (e.g. all "CCTV*").
+    /// **Exact** `tvg-name` (trimmed) merges sources. Different names (CCTV1 vs CCTV11) stay separate.
+    /// `tvg-id` is NOT used for merging — playlists often assign unique ids per URL.
     static func identityKey(for entry: M3UEntry) -> String {
-        if let id = entry.tvgID?.trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty {
-            return "tvg:" + id.lowercased()
-        }
         if let name = entry.tvgName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-            return "tvgn:" + normalizeName(name)
+            return "tvgn:" + name
         }
-        return "name:" + normalizeName(entry.name)
-    }
-
-    static func normalizeName(_ raw: String) -> String {
-        var s = raw.lowercased()
-        // Strip common quality tags but keep channel numbers
-        let tags = [" fhd", " uhd", " 4k", " hd", " sd", " hevc", " h265", " h264"]
-        for t in tags {
-            s = s.replacingOccurrences(of: t, with: "")
+        let display = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !display.isEmpty {
+            return "name:" + display
         }
-        // Remove punctuation except digits/letters
-        s = s.map { ch -> Character in
-            ch.isLetter || ch.isNumber ? ch : " "
-        }.map(String.init).joined()
-        while s.contains("  ") { s = s.replacingOccurrences(of: "  ", with: " ") }
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let id = entry.tvgID?.trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty {
+            return "tvg:" + id
+        }
+        return "url:" + entry.streamURL.absoluteString
     }
 
     static func displayName(for entry: M3UEntry) -> String {
+        if let tvg = entry.tvgName?.trimmingCharacters(in: .whitespacesAndNewlines), !tvg.isEmpty {
+            return tvg
+        }
         let n = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
         if !n.isEmpty { return n }
-        return entry.tvgName ?? "Channel"
+        return "Channel"
+    }
+
+    static func sourceLabel(for entry: M3UEntry, index: Int? = nil) -> String {
+        let host = entry.streamURL.host ?? entry.streamURL.absoluteString
+        if let index {
+            return "源\(index) · \(host)"
+        }
+        return host
     }
 
     static func inferQuality(from entry: M3UEntry) -> IPTVStreamQuality {
-        let blob = (entry.name + " " + (entry.tvgName ?? "")).lowercased()
+        let blob = (entry.name + " " + (entry.tvgName ?? "") + " " + entry.streamURL.absoluteString).lowercased()
         if blob.contains("4k") || blob.contains("uhd") || blob.contains("2160") { return .uhd }
         if blob.contains("1080") || blob.contains("fhd") || blob.contains("full hd") { return .fullHD }
         if blob.contains("720") || blob.contains(" hd") || blob.hasSuffix("hd") { return .hd }

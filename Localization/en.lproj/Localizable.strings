@@ -142,3 +142,12 @@
 "iptv.playback" = "Playback";
 "iptv.default_quality" = "Default quality";
 "iptv.auto_switch" = "Auto-switch source on failure";
+
+"iptv.guide" = "Program guide";
+"iptv.no_epg" = "No EPG data";
+"iptv.next" = "Next";
+"iptv.epg" = "EPG";
+"iptv.epg_url" = "XMLTV EPG URL";
+"iptv.refresh_epg" = "Refresh EPG";
+"iptv.adaptive_quality" = "Adaptive quality (throughput)";
+"iptv.diagnostics_hud" = "Show diagnostics HUD";

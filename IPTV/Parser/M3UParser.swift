@@ -102,7 +102,19 @@ enum M3UParser {
         return M3UParseResult(epgURL: epgURL, entries: entries)
     }
 
-    // MARK: - Helpers
+    // MARK: - Helpers (shared with streaming parser)
+
+    static func splitDurationPublic(_ body: String) -> (TimeInterval?, String) {
+        splitDuration(body)
+    }
+
+    static func splitAttrsAndNamePublic(_ rest: String) -> ([String: String], String) {
+        splitAttrsAndName(rest)
+    }
+
+    static func parseAttributesPublic(from text: String) -> [String: String] {
+        parseAttributes(from: text)
+    }
 
     private static func splitDuration(_ body: String) -> (TimeInterval?, String) {
         // "-1 tvg-id=...,Name" or "10.5,Name"

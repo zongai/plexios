@@ -142,3 +142,12 @@
 "iptv.playback" = "播放";
 "iptv.default_quality" = "默认画质";
 "iptv.auto_switch" = "失败时自动切换播放源";
+
+"iptv.guide" = "节目单";
+"iptv.no_epg" = "暂无节目信息";
+"iptv.next" = "下一节目";
+"iptv.epg" = "电子节目单";
+"iptv.epg_url" = "XMLTV 节目单地址";
+"iptv.refresh_epg" = "刷新节目单";
+"iptv.adaptive_quality" = "根据网速自适应画质";
+"iptv.diagnostics_hud" = "显示播放诊断信息";

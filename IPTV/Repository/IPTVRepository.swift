@@ -5,7 +5,7 @@ actor IPTVRepository {
     static let shared = IPTVRepository()
 
     private let defaults = UserDefaults.standard
-    private let maxPlaylistBytes = 15 * 1024 * 1024 // 15 MB
+    private let maxPlaylistBytes = M3UStreamingParser.maxBytes
 
     private enum Keys {
         static let playlists = "iptv.playlists"
@@ -96,29 +96,36 @@ actor IPTVRepository {
         }
     }
 
-    // MARK: - Fetch & parse
+    /// All EPG candidate URLs (global + per-playlist).
+    func epgURLs() -> [URL] {
+        var urls: [URL] = []
+        if let g = preferences().globalEPGURL {
+            urls.append(g)
+        }
+        for pl in playlists() where pl.enabled {
+            if let u = pl.epgURL { urls.append(u) }
+        }
+        // Unique by absoluteString
+        var seen = Set<String>()
+        return urls.filter { seen.insert($0.absoluteString).inserted }
+    }
+
+    // MARK: - Fetch & parse (streaming line parser)
 
     @discardableResult
     func refreshPlaylist(_ playlist: IPTVPlaylist) async throws -> IPTVPlaylist {
         guard let url = playlist.url else { throw IPTVError.invalidURL }
 
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 45
-        request.setValue("application/vnd.apple.mpegurl, audio/mpegurl, application/x-mpegURL, text/plain, */*", forHTTPHeaderField: "Accept")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-            throw IPTVError.downloadFailed("HTTP \(http.statusCode)")
+        let parsed: M3UParseResult
+        do {
+            parsed = try await M3UStreamingParser.downloadAndParse(url: url)
+        } catch {
+            // Keep existing channels on failure
+            throw error
         }
-        if data.count > maxPlaylistBytes {
-            throw IPTVError.playlistTooLarge
-        }
-
-        let parsed = try M3UParser.parse(data: data)
         guard !parsed.entries.isEmpty else { throw IPTVError.emptyPlaylist }
 
         let channels = ChannelNormalizer.channels(from: parsed.entries, playlistId: playlist.id)
-        // Only replace cache after successful parse
         saveChannels(channels, playlistId: playlist.id)
 
         var updated = playlist
@@ -129,6 +136,13 @@ actor IPTVRepository {
         }
         updatePlaylist(updated)
         return updated
+    }
+
+    /// Refresh all EPG sources for enabled playlists + global.
+    func refreshAllEPG(force: Bool = false) async {
+        for url in epgURLs() {
+            _ = try? await EPGRepository.shared.refresh(url: url, force: force)
+        }
     }
 
     func recordSourceSuccess(channelId: String, sourceId: UUID) {

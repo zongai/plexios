@@ -170,10 +170,52 @@ struct IPTVPreferences: Codable, Sendable {
     var defaultQuality: IPTVStreamQuality
     var autoSwitchSource: Bool
     var favoriteChannelIds: [String]
+    /// Prefer lower quality when measured throughput is below need.
+    var adaptiveQuality: Bool
+    /// Show IPTV diagnostic HUD during playback.
+    var showDiagnosticsHUD: Bool
+    /// Optional global EPG URL (overrides / supplements playlist header).
+    var globalEPGURLString: String?
+
+    var globalEPGURL: URL? { globalEPGURLString.flatMap(URL.init(string:)) }
 
     static let `default` = IPTVPreferences(
         defaultQuality: .unknown, // auto
         autoSwitchSource: true,
-        favoriteChannelIds: []
+        favoriteChannelIds: [],
+        adaptiveQuality: true,
+        showDiagnosticsHUD: false,
+        globalEPGURLString: nil
     )
+
+    enum CodingKeys: String, CodingKey {
+        case defaultQuality, autoSwitchSource, favoriteChannelIds
+        case adaptiveQuality, showDiagnosticsHUD, globalEPGURLString
+    }
+
+    init(
+        defaultQuality: IPTVStreamQuality,
+        autoSwitchSource: Bool,
+        favoriteChannelIds: [String],
+        adaptiveQuality: Bool,
+        showDiagnosticsHUD: Bool,
+        globalEPGURLString: String?
+    ) {
+        self.defaultQuality = defaultQuality
+        self.autoSwitchSource = autoSwitchSource
+        self.favoriteChannelIds = favoriteChannelIds
+        self.adaptiveQuality = adaptiveQuality
+        self.showDiagnosticsHUD = showDiagnosticsHUD
+        self.globalEPGURLString = globalEPGURLString
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        defaultQuality = try c.decodeIfPresent(IPTVStreamQuality.self, forKey: .defaultQuality) ?? .unknown
+        autoSwitchSource = try c.decodeIfPresent(Bool.self, forKey: .autoSwitchSource) ?? true
+        favoriteChannelIds = try c.decodeIfPresent([String].self, forKey: .favoriteChannelIds) ?? []
+        adaptiveQuality = try c.decodeIfPresent(Bool.self, forKey: .adaptiveQuality) ?? true
+        showDiagnosticsHUD = try c.decodeIfPresent(Bool.self, forKey: .showDiagnosticsHUD) ?? false
+        globalEPGURLString = try c.decodeIfPresent(String.self, forKey: .globalEPGURLString)
+    }
 }

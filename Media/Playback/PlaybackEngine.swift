@@ -31,6 +31,11 @@ final class PlaybackEngine {
     /// VLC reports `.buffering` often while still "playing"; icon must stay as pause.
     private(set) var isPlaying: Bool = false
 
+    /// Observed network throughput in Mbps (AVPlayer access log); nil if unknown.
+    private(set) var estimatedThroughputMbps: Double?
+    private var accessLogObserver: NSObjectProtocol?
+    private var throughputSamples: [Double] = []
+
     // MARK: - Dependencies
 
     private let decisionEngine: PlaybackDecisionEngine
@@ -469,6 +474,8 @@ final class PlaybackEngine {
         subtitleStreams = []
         selectedAudioId = nil
         selectedSubtitleId = nil
+        estimatedThroughputMbps = nil
+        throughputSamples = []
 
         let effectivePrefs = PlaybackSettingsStore.shared.preferences
         playbackRate = effectivePrefs.defaultPlaybackRate
@@ -526,17 +533,13 @@ final class PlaybackEngine {
                 activePlaybackBackend = .vlc
                 isPlaying = true
                 sessionState = .playing
-                // Synthetic title for Now Playing
                 nowPlaying.updateTitle(title, subtitle: "IPTV")
                 return
             } catch {
                 logger.playback.error("IPTV VLC failed: \(error.localizedDescription)")
-                // fall through to AVPlayer
             }
         }
 
-        var request = URLRequest(url: url)
-        for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
         let asset = AVURLAsset(url: url, options: headers.isEmpty ? nil : ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let item = AVPlayerItem(asset: asset)
         let avPlayer = AVPlayer(playerItem: item)
@@ -544,10 +547,40 @@ final class PlaybackEngine {
         self.player = avPlayer
         activePlaybackBackend = .avPlayer
         observe(player: avPlayer, item: item)
+        startAccessLogMonitoring(item: item)
         avPlayer.play()
         isPlaying = true
         sessionState = .playing
         nowPlaying.updateTitle(title, subtitle: "IPTV")
+    }
+
+    private func startAccessLogMonitoring(item: AVPlayerItem) {
+        if let accessLogObserver {
+            NotificationCenter.default.removeObserver(accessLogObserver)
+            self.accessLogObserver = nil
+        }
+        accessLogObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemNewAccessLogEntry,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.sampleAccessLog(item: item)
+            }
+        }
+    }
+
+    private func sampleAccessLog(item: AVPlayerItem) {
+        guard let log = item.accessLog(), let event = log.events.last else { return }
+        // observedBitrate is bits/s
+        let bps = event.observedBitrate
+        guard bps > 0 else { return }
+        let mbps = bps / 1_000_000
+        throughputSamples.append(mbps)
+        if throughputSamples.count > 12 {
+            throughputSamples.removeFirst(throughputSamples.count - 12)
+        }
+        estimatedThroughputMbps = throughputSamples.reduce(0, +) / Double(throughputSamples.count)
     }
 
     func togglePlayPause() {
@@ -961,6 +994,10 @@ final class PlaybackEngine {
             NotificationCenter.default.removeObserver(endObserver)
         }
         endObserver = nil
+        if let accessLogObserver {
+            NotificationCenter.default.removeObserver(accessLogObserver)
+        }
+        accessLogObserver = nil
     }
 
     private func handlePlaybackEnded() async {

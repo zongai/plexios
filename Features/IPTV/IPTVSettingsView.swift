@@ -78,6 +78,32 @@ struct IPTVSettingsView: View {
                     .onChange(of: prefs.autoSwitchSource) { _, _ in
                         Task { await IPTVRepository.shared.savePreferences(prefs) }
                     }
+                Toggle(String(localized: "iptv.adaptive_quality"), isOn: $prefs.adaptiveQuality)
+                    .onChange(of: prefs.adaptiveQuality) { _, _ in
+                        Task { await IPTVRepository.shared.savePreferences(prefs) }
+                    }
+                Toggle(String(localized: "iptv.diagnostics_hud"), isOn: $prefs.showDiagnosticsHUD)
+                    .onChange(of: prefs.showDiagnosticsHUD) { _, _ in
+                        Task { await IPTVRepository.shared.savePreferences(prefs) }
+                    }
+            }
+
+            Section(String(localized: "iptv.epg")) {
+                TextField(String(localized: "iptv.epg_url"), text: Binding(
+                    get: { prefs.globalEPGURLString ?? "" },
+                    set: { prefs.globalEPGURLString = $0.isEmpty ? nil : $0 }
+                ))
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                .autocorrectionDisabled()
+                .onChange(of: prefs.globalEPGURLString) { _, _ in
+                    Task { await IPTVRepository.shared.savePreferences(prefs) }
+                }
+                Button(String(localized: "iptv.refresh_epg")) {
+                    Task {
+                        await IPTVRepository.shared.refreshAllEPG(force: true)
+                    }
+                }
             }
 
             if let errorMessage {

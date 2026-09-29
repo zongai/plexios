@@ -196,15 +196,18 @@ struct EpisodeRow: View {
                 .frame(width: 140, height: 80)
                 .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.sm, style: .continuous))
 
-                if episode.isInProgress, let p = episode.progressFraction, p > 0, p < 1 {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(AppColors.progressTrack)
-                            Capsule().fill(AppColors.accent).frame(width: geo.size.width * p)
+                if episode.isInProgress {
+                    let p = episode.progressFraction
+                    if p > 0, p < 1 {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(AppColors.progressTrack)
+                                Capsule().fill(AppColors.accent).frame(width: geo.size.width * p)
+                            }
                         }
+                        .frame(height: 3)
+                        .padding(6)
                     }
-                    .frame(height: 3)
-                    .padding(6)
                 }
             }
 

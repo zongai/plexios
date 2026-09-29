@@ -55,6 +55,12 @@ struct HomeView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: LibraryProgressEvents.didChange)) { _ in
             Task {
+                // Avoid tearing down Home under an active full-screen player.
+                let playing = environment.playbackEngine.isPlaying
+                    || environment.playbackEngine.sessionState == .playing
+                    || environment.playbackEngine.sessionState == .buffering
+                    || environment.playbackEngine.sessionState == .loading
+                if playing { return }
                 if let mid = environment.serverContext?.machineIdentifier {
                     await environment.hubRepository.invalidate(machineIdentifier: mid)
                 }

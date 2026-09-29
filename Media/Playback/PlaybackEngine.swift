@@ -117,7 +117,8 @@ final class PlaybackEngine {
         forcedAudioId: Int? = nil,
         forcedSubtitleId: Int? = nil
     ) async {
-        await stop(report: true)
+        // Do not fan out Home "continue watching" refresh while opening the player.
+        await stop(report: true, notifyLibraryProgress: false)
 
         self.context = context
         self.networkClass = network
@@ -142,20 +143,13 @@ final class PlaybackEngine {
         logger.playback.info("Decision: \(decision.mode.rawValue) — \(decision.reason)")
         if let router = playerEngineRouter {
             let report = router.resolve(metadata: metadata, decision: decision, network: network)
-            var probe = MediaProbe().probeFromPlexMetadata(
+            // Metadata-only probe on the play path. Full HTTP Range/container sniffing has
+            // caused hard crashes on some files; keep it out of the critical path.
+            let probe = MediaProbe().probeFromPlexMetadata(
                 metadata,
                 mediaIndex: decision.mediaIndex,
                 partIndex: decision.partIndex
             )
-            // Phase 2: best-effort HTTP Range container probe (does not block path choice)
-            if let enriched = await MediaProbe().probePlexPart(
-                    metadata: metadata,
-                    context: context,
-                    mediaIndex: decision.mediaIndex,
-                    partIndex: decision.partIndex
-                ) {
-                    probe = enriched
-                }
             lastDiagnostics = PlaybackDiagnostics.from(info: probe, decision: decision, report: report)
             if let line = lastDiagnostics?.displayLines.joined(separator: " · ") {
                 logger.playback.info("Diagnostics: \(line)")
@@ -240,43 +234,52 @@ final class PlaybackEngine {
             do {
                 let vlc = vlcBackend ?? VLCPlaybackBackend()
                 vlcBackend = vlc
+                // Match IPTV: expose backend before prepare so SwiftUI can mount drawable.
+                activePlaybackBackend = .vlc
+                playerEngineRouter?.markActive(.vlc)
                 vlc.onTimeChange = { [weak self] pos, dur in
-                    guard let self else { return }
-                    self.positionMs = pos
-                    if dur > 0 { self.durationMs = dur }
-                    self.nowPlaying.updateProgress(
-                        positionMs: pos, durationMs: self.durationMs, isPlaying: self.isPlaying
-                    )
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.positionMs = pos
+                        if dur > 0 { self.durationMs = dur }
+                        self.nowPlaying.updateProgress(
+                            positionMs: pos, durationMs: self.durationMs, isPlaying: self.isPlaying
+                        )
+                    }
                 }
                 vlc.onEnded = { [weak self] in
                     Task { await self?.handlePlaybackEnded() }
                 }
                 vlc.onError = { [weak self] message in
-                    self?.logger.playback.error("VLC: \(message)")
-                    self?.errorMessage = message
+                    Task { @MainActor in
+                        self?.logger.playback.error("VLC: \(message)")
+                        self?.errorMessage = message
+                        self?.sessionState = .error
+                        self?.isPlaying = false
+                    }
                 }
                 vlc.onStateChange = { [weak self] st in
-                    guard let self else { return }
-                    switch st {
-                    case .playing:
-                        self.sessionState = .playing
-                        self.isPlaying = true
-                        // Audio tracks frequently become valid at first playing transition
-                        self.applyVLCAudioSelection(self.selectedAudioId)
-                        if let ctx = self.context {
-                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                    Task { @MainActor in
+                        guard let self else { return }
+                        switch st {
+                        case .playing:
+                            self.sessionState = .playing
+                            self.isPlaying = true
+                            self.applyVLCAudioSelection(self.selectedAudioId)
+                            if let ctx = self.context {
+                                self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                            }
+                        case .paused:
+                            self.sessionState = .paused
+                            self.isPlaying = false
+                        case .buffering:
+                            self.sessionState = .buffering
+                        case .failed:
+                            self.sessionState = .error
+                            self.isPlaying = false
+                        default:
+                            break
                         }
-                    case .paused:
-                        self.sessionState = .paused
-                        self.isPlaying = false
-                    case .buffering:
-                        // Keep isPlaying as-is — buffering is not pause.
-                        self.sessionState = .buffering
-                    case .failed:
-                        self.sessionState = .error
-                        self.isPlaying = false
-                    default:
-                        break
                     }
                 }
                 var headers = identityHeaders
@@ -286,6 +289,8 @@ final class PlaybackEngine {
                     baseURL: context.baseURL,
                     token: context.token
                 )
+                // Let SwiftUI attach VLCPlayerContainer before VLC draws (same as IPTV).
+                try? await Task.sleep(for: .milliseconds(80))
                 // Do not force software decode by default — VP9 played fine before landscape
                 // lock; glitches were from drawable size during rotation. Soft-decode remains
                 // available via forceSoftwareDecode if needed later.
@@ -304,10 +309,12 @@ final class PlaybackEngine {
                 applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
                 // Tracks often appear only after playing — retry for several seconds.
                 vlc.onTracksUpdated = { [weak self] in
-                    guard let self else { return }
-                    self.applyVLCAudioSelection(self.selectedAudioId)
-                    if let ctx = self.context {
-                        self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.applyVLCAudioSelection(self.selectedAudioId)
+                        if let ctx = self.context {
+                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
+                        }
                     }
                 }
                 Task { @MainActor in
@@ -390,7 +397,11 @@ final class PlaybackEngine {
             playerEngineRouter?.markActive(.avPlayer)
         }
 
-        let asset = AVURLAsset(url: url)
+        var assetOptions: [String: Any] = [:]
+        var assetHeaders = identityHeaders
+        assetHeaders["X-Plex-Token"] = context.token
+        assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = assetHeaders
+        let asset = AVURLAsset(url: url, options: assetOptions)
         let item = AVPlayerItem(asset: asset)
         let avPlayer = AVPlayer(playerItem: item)
         avPlayer.actionAtItemEnd = .pause
@@ -690,7 +701,7 @@ final class PlaybackEngine {
         await seek(toMs: target)
     }
 
-    func stop(report: Bool = true) async {
+    func stop(report: Bool = true, notifyLibraryProgress: Bool = true) async {
         reportTask?.cancel()
         reportTask = nil
         nativeTimelineTask?.cancel()
@@ -708,7 +719,9 @@ final class PlaybackEngine {
         if report, session != nil, context != nil {
             await session?.updateState(.stopped)
             await reportTimeline(force: true)
-            LibraryProgressEvents.postProgressDidChange(machineIdentifier: context?.machineIdentifier)
+            if notifyLibraryProgress {
+                LibraryProgressEvents.postProgressDidChange(machineIdentifier: context?.machineIdentifier)
+            }
         }
 
         player?.pause()

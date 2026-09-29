@@ -63,27 +63,55 @@ actor SourceProbeService {
         return (updated, result)
     }
 
-    /// Probe candidates that need testing (at most `limit`), persist via callback.
+    /// Probe candidates that need testing (at most `limit`).
+    /// Runs up to `maxConcurrent` probes in parallel to keep the source sheet responsive.
     /// - Parameter force: when true, re-probe even if interval has not elapsed (still respects in-flight).
     func probeIfNeeded(
         sources: [IPTVSource],
         prefs: IPTVPreferences,
         limit: Int = 3,
-        force: Bool = false
+        force: Bool = false,
+        maxConcurrent: Int = 4
     ) async -> [IPTVSource] {
         guard prefs.autoProbeSources || force else { return sources }
-        var list = sources
-        var probed = 0
-        for i in list.indices {
-            guard probed < limit else { break }
-            if !force {
-                guard needsProbe(list[i], prefs: prefs) else { continue }
+
+        var candidates: [(offset: Int, source: IPTVSource)] = []
+        for (i, src) in sources.enumerated() {
+            guard candidates.count < limit else { break }
+            if force {
+                guard src.streamURL != nil else { continue }
             } else {
-                guard list[i].streamURL != nil else { continue }
+                guard needsProbe(src, prefs: prefs) else { continue }
             }
-            let (u, _) = await probe(source: list[i], prefs: prefs)
-            list[i] = u
-            probed += 1
+            candidates.append((i, src))
+        }
+        guard !candidates.isEmpty else { return sources }
+
+        var list = sources
+        let concurrency = max(1, maxConcurrent)
+        var nextIndex = 0
+        var inFlight = 0
+
+        await withTaskGroup(of: (Int, IPTVSource).self) { group in
+            func enqueue() {
+                while nextIndex < candidates.count, inFlight < concurrency {
+                    let item = candidates[nextIndex]
+                    nextIndex += 1
+                    inFlight += 1
+                    group.addTask {
+                        let (updated, _) = await self.probe(source: item.source, prefs: prefs)
+                        return (item.offset, updated)
+                    }
+                }
+            }
+            enqueue()
+            for await (offset, updated) in group {
+                inFlight -= 1
+                if list.indices.contains(offset) {
+                    list[offset] = updated
+                }
+                enqueue()
+            }
         }
         return list
     }

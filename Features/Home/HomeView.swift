@@ -44,8 +44,14 @@ struct HomeView: View {
             Task { await loadHome(force: true) }
         }
         .onAppear {
-            // Re-apply home display preferences when returning from Settings
-            Task { await loadHome(force: true) }
+            // Settings may have changed home toggles — re-filter cached hubs only (no network).
+            Task {
+                var libraries: [PlexLibrary] = []
+                if let context = environment.serverContext {
+                    libraries = (try? await environment.libraryRepository.libraries(context: context)) ?? []
+                }
+                viewModel?.reapplyPreferences(libraries: libraries)
+            }
         }
     }
 

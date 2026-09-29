@@ -73,9 +73,9 @@ final class VLCPlaybackBackend: NSObject {
         drawableView.layoutIfNeeded()
 
         mediaPlayer.scaleFactor = 0
-        // Reset crop / forced ratio (strdup ownership transferred to VLC).
-        mediaPlayer.videoCropGeometry = nil
-        mediaPlayer.videoAspectRatio = nil
+        // MobileVLCKit ObjC setters free previous + strdup input — pass transient C strings only.
+        applyVLCStringProperty(nil, to: mediaPlayer, crop: true)
+        applyVLCStringProperty(nil, to: mediaPlayer, crop: false)
 
         let viewSize = drawableView.bounds.size
         let videoSize = mediaPlayer.videoSize
@@ -89,7 +89,7 @@ final class VLCPlaybackBackend: NSObject {
             if hasView {
                 let w = max(1, Int(viewSize.width.rounded()))
                 let h = max(1, Int(viewSize.height.rounded()))
-                mediaPlayer.videoAspectRatio = strdup("\(w):\(h)")
+                applyVLCStringProperty("\(w):\(h)", to: mediaPlayer, crop: false)
             }
         case .fill:
             if hasVideo, hasView {
@@ -100,26 +100,48 @@ final class VLCPlaybackBackend: NSObject {
                 if viewAspect > videoAspect {
                     let newH = vW / viewAspect
                     let y = max(0, (vH - newH) / 2)
-                    mediaPlayer.videoCropGeometry = strdup(
-                        "0+\(Int(y.rounded()))+\(Int(vW.rounded()))x\(Int(newH.rounded()))"
+                    applyVLCStringProperty(
+                        "0+\(Int(y.rounded()))+\(Int(vW.rounded()))x\(Int(newH.rounded()))",
+                        to: mediaPlayer,
+                        crop: true
                     )
                 } else {
                     let newW = vH * viewAspect
                     let x = max(0, (vW - newW) / 2)
-                    mediaPlayer.videoCropGeometry = strdup(
-                        "\(Int(x.rounded()))+0+\(Int(newW.rounded()))x\(Int(vH.rounded()))"
+                    applyVLCStringProperty(
+                        "\(Int(x.rounded()))+0+\(Int(newW.rounded()))x\(Int(vH.rounded()))",
+                        to: mediaPlayer,
+                        crop: true
                     )
                 }
             } else if hasView {
                 let w = max(1, Int(viewSize.width.rounded()))
                 let h = max(1, Int(viewSize.height.rounded()))
-                mediaPlayer.videoAspectRatio = strdup("\(w):\(h)")
+                applyVLCStringProperty("\(w):\(h)", to: mediaPlayer, crop: false)
             }
         }
 #endif
     }
 
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+    /// Setter copies the C string; do not strdup on the caller side (avoids leaks / double-free).
+    private func applyVLCStringProperty(_ value: String?, to player: VLCMediaPlayer, crop: Bool) {
+        if let value {
+            value.withCString { cStr in
+                let ptr = UnsafeMutablePointer(mutating: cStr)
+                if crop {
+                    player.videoCropGeometry = ptr
+                } else {
+                    player.videoAspectRatio = ptr
+                }
+            }
+        } else if crop {
+            player.videoCropGeometry = nil
+        } else {
+            player.videoAspectRatio = nil
+        }
+    }
+
     private var mediaPlayer: VLCMediaPlayer?
 #endif
 

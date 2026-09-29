@@ -13,6 +13,8 @@ final class LibrariesViewModel {
 
     private let repository: LibraryRepository
     private let logger: LogRouter
+    private var loadGeneration: UInt64 = 0
+    private var lastMachineId: String?
 
     init(repository: LibraryRepository, logger: LogRouter) {
         self.repository = repository
@@ -25,18 +27,32 @@ final class LibrariesViewModel {
             state = .loading
             return
         }
-        if case .loaded = state, !force { return }
+        let machineChanged = lastMachineId != nil && lastMachineId != context.machineIdentifier
+        if case .loaded = state, !force, !machineChanged { return }
 
-        state = .loading
+        loadGeneration &+= 1
+        let generation = loadGeneration
+        lastMachineId = context.machineIdentifier
+        if libraries.isEmpty {
+            state = .loading
+        }
         do {
-            libraries = try await repository.libraries(context: context, force: force)
+            let list = try await repository.libraries(context: context, force: force || machineChanged)
+            guard generation == loadGeneration else { return }
+            libraries = list
             state = libraries.isEmpty ? .empty : .loaded
         } catch is CancellationError {
             return
         } catch let error as PlexError {
-            state = .failed(error.localizedDescription)
+            guard generation == loadGeneration else { return }
+            if libraries.isEmpty {
+                state = .failed(error.localizedDescription)
+            }
         } catch {
-            state = .failed(error.localizedDescription)
+            guard generation == loadGeneration else { return }
+            if libraries.isEmpty {
+                state = .failed(error.localizedDescription)
+            }
         }
     }
 }

@@ -176,6 +176,13 @@ struct SettingsTabView: View {
         }
     }
 
+    private var vlcHelpText: String {
+        if VLCPlaybackBackend.isLinked {
+            return "VLC is linked. Direct Play uses MobileVLCKit unless you prefer the system player. PiP and AirPlay Video are limited on the VLC path."
+        }
+        return "MobileVLCKit is not linked in this build (SPM package missing). Playback stays on AVPlayer until the package resolves."
+    }
+
     private var nativeEngineHelpText: String {
         if FFmpegAvailability.isLinked {
             return "FFmpeg linked. Direct Play may use the native pipeline; failures fall back to AVPlayer / Transcode."

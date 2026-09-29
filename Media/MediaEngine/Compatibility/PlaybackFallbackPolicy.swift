@@ -30,6 +30,23 @@ struct PlaybackFallbackPolicy: Sendable {
                 note: "Force Plex transcode"
             ))
 
+        case .vlcDirectPlay:
+            steps.append(Step(
+                path: .avPlayerDirect,
+                backend: .avPlayer,
+                note: "VLC Direct Play failed → AVPlayer Direct Play"
+            ))
+            steps.append(Step(
+                path: .avPlayerHLS,
+                backend: .avPlayer,
+                note: "VLC failed → universal HLS"
+            ))
+            steps.append(Step(
+                path: .plexTranscode,
+                backend: .avPlayer,
+                note: "Force Plex transcode"
+            ))
+
         case .avPlayerDirect:
             steps.append(Step(
                 path: .avPlayerHLS,

@@ -14,7 +14,7 @@ private enum VLCKitImport { static let available = false }
 /// MobileVLCKit Direct Play backend. Keeps drawable + track state for PlayerView.
 @MainActor
 final class VLCPlaybackBackend: NSObject {
-    static var isLinked: Bool { VLCKitImport.available }
+    nonisolated static var isLinked: Bool { VLCKitImport.available }
 
     let backendKind: PlaybackBackend = .vlc
     private(set) var state: MediaEngineSessionState = .idle
@@ -202,11 +202,14 @@ final class VLCPlaybackBackend: NSObject {
     private func pollTime() {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         guard let mediaPlayer else { return }
-        if let t = mediaPlayer.time?.intValue {
-            positionMs = Int64(t)
+        if let time = mediaPlayer.time {
+            positionMs = Int64(time.intValue)
         }
-        if let len = mediaPlayer.media?.length.intValue, len > 0 {
-            durationMs = Int64(len)
+        if let media = mediaPlayer.media {
+            let len = media.length.intValue
+            if len > 0 {
+                durationMs = Int64(len)
+            }
         }
         onTimeChange?(positionMs, durationMs)
 #endif

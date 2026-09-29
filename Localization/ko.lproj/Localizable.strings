@@ -259,3 +259,5 @@
 "player.more_tools" = "추가 컨트롤";
 "player.volume" = "볼륨";
 "player.episodes" = "에피소드";
+"player.advanced" = "고급 옵션";
+"player.audio_boost" = "음량 부스트";

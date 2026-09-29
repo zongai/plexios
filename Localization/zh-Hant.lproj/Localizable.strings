@@ -259,3 +259,5 @@
 "player.more_tools" = "更多控制";
 "player.volume" = "音量";
 "player.episodes" = "選集";
+"player.advanced" = "進階選項";
+"player.audio_boost" = "聲音增強";

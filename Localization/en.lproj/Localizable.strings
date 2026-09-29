@@ -283,3 +283,5 @@
 "player.more_tools" = "More controls";
 "player.volume" = "Volume";
 "player.episodes" = "Episodes";
+"player.advanced" = "Advanced";
+"player.audio_boost" = "Audio boost";

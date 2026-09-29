@@ -14,10 +14,10 @@ struct PlayerView: View {
     @State private var dragProgress: Double?
     @State private var isPiPActive = false
     @State private var localError: String?
-    /// Extra tools (audio/sub/speed/aspect/volume/episodes) collapsed by default.
-    @State private var toolsExpanded = false
+    /// Right-side panels (reference-style floating menus).
+    @State private var showSettingsPanel = false
+    @State private var showEpisodePanel = false
     @State private var seasonEpisodes: [PlexMetadata] = []
-    @State private var showEpisodeSheet = false
 
     /// Prefer @Bindable so session / isPlaying mutations refresh the chrome.
     private var engine: PlaybackEngine { environment.playbackEngine }
@@ -78,13 +78,35 @@ struct PlayerView: View {
             Color.clear
                 .contentShape(Rectangle())
                 .ignoresSafeArea()
-                .onTapGesture { toggleControls() }
+                .onTapGesture {
+                    if showSettingsPanel || showEpisodePanel {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showSettingsPanel = false
+                            showEpisodePanel = false
+                        }
+                        bumpControls()
+                    } else {
+                        toggleControls()
+                    }
+                }
                 .zIndex(5)
 
             if showControls && !isPiPActive && hasActiveVideoSurface {
                 controlsOverlay
                     .transition(.opacity)
                     .zIndex(10)
+            }
+
+            // Right-side floating panels (settings / episodes)
+            if showSettingsPanel && !isPiPActive {
+                settingsSidePanel
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .zIndex(20)
+            }
+            if showEpisodePanel && !isPiPActive {
+                episodeSidePanel
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .zIndex(20)
             }
         }
         .statusBarHidden(true)
@@ -99,16 +121,12 @@ struct PlayerView: View {
             bumpControls()
             await loadSeasonEpisodes()
         }
-        .sheet(isPresented: $showEpisodeSheet) {
-            episodePickerSheet
-        }
         .onAppear {
             OrientationLock.lockLandscape()
             showControls = true
             bumpControls()
         }
         .onDisappear {
-            // Keep playing if PiP is active; otherwise stop.
             if !isPiPActive {
                 Task { await engine.stop(report: true) }
             }
@@ -117,28 +135,33 @@ struct PlayerView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            // Background: rely on audio session + PiP; do not stop.
             if phase == .active {
                 engine.refreshNowPlaying()
             }
         }
     }
 
-    // MARK: - Controls
-    // Layout: top chrome · center transport · bottom timeline (always) · collapsible tools
+    // MARK: - Controls (reference layout)
+    // Top: close · aspect ········· volume slider
+    // Center: −10 · play/pause · +10
+    // Bottom: title/meta ····· gear · AirPlay · episodes
+    //         progress bar
+    //         current ············· −remaining
 
     private var controlsOverlay: some View {
         VStack(spacing: 0) {
             topChrome
             Spacer(minLength: 0)
-            centerTransport
+            if !showSettingsPanel && !showEpisodePanel {
+                centerTransport
+            }
             Spacer(minLength: 0)
             bottomChrome
         }
-        .padding(.top, 4)
+        .padding(.top, 8)
         .background(
             LinearGradient(
-                colors: [.black.opacity(0.55), .clear, .black.opacity(0.75)],
+                colors: [.black.opacity(0.5), .clear, .clear, .black.opacity(0.72)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -148,7 +171,7 @@ struct PlayerView: View {
     }
 
     private var topChrome: some View {
-        HStack(spacing: AppSpacing.sm) {
+        HStack(spacing: 8) {
             controlIconButton("xmark", label: L10n.playerClose) {
                 Task {
                     await engine.stop(report: true)
@@ -157,42 +180,54 @@ struct PlayerView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(activeItem.grandparentTitle ?? activeItem.title)
-                    .font(AppTypography.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                if activeItem.type == .episode {
-                    Text(episodeCaption)
-                        .font(AppTypography.caption2)
-                        .foregroundStyle(.white.opacity(0.75))
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer(minLength: 4)
-
-            AirPlayRoutePickerView()
-                .frame(width: 40, height: 40)
-                .accessibilityLabel(L10n.airPlay)
-
+            // Aspect / fill cycle (reference: top-left secondary control)
             controlIconButton(
-                toolsExpanded ? "chevron.down.circle.fill" : "ellipsis.circle",
-                label: String(localized: "player.more_tools")
+                aspectIconName,
+                label: L10n.aspectRatio
             ) {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    toolsExpanded.toggle()
-                }
+                cycleAspectMode()
                 bumpControls()
             }
+
+            Spacer(minLength: 12)
+
+            // Compact volume slider (reference: top-right)
+            HStack(spacing: 8) {
+                Text("\(Int((engine.volume * 100).rounded()))%")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .monospacedDigit()
+                    .frame(width: 36, alignment: .trailing)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(engine.volume) },
+                        set: { engine.setVolume(Float($0)); bumpControls() }
+                    ),
+                    in: 0...1
+                )
+                .tint(.white)
+                .frame(width: 120)
+                .accessibilityLabel(String(localized: "player.volume"))
+
+                Image(systemName: engine.volume < 0.01 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(.black.opacity(0.35))
+            )
         }
-        .padding(.horizontal, AppSpacing.sm)
-        .padding(.top, AppSpacing.sm)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
     }
 
     private var centerTransport: some View {
-        HStack(spacing: 44) {
-            controlIconButton("gobackward.10", label: L10n.back10, size: 28) {
+        HStack(spacing: 48) {
+            controlIconButton("gobackward.10", label: L10n.back10, size: 30) {
                 Task { await engine.skip(seconds: -10) }
                 bumpControls()
             }
@@ -201,14 +236,14 @@ struct PlayerView: View {
                 engine.togglePlayPause()
                 bumpControls()
             } label: {
-                Image(systemName: engine.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 56))
+                Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 32, weight: .semibold))
                     .foregroundStyle(.white)
-                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 56, height: 56)
             }
             .accessibilityLabel(engine.isPlaying ? L10n.playerPause : L10n.playerPlay)
 
-            controlIconButton("goforward.10", label: L10n.forward10, size: 28) {
+            controlIconButton("goforward.10", label: L10n.forward10, size: 30) {
                 Task { await engine.skip(seconds: 10) }
                 bumpControls()
             }
@@ -216,43 +251,64 @@ struct PlayerView: View {
     }
 
     private var bottomChrome: some View {
-        VStack(spacing: AppSpacing.sm) {
-            if toolsExpanded {
-                expandedTools
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-
-            // Timeline always at the bottom
-            timelineBar
-
-            // Compact always-visible row: episodes (if any) + expand hint
-            HStack(spacing: AppSpacing.md) {
-                if activeItem.type == .episode {
-                    Button {
-                        showEpisodeSheet = true
-                        bumpControls()
-                    } label: {
-                        controlIcon("list.bullet.rectangle", label: String(localized: "player.episodes"))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    if activeItem.type == .episode {
+                        Text(episodeCaption)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .lineLimit(1)
                     }
+                    Text(primaryTitle)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
                 }
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
 
+                HStack(spacing: 4) {
+                    controlIconButton("gearshape.fill", label: String(localized: "player.more_tools"), size: 18) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showEpisodePanel = false
+                            showSettingsPanel.toggle()
+                        }
+                        bumpControls()
+                    }
+
+                    AirPlayRoutePickerView()
+                        .frame(width: 40, height: 40)
+                        .accessibilityLabel(L10n.airPlay)
+
+                    if activeItem.type == .episode {
+                        controlIconButton("list.bullet.rectangle", label: String(localized: "player.episodes"), size: 18) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showSettingsPanel = false
+                                showEpisodePanel.toggle()
+                            }
+                            bumpControls()
+                        }
+                    }
+                }
+            }
+
+            timelineBar
+
+            HStack {
                 Text(formatTime(engine.positionMs))
-                    .font(AppTypography.caption2)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white.opacity(0.8))
-                Text(" / ")
-                    .font(AppTypography.caption2)
-                    .foregroundStyle(.white.opacity(0.45))
-                Text(formatTime(engine.durationMs))
-                    .font(AppTypography.caption2)
+                Spacer()
+                Text(remainingTimeLabel)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white.opacity(0.8))
             }
         }
-        .padding(.horizontal, AppSpacing.lg)
-        .padding(.bottom, AppSpacing.md + 4)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 14)
     }
 
     private var timelineBar: some View {
@@ -260,15 +316,15 @@ struct PlayerView: View {
             let progress = dragProgress ?? playbackProgress
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(.white.opacity(0.28))
-                    .frame(height: 4)
+                    .fill(.white.opacity(0.22))
+                    .frame(height: 3)
                 Capsule()
                     .fill(.white)
-                    .frame(width: max(4, geo.size.width * progress), height: 4)
+                    .frame(width: max(3, geo.size.width * progress), height: 3)
                 Circle()
                     .fill(.white)
-                    .frame(width: 12, height: 12)
-                    .offset(x: max(0, geo.size.width * progress - 6))
+                    .frame(width: 11, height: 11)
+                    .offset(x: max(0, geo.size.width * progress - 5.5))
             }
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -287,146 +343,272 @@ struct PlayerView: View {
                     }
             )
         }
-        .frame(height: 28)
+        .frame(height: 22)
         .accessibilityLabel(L10n.playbackPosition)
     }
 
-    private var expandedTools: some View {
-        VStack(spacing: AppSpacing.md) {
-            // Volume
-            HStack(spacing: AppSpacing.sm) {
-                Image(systemName: engine.volume < 0.01 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .foregroundStyle(.white)
-                    .frame(width: 28)
-                Slider(
-                    value: Binding(
-                        get: { Double(engine.volume) },
-                        set: { engine.setVolume(Float($0)); bumpControls() }
-                    ),
-                    in: 0...1
-                )
-                .tint(.white)
-                .accessibilityLabel(String(localized: "player.volume"))
-            }
-            .padding(.horizontal, 4)
+    // MARK: - Settings side panel (reference)
 
-            HStack(spacing: AppSpacing.lg) {
-                audioMenu
-                subtitleMenu
-                speedMenu
-                aspectMenu
-                if activeItem.type == .episode {
+    private var settingsSidePanel: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 0) {
+                settingsRow(
+                    title: String(localized: "player.audio_boost"),
+                    trailing: "\(Int((engine.volume * 100).rounded()))%",
+                    systemImage: "speaker.wave.2.fill"
+                ) {
+                    // Cycle volume presets as a lightweight boost control
+                    let next: Float
+                    if engine.volume < 0.35 { next = 0.55 }
+                    else if engine.volume < 0.7 { next = 1.0 }
+                    else { next = 0.25 }
+                    engine.setVolume(next)
+                    bumpControls()
+                }
+
+                settingsMenuRow(
+                    title: rateLabel(engine.playbackRate),
+                    systemImage: "clock.arrow.circlepath"
+                ) {
+                    ForEach(PlaybackPreferences.rateOptions, id: \.self) { rate in
+                        Button {
+                            engine.setPlaybackRate(rate)
+                            bumpControls()
+                        } label: {
+                            if abs(engine.playbackRate - rate) < 0.01 {
+                                Label(rateLabel(rate), systemImage: "checkmark")
+                            } else {
+                                Text(rateLabel(rate))
+                            }
+                        }
+                    }
+                }
+
+                if !engine.audioStreams.isEmpty {
+                    settingsMenuRow(
+                        title: currentAudioLabel,
+                        systemImage: "music.note"
+                    ) {
+                        ForEach(engine.audioStreams, id: \.id) { stream in
+                            Button {
+                                Task { await engine.selectAudio(streamId: stream.id) }
+                                bumpControls()
+                            } label: {
+                                if stream.id == engine.selectedAudioId {
+                                    Label(streamLabel(stream), systemImage: "checkmark")
+                                } else {
+                                    Text(streamLabel(stream))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                settingsMenuRow(
+                    title: currentSubtitleLabel,
+                    systemImage: "captions.bubble"
+                ) {
                     Button {
-                        showEpisodeSheet = true
+                        Task { await engine.selectSubtitle(streamId: nil) }
                         bumpControls()
                     } label: {
-                        controlIcon("rectangle.stack", label: String(localized: "player.episodes"))
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-        }
-        .padding(.vertical, AppSpacing.sm)
-        .padding(.horizontal, 4)
-        .background(
-            RoundedRectangle(cornerRadius: PlexRadius.md, style: .continuous)
-                .fill(.black.opacity(0.35))
-        )
-    }
-
-    @ViewBuilder private var audioMenu: some View {
-        if !engine.audioStreams.isEmpty {
-            Menu {
-                ForEach(engine.audioStreams, id: \.id) { stream in
-                    Button {
-                        Task { await engine.selectAudio(streamId: stream.id) }
-                    } label: {
-                        if stream.id == engine.selectedAudioId {
-                            Label(stream.displayTitle ?? stream.language ?? "\(stream.id)", systemImage: "checkmark")
+                        if engine.selectedSubtitleId == nil {
+                            Label(L10n.off, systemImage: "checkmark")
                         } else {
-                            Text(stream.displayTitle ?? stream.language ?? "\(stream.id)")
+                            Text(L10n.off)
+                        }
+                    }
+                    ForEach(engine.subtitleStreams, id: \.id) { stream in
+                        Button {
+                            Task { await engine.selectSubtitle(streamId: stream.id) }
+                            bumpControls()
+                        } label: {
+                            if stream.id == engine.selectedSubtitleId {
+                                Label(streamLabel(stream), systemImage: "checkmark")
+                            } else {
+                                Text(streamLabel(stream))
+                            }
                         }
                     }
                 }
-            } label: {
-                controlIcon("speaker.wave.2.fill", label: L10n.audioTracks)
-            }
-        }
-    }
 
-    @ViewBuilder private var subtitleMenu: some View {
-        if !engine.subtitleStreams.isEmpty {
-            Menu {
-                Button {
-                    Task { await engine.selectSubtitle(streamId: nil) }
-                } label: {
-                    if engine.selectedSubtitleId == nil {
-                        Label(L10n.off, systemImage: "checkmark")
-                    } else {
-                        Text(L10n.off)
-                    }
-                }
-                ForEach(engine.subtitleStreams, id: \.id) { stream in
-                    Button {
-                        Task { await engine.selectSubtitle(streamId: stream.id) }
-                    } label: {
-                        if stream.id == engine.selectedSubtitleId {
-                            Label(stream.displayTitle ?? stream.language ?? "\(stream.id)", systemImage: "checkmark")
-                        } else {
-                            Text(stream.displayTitle ?? stream.language ?? "\(stream.id)")
+                settingsMenuRow(
+                    title: String(localized: "player.advanced"),
+                    systemImage: "gearshape"
+                ) {
+                    ForEach(VideoAspectMode.allCases) { mode in
+                        Button {
+                            engine.setAspectMode(mode)
+                            bumpControls()
+                        } label: {
+                            if engine.aspectMode == mode {
+                                Label(mode.title, systemImage: "checkmark")
+                            } else {
+                                Text(mode.title)
+                            }
                         }
                     }
                 }
-            } label: {
-                controlIcon(
-                    engine.selectedSubtitleId == nil ? "captions.bubble" : "captions.bubble.fill",
-                    label: L10n.subtitles
-                )
             }
-        }
-    }
-
-    private var speedMenu: some View {
-        Menu {
-            ForEach(PlaybackPreferences.rateOptions, id: \.self) { rate in
-                Button {
-                    engine.setPlaybackRate(rate)
-                    bumpControls()
-                } label: {
-                    if abs(engine.playbackRate - rate) < 0.01 {
-                        Label(rateLabel(rate), systemImage: "checkmark")
-                    } else {
-                        Text(rateLabel(rate))
-                    }
-                }
-            }
-        } label: {
-            controlIcon("gauge.with.dots.needle.33percent", label: "\(L10n.speed) \(rateLabel(engine.playbackRate))")
-        }
-    }
-
-    private var aspectMenu: some View {
-        Menu {
-            ForEach(VideoAspectMode.allCases) { mode in
-                Button {
-                    engine.setAspectMode(mode)
-                    bumpControls()
-                } label: {
-                    if engine.aspectMode == mode {
-                        Label(mode.title, systemImage: "checkmark")
-                    } else {
-                        Text(mode.title)
-                    }
-                }
-            }
-        } label: {
-            controlIcon(
-                engine.aspectMode == .fit
-                    ? "rectangle"
-                    : (engine.aspectMode == .fill ? "rectangle.arrowtriangle.2.outward" : "arrow.up.left.and.arrow.down.right"),
-                label: L10n.aspectRatio
+            .frame(width: 260)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
             )
+            .padding(.trailing, 16)
+            .padding(.top, 56)
+            .padding(.bottom, 100)
         }
+        .allowsHitTesting(true)
+    }
+
+    private func settingsRow(
+        title: String,
+        trailing: String?,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: "chevron.forward")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+                Text(title)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if let trailing {
+                    Text(trailing)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 22)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func settingsMenuRow<Content: View>(
+        title: String,
+        systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Menu {
+            content()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "chevron.forward")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+                Text(title)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 22)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+    }
+
+    // MARK: - Episode side panel (reference)
+
+    private var episodeSidePanel: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(activeItem.grandparentTitle ?? activeItem.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 8)
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(seasonEpisodes) { ep in
+                            Button {
+                                Task {
+                                    guard let context = environment.serverContext else { return }
+                                    let network = currentNetworkClass()
+                                    await engine.play(
+                                        metadata: ep,
+                                        context: context,
+                                        network: network,
+                                        resume: false
+                                    )
+                                    await loadSeasonEpisodes()
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        showEpisodePanel = false
+                                    }
+                                    bumpControls()
+                                }
+                            } label: {
+                                HStack(alignment: .top, spacing: 10) {
+                                    if ep.ratingKey == activeItem.ratingKey {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 14)
+                                    } else {
+                                        Color.clear.frame(width: 14)
+                                    }
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(episodeRowTitle(ep))
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundStyle(.white)
+                                            .multilineTextAlignment(.leading)
+                                        Text(ep.title)
+                                            .font(.system(size: 12, weight: .regular))
+                                            .foregroundStyle(.white.opacity(0.5))
+                                            .lineLimit(1)
+                                    }
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .frame(width: 280)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+            )
+            .padding(.trailing, 16)
+            .padding(.top, 56)
+            .padding(.bottom, 24)
+        }
+        .allowsHitTesting(true)
+    }
+
+    // MARK: - Labels / helpers
+
+    private var primaryTitle: String {
+        if activeItem.type == .episode {
+            return activeItem.grandparentTitle ?? activeItem.title
+        }
+        return activeItem.title
     }
 
     private var episodeCaption: String {
@@ -435,14 +617,80 @@ struct PlayerView: View {
             episode: activeItem.index
         )
         if let code {
-            return "\(code)  \(activeItem.title)"
+            return "\(code) - \(activeItem.title)"
         }
         return activeItem.title
+    }
+
+    private func episodeRowTitle(_ ep: PlexMetadata) -> String {
+        let code = MediaDisplayFormatting.seasonEpisodeCode(
+            season: ep.parentIndex ?? activeItem.parentIndex,
+            episode: ep.index
+        )
+        if let code {
+            return "\(code) - \(ep.title)"
+        }
+        return ep.title
+    }
+
+    private var currentAudioLabel: String {
+        if let id = engine.selectedAudioId,
+           let stream = engine.audioStreams.first(where: { $0.id == id }) {
+            return streamLabel(stream)
+        }
+        return L10n.audioTracks
+    }
+
+    private var currentSubtitleLabel: String {
+        if let id = engine.selectedSubtitleId,
+           let stream = engine.subtitleStreams.first(where: { $0.id == id }) {
+            return streamLabel(stream)
+        }
+        if engine.subtitleStreams.isEmpty {
+            return L10n.subtitles
+        }
+        return L10n.off
+    }
+
+    private func streamLabel(_ stream: PlexStream) -> String {
+        stream.displayTitle ?? stream.language ?? "\(stream.id)"
+    }
+
+    private var aspectIconName: String {
+        switch engine.aspectMode {
+        case .fit: return "arrow.up.left.and.arrow.down.right"
+        case .fill: return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
+        case .stretch: return "rectangle.ratio.16.to.9"
+        }
+    }
+
+    private func cycleAspectMode() {
+        let all = VideoAspectMode.allCases
+        guard let idx = all.firstIndex(of: engine.aspectMode) else {
+            engine.setAspectMode(.fit)
+            return
+        }
+        let next = all[(idx + 1) % all.count]
+        engine.setAspectMode(next)
+    }
+
+    private var remainingTimeLabel: String {
+        let remain = max(0, engine.durationMs - engine.positionMs)
+        return "-\(formatTime(remain))"
     }
 
     private var playbackProgress: Double {
         guard engine.durationMs > 0 else { return 0 }
         return min(1, Double(engine.positionMs) / Double(engine.durationMs))
+    }
+
+    private func currentNetworkClass() -> NetworkClass {
+        if let conn = environment.connectionManager.activeServer?.preferredConnection {
+            if conn.relay { return .relay }
+            if conn.local { return .lan }
+            return .wan
+        }
+        return .unknown
     }
 
     private func waitForLandscapeLayout() async {
@@ -467,16 +715,8 @@ struct PlayerView: View {
             return
         }
         localError = nil
-        let network: NetworkClass = {
-            if let conn = environment.connectionManager.activeServer?.preferredConnection {
-                if conn.relay { return .relay }
-                if conn.local { return .lan }
-                return .wan
-            }
-            return .unknown
-        }()
+        let network = currentNetworkClass()
 
-        // Seed from prop; engine.currentItem takes over after play / autoplay
         let seed = activeItem
         let full: PlexMetadata
         if seed.media.isEmpty {
@@ -508,7 +748,6 @@ struct PlayerView: View {
             return
         }
 
-        // 1) Refresh full metadata — hub/playback payloads often omit parentRatingKey
         var episode = activeItem
         if episode.parentRatingKey == nil || episode.grandparentRatingKey == nil {
             if let full = try? await environment.metadataRepository.metadata(
@@ -520,7 +759,6 @@ struct PlayerView: View {
             }
         }
 
-        // 2) Season children via parentRatingKey
         if let parentKey = episode.parentRatingKey {
             if let kids = try? await environment.metadataRepository.children(
                 ratingKey: parentKey,
@@ -535,14 +773,12 @@ struct PlayerView: View {
             }
         }
 
-        // 3) Show → seasons → match current season by index or membership
         if let showKey = episode.grandparentRatingKey {
             if let seasons = try? await environment.metadataRepository.children(
                 ratingKey: showKey,
                 context: context
             ) {
                 let seasonNodes = seasons.filter { $0.type == .season || $0.type == .unknown }
-                // Prefer season matching parentIndex
                 var ordered = seasonNodes
                 if let si = episode.parentIndex {
                     ordered = seasonNodes.filter { $0.index == si } + seasonNodes.filter { $0.index != si }
@@ -560,13 +796,11 @@ struct PlayerView: View {
                             return
                         }
                     }
-                    // First non-empty season as weak fallback only if single season
                     if seasonNodes.count == 1, !eps.isEmpty {
                         seasonEpisodes = eps
                         return
                     }
                 }
-                // If membership match failed, use first season with episodes that share parentIndex
                 if let si = episode.parentIndex {
                     for season in seasonNodes where season.index == si {
                         if let kids = try? await environment.metadataRepository.children(
@@ -585,7 +819,6 @@ struct PlayerView: View {
             }
         }
 
-        // 4) Related hubs — collect episode-like items as a last-resort list
         if let hubs = try? await environment.apiClient.fetchRelated(
             ratingKey: episode.ratingKey,
             baseURL: context.baseURL,
@@ -609,93 +842,28 @@ struct PlayerView: View {
         seasonEpisodes = []
     }
 
-    private var episodePickerSheet: some View {
-        NavigationStack {
-            List {
-                ForEach(seasonEpisodes) { ep in
-                    Button {
-                        showEpisodeSheet = false
-                        Task {
-                            guard let context = environment.serverContext else { return }
-                            let network: NetworkClass = {
-                                if let conn = environment.connectionManager.activeServer?.preferredConnection {
-                                    if conn.relay { return .relay }
-                                    if conn.local { return .lan }
-                                    return .wan
-                                }
-                                return .unknown
-                            }()
-                            await engine.play(metadata: ep, context: context, network: network, resume: false)
-                            await loadSeasonEpisodes()
-                            bumpControls()
-                        }
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(MediaDisplayFormatting.seasonEpisodeCode(
-                                    season: ep.parentIndex ?? activeItem.parentIndex,
-                                    episode: ep.index
-                                ) ?? "")
-                                .font(AppTypography.caption)
-                                .foregroundStyle(AppColors.secondaryText)
-                                Text(ep.title)
-                                    .font(AppTypography.body)
-                                    .foregroundStyle(AppColors.primaryText)
-                            }
-                            Spacer()
-                            if ep.ratingKey == activeItem.ratingKey {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(PlexColors.accent)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle(String(localized: "player.episodes"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.close) { showEpisodeSheet = false }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-
-    private func controlIcon(_ systemName: String, label: String) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 40, height: 40)
-            .contentShape(Rectangle())
-            .accessibilityLabel(label)
-    }
-
     private func controlIconButton(
         _ systemName: String,
         label: String,
-        size: CGFloat = 20,
+        size: CGFloat = 18,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: size, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
+                .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
         }
         .accessibilityLabel(label)
     }
 
-    private func backendLabel(for decision: PlaybackDecision) -> String {
-        if engine.isVLCBackendActive { return "vlc · \(decision.mode.rawValue)" }
-        if engine.isNativeBackendActive { return "native · \(decision.mode.rawValue)" }
-        return decision.mode.rawValue
-    }
-
     private func toggleControls() {
         withAnimation(.easeInOut(duration: 0.2)) {
+            if showControls {
+                showSettingsPanel = false
+                showEpisodePanel = false
+            }
             showControls.toggle()
         }
         if showControls { bumpControls() }
@@ -704,10 +872,12 @@ struct PlayerView: View {
     private func bumpControls() {
         controlsTask?.cancel()
         showControls = true
+        // Keep chrome visible while a side panel is open
+        if showSettingsPanel || showEpisodePanel { return }
         controlsTask = Task {
             try? await Task.sleep(for: .seconds(4))
             guard !Task.isCancelled else { return }
-            if engine.isPlaying {
+            if engine.isPlaying, !showSettingsPanel, !showEpisodePanel {
                 withAnimation { showControls = false }
             }
         }

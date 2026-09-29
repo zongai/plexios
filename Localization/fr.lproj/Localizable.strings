@@ -259,3 +259,5 @@
 "player.more_tools" = "Plus de commandes";
 "player.volume" = "Volume";
 "player.episodes" = "Épisodes";
+"player.advanced" = "Options avancées";
+"player.audio_boost" = "Amplification audio";

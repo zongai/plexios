@@ -259,3 +259,5 @@
 "player.more_tools" = "Weitere Steuerelemente";
 "player.volume" = "Lautstärke";
 "player.episodes" = "Folgen";
+"player.advanced" = "Erweitert";
+"player.audio_boost" = "Lautstärkerhöhung";

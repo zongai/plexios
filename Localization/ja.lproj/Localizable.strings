@@ -259,3 +259,5 @@
 "player.more_tools" = "その他の操作";
 "player.volume" = "音量";
 "player.episodes" = "エピソード";
+"player.advanced" = "詳細設定";
+"player.audio_boost" = "音量ブースト";

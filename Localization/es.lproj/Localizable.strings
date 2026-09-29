@@ -259,3 +259,5 @@
 "player.more_tools" = "Más controles";
 "player.volume" = "Volumen";
 "player.episodes" = "Episodios";
+"player.advanced" = "Avanzado";
+"player.audio_boost" = "Refuerzo de audio";

@@ -83,12 +83,19 @@ struct PlayerView: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .task {
+            OrientationLock.lockLandscape()
             await startPlayback()
+        }
+        .onAppear {
+            OrientationLock.lockLandscape()
         }
         .onDisappear {
             // Keep playing if PiP is active; otherwise stop.
             if !isPiPActive {
                 Task { await engine.stop(report: true) }
+            }
+            if !isPiPActive {
+                OrientationLock.unlockAll()
             }
         }
         .onChange(of: scenePhase) { _, phase in

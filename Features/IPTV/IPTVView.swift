@@ -93,6 +93,22 @@ final class IPTVViewModel {
             estimatedThroughputMbps: adaptiveQuality ? throughput : nil
         )
     }
+
+    /// Probe due sources (limited), then pick best available.
+    func preparePlayback(for channel: IPTVChannel) async -> (IPTVChannel, IPTVSource)? {
+        let probed = await IPTVRepository.shared.probeChannelSources(channel, limit: 3)
+        // Refresh in-memory list entry
+        if let idx = channels.firstIndex(where: { $0.id == probed.id }) {
+            channels[idx] = probed
+        }
+        guard let source = SourceSelectionEngine.select(
+            from: probed.sources,
+            preferred: quality,
+            excluding: [],
+            estimatedThroughputMbps: nil
+        ) else { return nil }
+        return (probed, source)
+    }
 }
 
 struct IPTVView: View {
@@ -236,8 +252,17 @@ struct IPTVView: View {
     }
 
     private func startPlay(_ channel: IPTVChannel) {
-        guard let source = vm.bestSource(for: channel) else { return }
-        playSession = IPTVPlaySession(channel: channel, source: source, tried: [source.id])
+        Task {
+            if let prepared = await vm.preparePlayback(for: channel) {
+                playSession = IPTVPlaySession(
+                    channel: prepared.0,
+                    source: prepared.1,
+                    tried: [prepared.1.id]
+                )
+            } else if let source = vm.bestSource(for: channel) {
+                playSession = IPTVPlaySession(channel: channel, source: source, tried: [source.id])
+            }
+        }
     }
 }
 

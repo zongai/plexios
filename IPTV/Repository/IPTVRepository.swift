@@ -145,6 +145,27 @@ actor IPTVRepository {
         }
     }
 
+
+    func applySourceUpdate(channelId: String, source: IPTVSource) {
+        updateSourceStats(channelId: channelId, sourceId: source.id) { src in
+            src = source
+        }
+    }
+
+    /// Probe sources that are due; persist results. Returns updated channel.
+    func probeChannelSources(_ channel: IPTVChannel, limit: Int = 3) async -> IPTVChannel {
+        let prefs = preferences()
+        guard prefs.autoProbeSources else { return channel }
+        var ch = channel
+        let updated = await SourceProbeService.shared.probeIfNeeded(sources: ch.sources, prefs: prefs, limit: limit)
+        ch.sources = updated
+        // Persist each changed source
+        for src in updated {
+            applySourceUpdate(channelId: ch.id, source: src)
+        }
+        return ch
+    }
+
     func recordSourceSuccess(channelId: String, sourceId: UUID) {
         updateSourceStats(channelId: channelId, sourceId: sourceId) { src in
             src.successCount += 1
@@ -153,9 +174,14 @@ actor IPTVRepository {
     }
 
     func recordSourceFailure(channelId: String, sourceId: UUID) {
+        let prefs = preferences()
+        let cooldown = max(15, prefs.probeFailureCooldownMinutes) * 60
         updateSourceStats(channelId: channelId, sourceId: sourceId) { src in
             src.failureCount += 1
             src.lastFailure = Date()
+            src.lastProbeAt = Date()
+            // Ignore until next allowed test window
+            src.disabledUntil = Date().addingTimeInterval(cooldown)
         }
     }
 

@@ -214,3 +214,14 @@
 "iptv.channel_next" = "下一频道";
 "iptv.sources_count" = "%d 个源";
 "iptv.group_other" = "其他";
+"iptv.auto_probe" = "自动测速源";
+"iptv.probe_interval" = "健康源复测间隔";
+"iptv.probe_3h" = "每 3 小时";
+"iptv.probe_6h" = "每 6 小时";
+"iptv.probe_12h" = "每 12 小时";
+"iptv.probe_24h" = "每 24 小时";
+"iptv.probe_cooldown" = "差源忽略时长";
+"iptv.probe_cd_30" = "30 分钟";
+"iptv.probe_cd_60" = "1 小时";
+"iptv.probe_cd_90" = "1.5 小时";
+"iptv.probe_cd_180" = "3 小时";

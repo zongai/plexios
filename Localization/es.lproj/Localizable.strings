@@ -214,3 +214,14 @@
 "iptv.channel_next" = "Canal siguiente";
 "iptv.sources_count" = "%d fuentes";
 "iptv.group_other" = "Otros";
+"iptv.auto_probe" = "Probar fuentes";
+"iptv.probe_interval" = "Reprobar sanas";
+"iptv.probe_3h" = "Cada 3 h";
+"iptv.probe_6h" = "Cada 6 h";
+"iptv.probe_12h" = "Cada 12 h";
+"iptv.probe_24h" = "Cada 24 h";
+"iptv.probe_cooldown" = "Ignorar malas";
+"iptv.probe_cd_30" = "30 min";
+"iptv.probe_cd_60" = "1 h";
+"iptv.probe_cd_90" = "1,5 h";
+"iptv.probe_cd_180" = "3 h";

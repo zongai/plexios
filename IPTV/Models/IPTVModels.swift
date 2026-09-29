@@ -90,6 +90,16 @@ struct IPTVSource: Identifiable, Codable, Hashable, Sendable {
     var failureCount: Int
     var lastSuccess: Date?
     var lastFailure: Date?
+    var lastProbeAt: Date?
+    var lastProbeLatencyMs: Int?
+    var lastProbeMbps: Double?
+    /// Skip in selection until this time after failed/slow probe.
+    var disabledUntil: Date?
+
+    var isTemporarilyDisabled: Bool {
+        guard let until = disabledUntil else { return false }
+        return until > Date()
+    }
 
     var streamURL: URL? { IPTVNetwork.normalizeURL(from: streamURLString) }
 
@@ -112,7 +122,11 @@ struct IPTVSource: Identifiable, Codable, Hashable, Sendable {
         successCount: Int = 0,
         failureCount: Int = 0,
         lastSuccess: Date? = nil,
-        lastFailure: Date? = nil
+        lastFailure: Date? = nil,
+        lastProbeAt: Date? = nil,
+        lastProbeLatencyMs: Int? = nil,
+        lastProbeMbps: Double? = nil,
+        disabledUntil: Date? = nil
     ) {
         self.id = id
         self.streamURLString = streamURLString
@@ -123,6 +137,33 @@ struct IPTVSource: Identifiable, Codable, Hashable, Sendable {
         self.failureCount = failureCount
         self.lastSuccess = lastSuccess
         self.lastFailure = lastFailure
+        self.lastProbeAt = lastProbeAt
+        self.lastProbeLatencyMs = lastProbeLatencyMs
+        self.lastProbeMbps = lastProbeMbps
+        self.disabledUntil = disabledUntil
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, streamURLString, name, quality, headers
+        case successCount, failureCount, lastSuccess, lastFailure
+        case lastProbeAt, lastProbeLatencyMs, lastProbeMbps, disabledUntil
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        streamURLString = try c.decode(String.self, forKey: .streamURLString)
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        quality = try c.decodeIfPresent(IPTVStreamQuality.self, forKey: .quality) ?? .unknown
+        headers = try c.decodeIfPresent([String: String].self, forKey: .headers) ?? [:]
+        successCount = try c.decodeIfPresent(Int.self, forKey: .successCount) ?? 0
+        failureCount = try c.decodeIfPresent(Int.self, forKey: .failureCount) ?? 0
+        lastSuccess = try c.decodeIfPresent(Date.self, forKey: .lastSuccess)
+        lastFailure = try c.decodeIfPresent(Date.self, forKey: .lastFailure)
+        lastProbeAt = try c.decodeIfPresent(Date.self, forKey: .lastProbeAt)
+        lastProbeLatencyMs = try c.decodeIfPresent(Int.self, forKey: .lastProbeLatencyMs)
+        lastProbeMbps = try c.decodeIfPresent(Double.self, forKey: .lastProbeMbps)
+        disabledUntil = try c.decodeIfPresent(Date.self, forKey: .disabledUntil)
     }
 }
 
@@ -176,8 +217,16 @@ struct IPTVPreferences: Codable, Sendable {
     var showDiagnosticsHUD: Bool
     /// Optional global EPG URL (overrides / supplements playlist header).
     var globalEPGURLString: String?
+    /// Probe sources for latency/speed before use; slow/failed sources are ignored until cooldown ends.
+    var autoProbeSources: Bool
+    /// Minimum hours between probes of a healthy source (default 6).
+    var probeIntervalHours: Double
+    /// Minutes to ignore a failed/slow source before re-probe (default 90).
+    var probeFailureCooldownMinutes: Double
+    /// Mark source bad if TTFB exceeds this many ms (default 8000).
+    var probeMaxLatencyMs: Int
 
-    var globalEPGURL: URL? { globalEPGURLString.flatMap(URL.init(string:)) }
+    var globalEPGURL: URL? { globalEPGURLString.flatMap { IPTVNetwork.normalizeURL(from: $0) } }
 
     static let `default` = IPTVPreferences(
         defaultQuality: .unknown, // auto
@@ -185,12 +234,17 @@ struct IPTVPreferences: Codable, Sendable {
         favoriteChannelIds: [],
         adaptiveQuality: true,
         showDiagnosticsHUD: false,
-        globalEPGURLString: nil
+        globalEPGURLString: nil,
+        autoProbeSources: true,
+        probeIntervalHours: 6,
+        probeFailureCooldownMinutes: 90,
+        probeMaxLatencyMs: 8000
     )
 
     enum CodingKeys: String, CodingKey {
         case defaultQuality, autoSwitchSource, favoriteChannelIds
         case adaptiveQuality, showDiagnosticsHUD, globalEPGURLString
+        case autoProbeSources, probeIntervalHours, probeFailureCooldownMinutes, probeMaxLatencyMs
     }
 
     init(
@@ -199,7 +253,11 @@ struct IPTVPreferences: Codable, Sendable {
         favoriteChannelIds: [String],
         adaptiveQuality: Bool,
         showDiagnosticsHUD: Bool,
-        globalEPGURLString: String?
+        globalEPGURLString: String?,
+        autoProbeSources: Bool = true,
+        probeIntervalHours: Double = 6,
+        probeFailureCooldownMinutes: Double = 90,
+        probeMaxLatencyMs: Int = 8000
     ) {
         self.defaultQuality = defaultQuality
         self.autoSwitchSource = autoSwitchSource
@@ -207,6 +265,10 @@ struct IPTVPreferences: Codable, Sendable {
         self.adaptiveQuality = adaptiveQuality
         self.showDiagnosticsHUD = showDiagnosticsHUD
         self.globalEPGURLString = globalEPGURLString
+        self.autoProbeSources = autoProbeSources
+        self.probeIntervalHours = probeIntervalHours
+        self.probeFailureCooldownMinutes = probeFailureCooldownMinutes
+        self.probeMaxLatencyMs = probeMaxLatencyMs
     }
 
     init(from decoder: Decoder) throws {
@@ -217,5 +279,9 @@ struct IPTVPreferences: Codable, Sendable {
         adaptiveQuality = try c.decodeIfPresent(Bool.self, forKey: .adaptiveQuality) ?? true
         showDiagnosticsHUD = try c.decodeIfPresent(Bool.self, forKey: .showDiagnosticsHUD) ?? false
         globalEPGURLString = try c.decodeIfPresent(String.self, forKey: .globalEPGURLString)
+        autoProbeSources = try c.decodeIfPresent(Bool.self, forKey: .autoProbeSources) ?? true
+        probeIntervalHours = try c.decodeIfPresent(Double.self, forKey: .probeIntervalHours) ?? 6
+        probeFailureCooldownMinutes = try c.decodeIfPresent(Double.self, forKey: .probeFailureCooldownMinutes) ?? 90
+        probeMaxLatencyMs = try c.decodeIfPresent(Int.self, forKey: .probeMaxLatencyMs) ?? 8000
     }
 }

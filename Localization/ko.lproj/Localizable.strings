@@ -214,3 +214,14 @@
 "iptv.channel_next" = "다음 채널";
 "iptv.sources_count" = "%d개 소스";
 "iptv.group_other" = "기타";
+"iptv.auto_probe" = "소스 자동 테스트";
+"iptv.probe_interval" = "정상 소스 재테스트";
+"iptv.probe_3h" = "3시간마다";
+"iptv.probe_6h" = "6시간마다";
+"iptv.probe_12h" = "12시간마다";
+"iptv.probe_24h" = "24시간마다";
+"iptv.probe_cooldown" = "불량 소스 무시";
+"iptv.probe_cd_30" = "30분";
+"iptv.probe_cd_60" = "1시간";
+"iptv.probe_cd_90" = "1.5시간";
+"iptv.probe_cd_180" = "3시간";

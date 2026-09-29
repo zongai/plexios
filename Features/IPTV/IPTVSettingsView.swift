@@ -82,6 +82,30 @@ struct IPTVSettingsView: View {
                     .onChange(of: prefs.adaptiveQuality) { _, _ in
                         Task { await IPTVRepository.shared.savePreferences(prefs) }
                     }
+                Toggle(String(localized: "iptv.auto_probe"), isOn: $prefs.autoProbeSources)
+                    .onChange(of: prefs.autoProbeSources) { _, _ in
+                        Task { await IPTVRepository.shared.savePreferences(prefs) }
+                    }
+                if prefs.autoProbeSources {
+                    Picker(String(localized: "iptv.probe_interval"), selection: $prefs.probeIntervalHours) {
+                        Text(String(localized: "iptv.probe_3h")).tag(3.0)
+                        Text(String(localized: "iptv.probe_6h")).tag(6.0)
+                        Text(String(localized: "iptv.probe_12h")).tag(12.0)
+                        Text(String(localized: "iptv.probe_24h")).tag(24.0)
+                    }
+                    .onChange(of: prefs.probeIntervalHours) { _, _ in
+                        Task { await IPTVRepository.shared.savePreferences(prefs) }
+                    }
+                    Picker(String(localized: "iptv.probe_cooldown"), selection: $prefs.probeFailureCooldownMinutes) {
+                        Text(String(localized: "iptv.probe_cd_30")).tag(30.0)
+                        Text(String(localized: "iptv.probe_cd_60")).tag(60.0)
+                        Text(String(localized: "iptv.probe_cd_90")).tag(90.0)
+                        Text(String(localized: "iptv.probe_cd_180")).tag(180.0)
+                    }
+                    .onChange(of: prefs.probeFailureCooldownMinutes) { _, _ in
+                        Task { await IPTVRepository.shared.savePreferences(prefs) }
+                    }
+                }
                 Toggle(String(localized: "iptv.diagnostics_hud"), isOn: $prefs.showDiagnosticsHUD)
                     .onChange(of: prefs.showDiagnosticsHUD) { _, _ in
                         Task { await IPTVRepository.shared.savePreferences(prefs) }

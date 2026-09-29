@@ -1,6 +1,8 @@
 import Foundation
 
-struct M3UEntry: Sendable {
+// MARK: - Parsed row (one EXTINF + URL pairing)
+
+struct M3UEntry: Sendable, Equatable {
     var duration: TimeInterval?
     var name: String
     var tvgID: String?
@@ -11,17 +13,33 @@ struct M3UEntry: Sendable {
     var language: String?
     var attributes: [String: String]
     var streamURL: URL
+    /// HTTP headers derived from #EXTVLCOPT (and similar).
     var headers: [String: String]
+    /// Raw option lines associated with this entry (for diagnostics).
+    var opts: [String]
 }
 
-struct M3UParseResult: Sendable {
+struct M3UParseResult: Sendable, Equatable {
     var epgURL: URL?
     var entries: [M3UEntry]
 }
 
+/// Robust EXTM3U / EXTINF parser (pure functions, state-machine pairing).
+///
+/// Design:
+/// - `#EXTINF` opens a pending entry; the **next non-empty non-`#` line** is its URL.
+/// - `#EXTVLCOPT` / `#EXTGRP` / other `#` lines between them attach to the pending entry
+///   and **must not** break the pairing (no odd/even line pairing).
+/// - Trailing `#EXTINF` without URL is dropped (no crash).
+/// - Attributes: `key="value"` with keys lowercased; display name is after the last
+///   comma that is outside quotes.
 enum M3UParser {
-    /// Tolerant EXTM3U parser. Unknown attributes are kept; bad lines are skipped.
     static func parse(data: Data) throws -> M3UParseResult {
+        // Strip UTF-8 BOM if present
+        var data = data
+        if data.count >= 3, data[0] == 0xEF, data[1] == 0xBB, data[2] == 0xBF {
+            data = data.dropFirst(3)
+        }
         guard let text = String(data: data, encoding: .utf8)
                 ?? String(data: data, encoding: .isoLatin1) else {
             throw IPTVError.invalidPlaylistEncoding
@@ -30,164 +48,190 @@ enum M3UParser {
     }
 
     static func parse(text: String) -> M3UParseResult {
+        parseLines(normalizeNewlines(text))
+    }
+
+    // MARK: - State machine
+
+    private struct Pending {
+        var duration: TimeInterval?
+        var name: String
+        var attrs: [String: String]
+        var headers: [String: String] = [:]
+        var opts: [String] = []
+    }
+
+    static func parseLines(_ text: String) -> M3UParseResult {
         var epgURL: URL?
         var entries: [M3UEntry] = []
-        var pendingInfo: (duration: TimeInterval?, name: String, attrs: [String: String])?
-        var pendingHeaders: [String: String] = [:]
+        var pending: Pending?
 
-        let lines = text.split(whereSeparator: \.isNewline).map {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        // Split on any newline style; keep empty lines as delimiters only (skipped)
+        text.enumerateLines { rawLine, _ in
+            var line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { return }
 
-        for line in lines {
-            guard !line.isEmpty else { continue }
+            // Tolerate junk before #EXTINF on the same logical start (rare)
+            if let range = line.range(of: "#EXTINF:", options: .caseInsensitive) {
+                line = String(line[range.lowerBound...])
+            }
 
-            if line.hasPrefix("#EXTM3U") {
-                let attrs = parseAttributes(from: String(line.dropFirst("#EXTM3U".count)))
+            let upper = line.uppercased()
+
+            if upper.hasPrefix("#EXTM3U") {
+                let attrs = parseAttributes(from: String(line.dropFirst(7)))
                 if let u = attrs["url-tvg"] ?? attrs["x-tvg-url"] ?? attrs["tvg-url"] {
-                    epgURL = URL(string: u)
+                    epgURL = IPTVNetwork.normalizeURL(from: u)
                 }
-                continue
+                return
             }
 
-            if line.hasPrefix("#EXTVLCOPT:") {
-                let body = String(line.dropFirst("#EXTVLCOPT:".count))
-                if body.lowercased().hasPrefix("http-user-agent="),
-                   let v = body.split(separator: "=", maxSplits: 1).last {
-                    pendingHeaders["User-Agent"] = String(v)
-                } else if body.lowercased().hasPrefix("http-referrer=")
-                            || body.lowercased().hasPrefix("http-referer="),
-                          let v = body.split(separator: "=", maxSplits: 1).last {
-                    pendingHeaders["Referer"] = String(v)
-                } else if body.lowercased().hasPrefix("http-origin="),
-                          let v = body.split(separator: "=", maxSplits: 1).last {
-                    pendingHeaders["Origin"] = String(v)
-                }
-                continue
-            }
-
-            if line.hasPrefix("#EXTINF:") {
+            if upper.hasPrefix("#EXTINF:") {
+                // New EXTINF replaces previous unfinished pending (orphan EXTINF dropped)
                 let body = String(line.dropFirst("#EXTINF:".count))
                 let (duration, rest) = splitDuration(body)
                 let (attrs, name) = splitAttrsAndName(rest)
-                pendingInfo = (duration, name, attrs)
-                continue
+                pending = Pending(duration: duration, name: name, attrs: attrs)
+                return
             }
 
-            if line.hasPrefix("#") { continue }
+            // Directive lines while pending → attach, do not close entry
+            if line.hasPrefix("#") {
+                if var p = pending {
+                    p.opts.append(line)
+                    applyDirective(line, to: &p)
+                    pending = p
+                }
+                // Unknown # outside pending: ignore
+                return
+            }
 
-            // Stream URL line
-            guard let url = IPTVNetwork.normalizeURL(from: line) else { continue }
-            let info = pendingInfo
+            // URL line
+            guard let url = IPTVNetwork.normalizeURL(from: line) else {
+                // Invalid URL: drop pending pairing for this EXTINF
+                pending = nil
+                return
+            }
+
+            let info = pending
             let attrs = info?.attrs ?? [:]
-            let name = (info?.name.isEmpty == false ? info!.name : (attrs["tvg-name"] ?? "Channel"))
-            let entry = M3UEntry(
-                duration: info?.duration,
-                name: name,
-                tvgID: attrs["tvg-id"],
-                tvgName: attrs["tvg-name"],
-                tvgLogo: attrs["tvg-logo"],
-                groupTitle: attrs["group-title"],
-                country: attrs["tvg-country"],
-                language: attrs["tvg-language"],
-                attributes: attrs,
-                streamURL: url,
-                headers: pendingHeaders
+            let display = {
+                if let n = info?.name, !n.isEmpty { return n }
+                return attrs["tvg-name"] ?? "Channel"
+            }()
+
+            entries.append(
+                M3UEntry(
+                    duration: info?.duration,
+                    name: display,
+                    tvgID: attrs["tvg-id"],
+                    tvgName: attrs["tvg-name"],
+                    tvgLogo: attrs["tvg-logo"],
+                    groupTitle: attrs["group-title"] ?? attrs["extgrp"],
+                    country: attrs["tvg-country"],
+                    language: attrs["tvg-language"],
+                    attributes: attrs,
+                    streamURL: url,
+                    headers: info?.headers ?? [:],
+                    opts: info?.opts ?? []
+                )
             )
-            entries.append(entry)
-            pendingInfo = nil
-            pendingHeaders = [:]
+            pending = nil
         }
 
+        // Trailing EXTINF without URL → ignored (no crash)
         return M3UParseResult(epgURL: epgURL, entries: entries)
     }
 
-    // MARK: - Helpers (shared with streaming parser)
-
-    static func splitDurationPublic(_ body: String) -> (TimeInterval?, String) {
-        splitDuration(body)
-    }
-
-    static func splitAttrsAndNamePublic(_ rest: String) -> ([String: String], String) {
-        splitAttrsAndName(rest)
-    }
-
-    static func parseAttributesPublic(from text: String) -> [String: String] {
-        parseAttributes(from: text)
-    }
-
-    private static func splitDuration(_ body: String) -> (TimeInterval?, String) {
-        // "-1 tvg-id=...,Name" or "10.5,Name"
-        guard let comma = body.firstIndex(of: ",") else {
-            if let d = TimeInterval(body.trimmingCharacters(in: .whitespaces)) {
-                return (d < 0 ? -1 : d, "")
+    private static func applyDirective(_ line: String, to pending: inout Pending) {
+        let upper = line.uppercased()
+        if upper.hasPrefix("#EXTVLCOPT:") {
+            let body = String(line.dropFirst("#EXTVLCOPT:".count))
+            let lower = body.lowercased()
+            if lower.hasPrefix("http-user-agent="),
+               let v = body.split(separator: "=", maxSplits: 1).last {
+                pending.headers["User-Agent"] = String(v)
+            } else if lower.hasPrefix("http-referrer=") || lower.hasPrefix("http-referer="),
+                      let v = body.split(separator: "=", maxSplits: 1).last {
+                pending.headers["Referer"] = String(v)
+            } else if lower.hasPrefix("http-origin="),
+                      let v = body.split(separator: "=", maxSplits: 1).last {
+                pending.headers["Origin"] = String(v)
             }
-            return (nil, body)
+        } else if upper.hasPrefix("#EXTGRP:") {
+            let g = String(line.dropFirst("#EXTGRP:".count)).trimmingCharacters(in: .whitespaces)
+            if !g.isEmpty {
+                pending.attrs["group-title"] = g
+            }
         }
-        let head = body[..<comma].trimmingCharacters(in: .whitespaces)
-        let tail = String(body[body.index(after: comma)...])
-        // head may be "-1 tvg-id=..."
-        let parts = head.split(separator: " ", maxSplits: 1).map(String.init)
-        var duration: TimeInterval?
-        var attrPart = head
-        if let first = parts.first, let d = TimeInterval(first) {
-            duration = d
-            attrPart = parts.count > 1 ? parts[1] : ""
-        }
-        let rest = attrPart.isEmpty ? tail : (attrPart + "," + tail)
-        // Actually if duration consumed, rest attrs are in parts[1] + comma name
-        if parts.count > 1 {
-            return (duration, parts[1] + "," + tail)
-        }
-        return (duration, tail)
     }
 
-    private static func splitAttrsAndName(_ rest: String) -> ([String: String], String) {
-        // "tvg-id=\"x\" group-title=\"G\",Display Name"
-        guard let lastComma = rest.lastIndex(of: ",") else {
-            return (parseAttributes(from: rest), rest.trimmingCharacters(in: .whitespaces))
+    // MARK: - Attribute / name parsing
+
+    /// Split duration prefix from EXTINF body.
+    static func splitDuration(_ body: String) -> (TimeInterval?, String) {
+        let trimmed = body.trimmingCharacters(in: .whitespaces)
+        // Duration ends at first space or comma
+        var i = trimmed.startIndex
+        while i < trimmed.endIndex {
+            let c = trimmed[i]
+            if c == " " || c == "," { break }
+            i = trimmed.index(after: i)
         }
-        // Prefer last comma as name separator (attrs may contain commas rarely)
-        let attrRegion = String(rest[..<lastComma])
-        let name = String(rest[rest.index(after: lastComma)...]).trimmingCharacters(in: .whitespaces)
-        return (parseAttributes(from: attrRegion), name)
+        let durStr = String(trimmed[..<i])
+        let rest = String(trimmed[i...]).trimmingCharacters(in: .whitespaces)
+        let duration = TimeInterval(durStr)
+        return (duration, rest)
     }
 
-    private static func parseAttributes(from text: String) -> [String: String] {
+    /// Attributes + display name. Display name = after last comma **outside quotes**.
+    static func splitAttrsAndName(_ rest: String) -> ([String: String], String) {
+        // Find last comma outside double quotes
+        var inQuotes = false
+        var lastComma: String.Index?
+        var i = rest.startIndex
+        while i < rest.endIndex {
+            let c = rest[i]
+            if c == "\"" { inQuotes.toggle() }
+            else if c == ",", !inQuotes { lastComma = i }
+            i = rest.index(after: i)
+        }
+
+        if let comma = lastComma {
+            let attrPart = String(rest[..<comma])
+            let name = String(rest[rest.index(after: comma)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (parseAttributes(from: attrPart), name)
+        }
+        // No comma → treat whole as attrs only, name empty
+        return (parseAttributes(from: rest), "")
+    }
+
+    /// `key="value"` pairs; keys lowercased. Tolerates spaces around `=`.
+    static func parseAttributes(from text: String) -> [String: String] {
         var result: [String: String] = [:]
-        // key="value" or key=value
-        let pattern = #"([A-Za-z0-9_-]+)=(\"[^\"]*\"|[^\s,]+)"#
+        let pattern = #"([A-Za-z0-9_-]+)\s*=\s*"([^"]*)""#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return result }
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        for match in regex.matches(in: text, range: range) {
-            guard let kr = Range(match.range(at: 1), in: text),
-                  let vr = Range(match.range(at: 2), in: text) else { continue }
-            var value = String(text[vr])
-            if value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 {
-                value = String(value.dropFirst().dropLast())
-            }
-            result[String(text[kr]).lowercased()] = value
+        let ns = text as NSString
+        let range = NSRange(location: 0, length: ns.length)
+        regex.enumerateMatches(in: text, range: range) { match, _, _ in
+            guard let match,
+                  match.numberOfRanges >= 3,
+                  let keyR = Range(match.range(at: 1), in: text),
+                  let valR = Range(match.range(at: 2), in: text) else { return }
+            let key = String(text[keyR]).lowercased()
+            result[key] = String(text[valR])
         }
         return result
     }
-}
 
-enum IPTVError: LocalizedError {
-    case invalidURL
-    case invalidPlaylistEncoding
-    case playlistTooLarge
-    case downloadFailed(String)
-    case emptyPlaylist
-    case noSources
+    // MARK: - Shared helpers for streaming parser
 
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL: return "Invalid playlist URL"
-        case .invalidPlaylistEncoding: return "Could not decode playlist text"
-        case .playlistTooLarge: return "Playlist is too large"
-        case .downloadFailed(let m): return m
-        case .emptyPlaylist: return "Playlist contains no channels"
-        case .noSources: return "No playable sources"
-        }
+    static func splitDurationPublic(_ body: String) -> (TimeInterval?, String) { splitDuration(body) }
+    static func splitAttrsAndNamePublic(_ rest: String) -> ([String: String], String) { splitAttrsAndName(rest) }
+    static func parseAttributesPublic(from text: String) -> [String: String] { parseAttributes(from: text) }
+
+    private static func normalizeNewlines(_ text: String) -> String {
+        text.replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
     }
 }

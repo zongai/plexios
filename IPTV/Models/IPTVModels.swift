@@ -225,6 +225,8 @@ struct IPTVPreferences: Codable, Sendable {
     var probeFailureCooldownMinutes: Double
     /// Mark source bad if TTFB exceeds this many ms (default 8000).
     var probeMaxLatencyMs: Int
+    /// Same tvg-name in different groups counts as one channel when true.
+    var mergeAcrossGroups: Bool
 
     var globalEPGURL: URL? { globalEPGURLString.flatMap { IPTVNetwork.normalizeURL(from: $0) } }
 
@@ -238,13 +240,14 @@ struct IPTVPreferences: Codable, Sendable {
         autoProbeSources: true,
         probeIntervalHours: 6,
         probeFailureCooldownMinutes: 90,
-        probeMaxLatencyMs: 8000
+        probeMaxLatencyMs: 8000,
+        mergeAcrossGroups: false
     )
 
     enum CodingKeys: String, CodingKey {
         case defaultQuality, autoSwitchSource, favoriteChannelIds
         case adaptiveQuality, showDiagnosticsHUD, globalEPGURLString
-        case autoProbeSources, probeIntervalHours, probeFailureCooldownMinutes, probeMaxLatencyMs
+        case autoProbeSources, probeIntervalHours, probeFailureCooldownMinutes, probeMaxLatencyMs, mergeAcrossGroups
     }
 
     init(
@@ -257,7 +260,8 @@ struct IPTVPreferences: Codable, Sendable {
         autoProbeSources: Bool = true,
         probeIntervalHours: Double = 6,
         probeFailureCooldownMinutes: Double = 90,
-        probeMaxLatencyMs: Int = 8000
+        probeMaxLatencyMs: Int = 8000,
+        mergeAcrossGroups: Bool = false
     ) {
         self.defaultQuality = defaultQuality
         self.autoSwitchSource = autoSwitchSource
@@ -269,6 +273,7 @@ struct IPTVPreferences: Codable, Sendable {
         self.probeIntervalHours = probeIntervalHours
         self.probeFailureCooldownMinutes = probeFailureCooldownMinutes
         self.probeMaxLatencyMs = probeMaxLatencyMs
+        self.mergeAcrossGroups = mergeAcrossGroups
     }
 
     init(from decoder: Decoder) throws {
@@ -283,5 +288,6 @@ struct IPTVPreferences: Codable, Sendable {
         probeIntervalHours = try c.decodeIfPresent(Double.self, forKey: .probeIntervalHours) ?? 6
         probeFailureCooldownMinutes = try c.decodeIfPresent(Double.self, forKey: .probeFailureCooldownMinutes) ?? 90
         probeMaxLatencyMs = try c.decodeIfPresent(Int.self, forKey: .probeMaxLatencyMs) ?? 8000
+        mergeAcrossGroups = try c.decodeIfPresent(Bool.self, forKey: .mergeAcrossGroups) ?? false
     }
 }

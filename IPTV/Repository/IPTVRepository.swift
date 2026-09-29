@@ -125,7 +125,12 @@ actor IPTVRepository {
         }
         guard !parsed.entries.isEmpty else { throw IPTVError.emptyPlaylist }
 
-        let channels = ChannelNormalizer.channels(from: parsed.entries, playlistId: playlist.id)
+        let prefs = preferences()
+        let channels = ChannelNormalizer.channels(
+            from: parsed.entries,
+            playlistId: playlist.id,
+            options: .init(mergeAcrossGroups: prefs.mergeAcrossGroups)
+        )
         saveChannels(channels, playlistId: playlist.id)
 
         var updated = playlist

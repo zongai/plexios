@@ -1,67 +1,126 @@
 import Foundation
 
+/// Aggregates M3U entries into channels vs sources.
+///
+/// Channel key (default): `normalize(group) + "|" + normalize(tvg-name ?? display name)`.
+/// `tvg-id` is never the channel key. Kept only when consistent within channel and unique globally.
 enum ChannelNormalizer {
-    /// Build channels: entries with the same exact `tvg-name` become one channel with multiple sources.
-    static func channels(from entries: [M3UEntry], playlistId: UUID) -> [IPTVChannel] {
-        var map: [String: IPTVChannel] = [:]
-        var order: [String] = []
-
-        for entry in entries {
-            let identity = identityKey(for: entry)
-            var source = IPTVSource(
-                streamURLString: entry.streamURL.absoluteString,
-                name: sourceLabel(for: entry),
-                quality: inferQuality(from: entry),
-                headers: entry.headers
-            )
-
-            if var existing = map[identity] {
-                if !existing.sources.contains(where: { $0.streamURLString == source.streamURLString }) {
-                    // When becoming multi-source, label by host index
-                    if existing.sources.count == 1,
-                       let firstURL = URL(string: existing.sources[0].streamURLString) {
-                        existing.sources[0].name = "源1 · \(firstURL.host ?? existing.sources[0].streamURLString)"
-                    }
-                    source.name = sourceLabel(for: entry, index: existing.sources.count + 1)
-                    existing.sources.append(source)
-                }
-                if existing.logoURLString == nil { existing.logoURLString = entry.tvgLogo }
-                if existing.group == nil { existing.group = entry.groupTitle }
-                if existing.tvgID == nil { existing.tvgID = entry.tvgID }
-                if existing.language == nil { existing.language = entry.language }
-                if existing.country == nil { existing.country = entry.country }
-                map[identity] = existing
-            } else {
-                let channel = IPTVChannel(
-                    id: identity,
-                    name: displayName(for: entry),
-                    logoURLString: entry.tvgLogo,
-                    group: entry.groupTitle,
-                    tvgID: entry.tvgID,
-                    language: entry.language,
-                    country: entry.country,
-                    sources: [source],
-                    playlistId: playlistId
-                )
-                map[identity] = channel
-                order.append(identity)
-            }
-        }
-
-        return order.compactMap { map[$0] }
+    struct Options: Sendable {
+        /// When true, key ignores group (same name merges across groups). Default false.
+        var mergeAcrossGroups: Bool = false
     }
 
-    /// Channel identity ignores `tvg-id` entirely (lists often give each URL a unique id).
-    /// 1) exact `tvg-name` → 2) exact display name → 3) stream URL.
-    static func identityKey(for entry: M3UEntry) -> String {
-        if let name = entry.tvgName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-            return "tvgn:" + name
+    static func channels(
+        from entries: [M3UEntry],
+        playlistId: UUID,
+        options: Options = Options()
+    ) -> [IPTVChannel] {
+        var order: [String] = []
+        var buckets: [String: [M3UEntry]] = [:]
+
+        for entry in entries {
+            let key = channelKey(for: entry, options: options)
+            if buckets[key] == nil {
+                order.append(key)
+                buckets[key] = []
+            }
+            buckets[key, default: []].append(entry)
         }
-        let display = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !display.isEmpty {
-            return "name:" + display
+
+        var draft: [(key: String, channel: IPTVChannel, tvgIds: [String])] = []
+        for key in order {
+            let group = buckets[key] ?? []
+            guard let first = group.first else { continue }
+
+            var sources: [IPTVSource] = []
+            var seenURL = Set<String>()
+            var logo: String?
+            var collectedIDs: [String] = []
+
+            for (idx, entry) in group.enumerated() {
+                let urlStr = entry.streamURL.absoluteString
+                guard !seenURL.contains(urlStr) else { continue }
+                seenURL.insert(urlStr)
+
+                if logo == nil, let l = entry.tvgLogo, !l.isEmpty { logo = l }
+                if let id = entry.tvgID?.trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty {
+                    collectedIDs.append(id)
+                }
+
+                sources.append(
+                    IPTVSource(
+                        streamURLString: urlStr,
+                        name: sourceLabel(entry: entry, index: idx + 1, totalHint: group.count),
+                        quality: inferQuality(from: entry),
+                        headers: entry.headers
+                    )
+                )
+            }
+            guard !sources.isEmpty else { continue }
+
+            if sources.count > 1 {
+                for i in sources.indices {
+                    let host = URL(string: sources[i].streamURLString)?.host
+                        ?? sources[i].streamURLString
+                    sources[i].name = "源\(i + 1) · \(host)"
+                }
+            }
+
+            let channel = IPTVChannel(
+                id: key,
+                name: displayName(for: first),
+                logoURLString: logo,
+                group: first.groupTitle,
+                tvgID: nil,
+                language: first.language,
+                country: first.country,
+                sources: sources,
+                playlistId: playlistId
+            )
+            draft.append((key, channel, collectedIDs))
         }
-        return "url:" + entry.streamURL.absoluteString
+
+        // Trusted tvg-id pass
+        var idOwners: [String: Set<String>] = [:]
+        for item in draft {
+            let unique = Set(item.tvgIds)
+            guard unique.count == 1, let only = unique.first else { continue }
+            if item.tvgIds.allSatisfy({ $0 == only }) {
+                idOwners[only, default: []].insert(item.key)
+            }
+        }
+        let trusted = Set(idOwners.compactMap { id, keys in keys.count == 1 ? id : nil })
+
+        return draft.map { item in
+            var ch = item.channel
+            let unique = Set(item.tvgIds)
+            if unique.count == 1, let only = unique.first, trusted.contains(only) {
+                ch.tvgID = only
+            }
+            return ch
+        }
+    }
+
+    static func channelKey(for entry: M3UEntry, options: Options = Options()) -> String {
+        let nameRaw = entry.tvgName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = normalize(nameRaw.flatMap { $0.isEmpty ? nil : $0 } ?? entry.name)
+        if options.mergeAcrossGroups {
+            return "n:" + name
+        }
+        let group = normalize(entry.groupTitle ?? "")
+        return "g:" + group + "|n:" + name
+    }
+
+    /// NFKC → trim → collapse whitespace → lowercase.
+    static func normalize(_ raw: String) -> String {
+        let nfkc = raw.precomposedStringWithCompatibilityMapping
+        let trimmed = nfkc.trimmingCharacters(in: .whitespacesAndNewlines)
+        let collapsed = trimmed.replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        )
+        return collapsed.lowercased()
     }
 
     static func displayName(for entry: M3UEntry) -> String {
@@ -69,24 +128,26 @@ enum ChannelNormalizer {
             return tvg
         }
         let n = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !n.isEmpty { return n }
-        return "Channel"
+        return n.isEmpty ? "Channel" : n
     }
 
-    static func sourceLabel(for entry: M3UEntry, index: Int? = nil) -> String {
+    private static func sourceLabel(entry: M3UEntry, index: Int, totalHint: Int) -> String {
         let host = entry.streamURL.host ?? entry.streamURL.absoluteString
-        if let index {
-            return "源\(index) · \(host)"
-        }
+        if totalHint > 1 { return "源\(index) · \(host)" }
         return host
     }
 
     static func inferQuality(from entry: M3UEntry) -> IPTVStreamQuality {
-        let blob = (entry.name + " " + (entry.tvgName ?? "") + " " + entry.streamURL.absoluteString).lowercased()
+        let blob = (entry.name + " " + (entry.tvgName ?? "") + " " + entry.streamURL.absoluteString)
+            .lowercased()
         if blob.contains("4k") || blob.contains("uhd") || blob.contains("2160") { return .uhd }
         if blob.contains("1080") || blob.contains("fhd") || blob.contains("full hd") { return .fullHD }
         if blob.contains("720") || blob.contains(" hd") || blob.hasSuffix("hd") { return .hd }
         if blob.contains("480") || blob.contains("576") || blob.contains("sd") { return .sd }
         return .unknown
+    }
+
+    static func identityKey(for entry: M3UEntry) -> String {
+        channelKey(for: entry, options: Options())
     }
 }

@@ -49,8 +49,19 @@ final class IPTVViewModel {
         var titles: [String: String] = [:]
         var progress: [String: Double] = [:]
         for ch in channels {
-            guard let tvg = ch.tvgID else { continue }
-            if let cur = index.current(channelID: tvg) {
+            let keys: [String] = [
+                ch.tvgID,
+                ChannelNormalizer.normalize(ch.name),
+                ch.name
+            ].compactMap { $0 }.filter { !$0.isEmpty }
+            var matched: EPGProgram?
+            for k in keys {
+                if let cur = index.current(channelID: k) {
+                    matched = cur
+                    break
+                }
+            }
+            if let cur = matched {
                 titles[ch.id] = cur.title
                 progress[ch.id] = cur.progress()
             }

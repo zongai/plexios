@@ -225,3 +225,4 @@
 "iptv.probe_cd_60" = "1 Std.";
 "iptv.probe_cd_90" = "1,5 Std.";
 "iptv.probe_cd_180" = "3 Std.";
+"iptv.merge_across_groups" = "Gleicher Name gruppenübergreifend";

@@ -90,7 +90,11 @@ actor EPGRepository {
 
     func matchTvgID(for channel: IPTVChannel) -> String? {
         if let id = channel.tvgID, !id.isEmpty { return id }
-        // Fallback: exact name match against known channel keys is unsafe; skip fuzzy
+        // Fallback: normalized channel name (when tvg-id is untrusted / ignored)
+        let name = ChannelNormalizer.normalize(channel.name)
+        if !name.isEmpty, memoryIndex.programsByChannel[name] != nil {
+            return name
+        }
         return nil
     }
 }

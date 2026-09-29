@@ -8,11 +8,12 @@ enum M3UStreamingParser {
 
     static func parse(data: Data) throws -> M3UParseResult {
         if data.count > maxBytes { throw IPTVError.playlistTooLarge }
-        guard let text = String(data: data, encoding: .utf8)
-                ?? String(data: data, encoding: .isoLatin1) else {
-            throw IPTVError.invalidPlaylistEncoding
+        // Delegate to robust state-machine parser (EXTINF↔URL pairing, opts, etc.)
+        let result = try M3UParser.parse(data: data)
+        if result.entries.count > maxEntries {
+            return M3UParseResult(epgURL: result.epgURL, entries: Array(result.entries.prefix(maxEntries)))
         }
-        return parseLines(text)
+        return result
     }
 
     /// Download with size cap and parse.
@@ -109,7 +110,8 @@ enum M3UStreamingParser {
                     language: attrs["tvg-language"],
                     attributes: attrs,
                     streamURL: url,
-                    headers: pendingHeaders
+                    headers: pendingHeaders,
+                    opts: []
                 )
             )
             pendingInfo = nil

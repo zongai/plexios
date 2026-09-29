@@ -78,6 +78,10 @@ struct IPTVSettingsView: View {
                     .onChange(of: prefs.autoSwitchSource) { _, _ in
                         Task { await IPTVRepository.shared.savePreferences(prefs) }
                     }
+                Toggle(String(localized: "iptv.merge_across_groups"), isOn: $prefs.mergeAcrossGroups)
+                    .onChange(of: prefs.mergeAcrossGroups) { _, _ in
+                        Task { await IPTVRepository.shared.savePreferences(prefs) }
+                    }
                 Toggle(String(localized: "iptv.adaptive_quality"), isOn: $prefs.adaptiveQuality)
                     .onChange(of: prefs.adaptiveQuality) { _, _ in
                         Task { await IPTVRepository.shared.savePreferences(prefs) }

@@ -23,7 +23,9 @@ struct MovieDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(false)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(AppColors.background.opacity(0.92), for: .navigationBar)
         .task { await load() }
         .playerSheet(item: $playItem)
     }

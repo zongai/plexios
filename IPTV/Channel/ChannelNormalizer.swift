@@ -51,8 +51,8 @@ enum ChannelNormalizer {
         return order.compactMap { map[$0] }
     }
 
-    /// **Exact** `tvg-name` (trimmed) merges sources. Different names (CCTV1 vs CCTV11) stay separate.
-    /// `tvg-id` is NOT used for merging — playlists often assign unique ids per URL.
+    /// Channel identity ignores `tvg-id` entirely (lists often give each URL a unique id).
+    /// 1) exact `tvg-name` → 2) exact display name → 3) stream URL.
     static func identityKey(for entry: M3UEntry) -> String {
         if let name = entry.tvgName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
             return "tvgn:" + name
@@ -60,9 +60,6 @@ enum ChannelNormalizer {
         let display = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
         if !display.isEmpty {
             return "name:" + display
-        }
-        if let id = entry.tvgID?.trimmingCharacters(in: .whitespacesAndNewlines), !id.isEmpty {
-            return "tvg:" + id
         }
         return "url:" + entry.streamURL.absoluteString
     }

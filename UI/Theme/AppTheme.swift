@@ -1,63 +1,62 @@
 import SwiftUI
 
-// MARK: - Colors (system light / dark adaptive)
+// MARK: - Colors (aliases → Plex Design System)
 
 enum AppColors {
-    static let background = Color(.systemBackground)
-    static let secondaryBackground = Color(.secondarySystemBackground)
-    static let tertiaryBackground = Color(.tertiarySystemBackground)
+    static let background = PlexColors.background
+    static let secondaryBackground = PlexColors.surface
+    static let tertiaryBackground = PlexColors.surfaceElevated
 
-    static let primaryText = Color(.label)
-    static let secondaryText = Color(.secondaryLabel)
-    static let tertiaryText = Color(.tertiaryLabel)
+    static let primaryText = PlexColors.primaryText
+    static let secondaryText = PlexColors.secondaryText
+    static let tertiaryText = PlexColors.tertiaryText
 
-    static let accent = Color.accentColor
-    static let destructive = Color.red
+    static let accent = PlexColors.accent
+    static let destructive = PlexColors.destructive
 
-    static let mediaCardBackground = Color(.secondarySystemBackground)
-    static let posterPlaceholder = Color(.tertiarySystemFill)
+    static let mediaCardBackground = PlexColors.surface
+    static let posterPlaceholder = PlexColors.posterPlaceholder
 
-    static let chipBackground = Color(.tertiarySystemFill)
-    static let progressTrack = Color(.tertiarySystemFill)
+    static let chipBackground = PlexColors.chipBackground
+    static let progressTrack = PlexColors.progressTrack
 
-    /// Overlay text on hero artwork (always light for contrast on backdrops).
-    static let onMediaPrimary = Color.white
-    static let onMediaSecondary = Color.white.opacity(0.85)
+    static let onMediaPrimary = PlexColors.onMediaPrimary
+    static let onMediaSecondary = PlexColors.onMediaSecondary
 }
 
 // MARK: - Typography
 
 enum AppTypography {
-    static let largeTitle = Font.system(.largeTitle, design: .rounded).weight(.bold)
-    static let title = Font.system(.title2, design: .rounded).weight(.semibold)
+    static let largeTitle = PlexTypography.largeTitle
+    static let title = PlexTypography.heroTitle
     static let title3 = Font.system(.title3, design: .rounded).weight(.semibold)
-    static let headline = Font.system(.headline, design: .rounded)
-    static let body = Font.system(.body, design: .default)
-    static let subheadline = Font.system(.subheadline, design: .default)
-    static let caption = Font.system(.caption, design: .default)
-    static let caption2 = Font.system(.caption2, design: .default)
-    static let section = Font.system(.title3, design: .rounded).weight(.semibold)
+    static let headline = PlexTypography.button
+    static let body = PlexTypography.body
+    static let subheadline = PlexTypography.secondary
+    static let caption = PlexTypography.caption
+    static let caption2 = PlexTypography.metadata
+    static let section = PlexTypography.sectionTitle
 }
 
 // MARK: - Spacing
 
 enum AppSpacing {
     static let xxs: CGFloat = 2
-    static let xs: CGFloat = 4
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 12
-    static let lg: CGFloat = 16
-    static let xl: CGFloat = 24
-    static let xxl: CGFloat = 32
+    static let xs: CGFloat = PlexSpacing.xs
+    static let sm: CGFloat = PlexSpacing.sm
+    static let md: CGFloat = PlexSpacing.md
+    static let lg: CGFloat = PlexSpacing.lg
+    static let xl: CGFloat = PlexSpacing.xl
+    static let xxl: CGFloat = PlexSpacing.xxl
 }
 
 // MARK: - Corner Radius
 
 enum AppCornerRadius {
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 12
-    static let lg: CGFloat = 16
-    static let xl: CGFloat = 22
+    static let sm: CGFloat = PlexRadius.sm
+    static let md: CGFloat = PlexRadius.card
+    static let lg: CGFloat = PlexRadius.lg
+    static let xl: CGFloat = PlexRadius.xl
 }
 
 // MARK: - Layout helpers
@@ -65,13 +64,13 @@ enum AppCornerRadius {
 enum AppLayout {
     static let posterAspect: CGFloat = 2.0 / 3.0
     static let backdropAspect: CGFloat = 16.0 / 9.0
-    static let gridSpacing: CGFloat = AppSpacing.md
-    static let railSpacing: CGFloat = 12
+    static let gridSpacing: CGFloat = PlexSpacing.md
+    static let railSpacing: CGFloat = PlexSpacing.railGap
 
     static func posterWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
         switch horizontalSizeClass {
         case .regular: return 150
-        default: return 128
+        default: return 120
         }
     }
 
@@ -84,8 +83,8 @@ enum AppLayout {
 
     static func gridMinWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
         switch horizontalSizeClass {
-        case .regular: return 150
-        default: return 118
+        case .regular: return 140
+        default: return 110
         }
     }
 
@@ -118,11 +117,11 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     var systemImage: String {
         switch self {
         case .home: return "house.fill"
-        case .libraries: return "books.vertical.fill"
+        case .libraries: return PlexIcon.library
         case .collections: return "square.stack.fill"
-        case .playlists: return "music.note.list"
-        case .search: return "magnifyingglass"
-        case .settings: return "gearshape.fill"
+        case .playlists: return PlexIcon.playlist
+        case .search: return PlexIcon.search
+        case .settings: return PlexIcon.settings
         }
     }
 }

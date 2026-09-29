@@ -387,6 +387,7 @@ final class PlaybackEngine {
             await avPlayer.seek(to: time)
         }
 
+        avPlayer.volume = volume
         avPlayer.play()
         applyRateToPlayer()
         isPlaying = true
@@ -572,6 +573,7 @@ final class PlaybackEngine {
                     forceSoftwareDecode: false
                 )
                 vlc.rebindDrawable()
+                vlc.setVolume(volume)
                 isPlaying = true
                 sessionState = .playing
                 nowPlaying.updateTitle(title, subtitle: "IPTV")
@@ -591,6 +593,7 @@ final class PlaybackEngine {
         activePlaybackBackend = .avPlayer
         observe(player: avPlayer, item: item)
         startAccessLogMonitoring(item: item)
+        avPlayer.volume = volume
         avPlayer.play()
         isPlaying = true
         sessionState = .playing

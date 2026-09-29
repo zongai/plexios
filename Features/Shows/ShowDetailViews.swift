@@ -48,8 +48,7 @@ struct ShowDetailView: View {
                     isInProgress: show.isInProgress,
                     progress: show.isInProgress ? show.progressFraction : nil,
                     onPlay: {
-                        // Prefer first in-progress episode from seasons later; for now open show metadata if playable
-                        playItem = show
+                        Task { await playShow(show) }
                     },
                     secondaryActions: nil
                 )
@@ -115,6 +114,27 @@ struct ShowDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Resolve a playable episode (in-progress preferred, else first episode of first season).
+    private func playShow(_ show: PlexMetadata) async {
+        guard let context = environment.serverContext else { return }
+        var fallback: PlexMetadata?
+        for season in seasons {
+            guard let eps = try? await environment.metadataRepository.children(
+                ratingKey: season.ratingKey,
+                context: context
+            ) else { continue }
+            let episodes = eps.filter { $0.type == .episode }
+            if let progress = episodes.first(where: { $0.isInProgress }) {
+                playItem = progress
+                return
+            }
+            if fallback == nil {
+                fallback = episodes.first
+            }
+        }
+        playItem = fallback ?? show
     }
 }
 

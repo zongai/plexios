@@ -107,10 +107,10 @@ struct MediaDetailHero: View {
                                 .fontWeight(.semibold)
                         }
                         .font(isCompactHeight ? AppTypography.subheadline : AppTypography.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.black.opacity(0.9))
                         .padding(.horizontal, isCompactHeight ? 16 : 24)
                         .padding(.vertical, isCompactHeight ? 8 : 12)
-                        .background(AppColors.accent, in: Capsule())
+                        .background(PlexColors.accent, in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(isInProgress ? L10n.resume : L10n.play)

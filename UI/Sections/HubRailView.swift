@@ -20,11 +20,11 @@ struct HubRailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
+        VStack(alignment: .leading, spacing: PlexSpacing.md) {
             Text(hub.title)
                 .font(AppTypography.section)
                 .foregroundStyle(AppColors.primaryText)
-                .padding(.horizontal, AppSpacing.lg)
+                .padding(.horizontal, PlexSpacing.pageHorizontal)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: AppLayout.railSpacing) {
@@ -37,7 +37,7 @@ struct HubRailView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, AppSpacing.lg)
+                .padding(.horizontal, PlexSpacing.pageHorizontal)
                 .padding(.bottom, 4)
             }
         }

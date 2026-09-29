@@ -17,7 +17,7 @@ struct PosterCard: View {
     private var cardHeight: CGFloat { cardWidth / AppLayout.posterAspect }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: PlexSpacing.xs) {
             ZStack(alignment: .bottom) {
                 PlexImage(
                     url: PlexImageURL.resolve(
@@ -30,9 +30,9 @@ struct PosterCard: View {
                     pointSize: CGSize(width: cardWidth, height: cardHeight)
                 )
                 .frame(width: cardWidth, height: cardHeight)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: PlexRadius.card, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous)
+                    RoundedRectangle(cornerRadius: PlexRadius.card, style: .continuous)
                         .stroke(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06), lineWidth: 1)
                 )
                 .shadow(
@@ -97,7 +97,7 @@ struct EpisodeCard: View {
     private var cardHeight: CGFloat { cardWidth / AppLayout.backdropAspect }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: PlexSpacing.xs) {
             ZStack(alignment: .bottomLeading) {
                 PlexImage(
                     url: PlexImageURL.resolve(
@@ -110,9 +110,9 @@ struct EpisodeCard: View {
                     pointSize: CGSize(width: cardWidth, height: cardHeight)
                 )
                 .frame(width: cardWidth, height: cardHeight)
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: PlexRadius.card, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous)
+                    RoundedRectangle(cornerRadius: PlexRadius.card, style: .continuous)
                         .stroke(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06), lineWidth: 1)
                 )
                 .shadow(
@@ -125,7 +125,7 @@ struct EpisodeCard: View {
                     startPoint: .center,
                     endPoint: .bottom
                 )
-                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: PlexRadius.card, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Spacer(minLength: 0)

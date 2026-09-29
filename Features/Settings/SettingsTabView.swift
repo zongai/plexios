@@ -19,7 +19,9 @@ struct SettingsTabView: View {
                 cacheSection
                 aboutSection
             }
-            .navigationTitle("Settings")
+            .navigationTitle(L10n.settings)
+            .scrollContentBackground(.hidden)
+            .background(PlexColors.background)
             .onAppear {
                 prefs = PlaybackSettingsStore.shared.preferences
                 homePrefs = HomeSettingsStore.shared.preferences

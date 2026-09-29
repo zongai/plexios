@@ -9,6 +9,8 @@ struct PlexApp: App {
         WindowGroup {
             RootView()
                 .environment(environment)
+                .preferredColorScheme(.dark)
+                .tint(PlexColors.accent)
         }
     }
 }

@@ -53,7 +53,7 @@ final class MediaModelTests: XCTestCase {
             childCount: nil, studio: nil, tagline: nil,
             genres: [], directors: [], writers: [], actors: [], media: []
         )
-        XCTAssertEqual(item.cardSubtitle(), "S1 · E1")
+        XCTAssertEqual(item.cardSubtitle(), "S1 · E1 · Pilot")
     }
 
     private func makeMetadata(

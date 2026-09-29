@@ -123,7 +123,7 @@ private struct SearchResultsList: View {
 
             if !viewModel.results.isEmpty {
                 ForEach(viewModel.results) { hub in
-                    Section(hub.title) {
+                    Section(MediaDisplayFormatting.hubTitle(hub)) {
                         ForEach(hub.items) { item in
                             Button {
                                 path.append(MediaRoute.from(item))

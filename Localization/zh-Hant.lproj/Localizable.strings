@@ -252,3 +252,6 @@
 "iptv.quality.fhd" = "1080p";
 "iptv.quality.uhd" = "4K";
 "iptv.quality.highest" = "最高";
+"media.episode_count" = "%d 集";
+"media.season_n" = "第%d季";
+"media.episode_n" = "第%d集";

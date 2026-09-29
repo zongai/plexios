@@ -168,20 +168,6 @@ extension PlexMetadata {
     func episodeThumbPath() -> String? { thumb ?? parentThumb }
 
     func cardSubtitle() -> String? {
-        switch type {
-        case .movie:
-            return year.map(String.init)
-        case .show:
-            if let leaf = leafCount { return "\(leaf) episodes" }
-            return year.map(String.init)
-        case .episode:
-            var parts: [String] = []
-            if let s = parentIndex { parts.append("S\(s)") }
-            if let e = index { parts.append("E\(e)") }
-            if parts.isEmpty { return grandparentTitle ?? parentTitle }
-            return parts.joined(separator: " · ")
-        default:
-            return year.map(String.init)
-        }
+        MediaDisplayFormatting.cardSubtitle(for: self, wide: false)
     }
 }

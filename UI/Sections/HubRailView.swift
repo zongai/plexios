@@ -12,7 +12,7 @@ struct HubRailView: View {
         switch HomeDisplayPreferences.personalKind(for: hub) {
         case .continueWatching, .recentlyPlayed:
             return true
-        case .none:
+        case .recentlyAdded, .none:
             break
         }
         let episodes = hub.items.filter { $0.type == .episode }.count
@@ -21,7 +21,7 @@ struct HubRailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PlexSpacing.md) {
-            Text(hub.title)
+            Text(MediaDisplayFormatting.hubTitle(hub))
                 .font(AppTypography.section)
                 .foregroundStyle(AppColors.primaryText)
                 .padding(.horizontal, PlexSpacing.pageHorizontal)
@@ -47,12 +47,8 @@ struct HubRailView: View {
     private func card(for item: PlexMetadata) -> some View {
         if useWideCards {
             EpisodeCard(
-                title: item.type == .episode
-                    ? (item.grandparentTitle ?? item.title)
-                    : item.title,
-                subtitle: item.type == .episode
-                    ? (item.cardSubtitle().map { "\($0) · \(item.title)" } ?? item.title)
-                    : item.cardSubtitle(),
+                title: MediaDisplayFormatting.cardTitle(for: item, wide: true),
+                subtitle: MediaDisplayFormatting.cardSubtitle(for: item, wide: true),
                 imagePath: item.type == .episode
                     ? item.episodeThumbPath()
                     : (item.art ?? item.posterPath()),
@@ -62,8 +58,8 @@ struct HubRailView: View {
             )
         } else {
             PosterCard(
-                title: item.title,
-                subtitle: item.cardSubtitle(),
+                title: MediaDisplayFormatting.cardTitle(for: item, wide: false),
+                subtitle: MediaDisplayFormatting.cardSubtitle(for: item, wide: false),
                 imagePath: item.posterPath(),
                 progress: item.isInProgress ? item.progressFraction : nil,
                 baseURL: baseURL,

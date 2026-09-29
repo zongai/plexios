@@ -31,6 +31,7 @@ struct HomeDisplayPreferences: Sendable, Equatable {
 
     enum PersonalKind {
         case continueWatching
+        case recentlyAdded
         case recentlyPlayed
         case none
     }
@@ -42,6 +43,10 @@ struct HomeDisplayPreferences: Sendable, Equatable {
         if blob.contains("continue") || blob.contains("on.deck") || blob.contains("ondeck")
             || blob.contains("inprogress") || blob.contains("in progress") {
             return .continueWatching
+        }
+        if blob.contains("recently.added") || blob.contains("recently added")
+            || blob.contains("recentlyadded") || blob.contains("newest") {
+            return .recentlyAdded
         }
         if blob.contains("recently.played") || blob.contains("recently.viewed")
             || blob.contains("recently played") || blob.contains("recently viewed")
@@ -96,6 +101,9 @@ struct HomeDisplayPreferences: Sendable, Equatable {
             switch Self.personalKind(for: hub) {
             case .continueWatching:
                 guard showContinueWatching else { return nil }
+            case .recentlyAdded:
+                // Library "Recently Added" shelves still respect library toggles below.
+                break
             case .recentlyPlayed:
                 guard showRecentlyPlayed else { return nil }
             case .none:

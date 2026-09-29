@@ -252,3 +252,6 @@
 "iptv.quality.fhd" = "1080p";
 "iptv.quality.uhd" = "4K";
 "iptv.quality.highest" = "Más alta";
+"media.episode_count" = "%d episodios";
+"media.season_n" = "Temporada %d";
+"media.episode_n" = "Episodio %d";

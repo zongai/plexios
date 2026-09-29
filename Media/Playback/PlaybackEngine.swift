@@ -511,6 +511,8 @@ final class PlaybackEngine {
             do {
                 let vlc = vlcBackend ?? VLCPlaybackBackend()
                 vlcBackend = vlc
+                // Activate backend early so SwiftUI mounts VLCPlayerContainer before play.
+                activePlaybackBackend = .vlc
                 vlc.onTimeChange = { [weak self] pos, dur in
                     guard let self else { return }
                     self.positionMs = pos
@@ -545,21 +547,26 @@ final class PlaybackEngine {
                         break
                     }
                 }
+                // Give UI a frame to attach the drawable view.
+                try? await Task.sleep(for: .milliseconds(50))
                 try await vlc.prepare(
                     url: url,
                     headers: headers,
                     startPositionMs: 0,
                     externalSubtitles: [],
                     preferredSubtitlePlexId: nil,
+                    preferredAudioPlexId: nil,
                     forceSoftwareDecode: false
                 )
-                activePlaybackBackend = .vlc
+                vlc.rebindDrawable()
                 isPlaying = true
                 sessionState = .playing
                 nowPlaying.updateTitle(title, subtitle: "IPTV")
+                logger.playback.info("IPTV via VLC: \(url.absoluteString.prefix(80))")
                 return
             } catch {
                 logger.playback.error("IPTV VLC failed: \(error.localizedDescription)")
+                activePlaybackBackend = .avPlayer
             }
         }
 

@@ -269,36 +269,68 @@ struct IPTVPlayerView: View {
     private var engine: PlaybackEngine { environment.playbackEngine }
 
     var body: some View {
-        PlayerShell {
+        @Bindable var engine = environment.playbackEngine
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            // Video surface — must observe engine so VLC/AVPlayer layer appears after start.
+            Group {
+                if engine.isVLCBackendActive, let vlc = engine.vlcBackend {
+                    VLCPlayerContainer(backend: vlc, aspectMode: engine.aspectMode)
+                } else if let player = engine.player {
+                    PlayerLayerView(player: player, aspectMode: engine.aspectMode) { _ in }
+                } else if engine.sessionState == .loading {
+                    ProgressView()
+                        .tint(.white)
+                } else if let err = engine.errorMessage {
+                    Text(err)
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                }
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
             Color.clear
-            IPTVPlayerChrome(
-                title: session.channel.name,
-                sourceLabel: session.source.name ?? session.source.quality.displayName,
-                programTitle: currentProgramTitle,
-                onClose: {
-                    Task {
-                        await engine.stop(report: false)
-                        dismiss()
-                    }
-                },
-                onSources: { showSources = true },
-                onPlayPause: { engine.togglePlayPause() },
-                onToggleHUD: {
-                    diagnostics.isVisible.toggle()
-                },
-                isPlaying: engine.isPlaying
-            )
-            .opacity(showControls ? 1 : 0)
+                .contentShape(Rectangle())
+                .ignoresSafeArea()
+                .onTapGesture { showControls.toggle() }
+                .zIndex(5)
+
+            if showControls {
+                IPTVPlayerChrome(
+                    title: session.channel.name,
+                    sourceLabel: session.source.name ?? session.source.quality.displayName,
+                    programTitle: currentProgramTitle,
+                    onClose: {
+                        Task {
+                            await engine.stop(report: false)
+                            dismiss()
+                        }
+                    },
+                    onSources: { showSources = true },
+                    onPlayPause: { engine.togglePlayPause() },
+                    onToggleHUD: {
+                        diagnostics.isVisible.toggle()
+                    },
+                    isPlaying: engine.isPlaying
+                )
+                .opacity(showControls ? 1 : 0)
+                .zIndex(10)
+            }
 
             if diagnostics.isVisible {
                 IPTVDiagnosticsHUD(diagnostics: diagnostics)
                     .padding()
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .zIndex(20)
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { showControls.toggle() }
+        .statusBarHidden(true)
+        .background(Color.black)
         .task {
+            OrientationLock.lockLandscape()
             let prefs = await IPTVRepository.shared.preferences()
             diagnostics.isVisible = prefs.showDiagnosticsHUD
             diagnostics.reset(
@@ -307,6 +339,13 @@ struct IPTVPlayerView: View {
                 backend: "…"
             )
             await playCurrent()
+            // Rebind after container has layout bounds.
+            try? await Task.sleep(for: .milliseconds(200))
+            engine.vlcBackend?.rebindDrawable()
+        }
+        .onDisappear {
+            Task { await engine.stop(report: false) }
+            OrientationLock.unlockAll()
         }
         .onChange(of: engine.sessionState) { _, state in
             diagnostics.sessionState = String(describing: state)
@@ -316,6 +355,7 @@ struct IPTVPlayerView: View {
             case .playing:
                 diagnostics.markPlaying()
                 bufferingStarted = nil
+                engine.vlcBackend?.rebindDrawable()
                 Task {
                     await IPTVRepository.shared.recordSourceSuccess(
                         channelId: session.channel.id,
@@ -378,15 +418,20 @@ struct IPTVPlayerView: View {
     }
 
     private func playCurrent() async {
-        guard let url = session.source.streamURL else { return }
+        guard let url = session.source.streamURL else {
+            diagnostics.markError(String(localized: "iptv.error.invalid_url"))
+            return
+        }
         diagnostics.backend = "starting"
+        diagnostics.redactedURL = IPTVDiagnostics.redact(session.source.streamURLString)
         await engine.playIPTV(
             url: url,
             headers: session.source.headers,
             title: session.channel.name
         )
         diagnostics.backend = engine.isVLCBackendActive ? "VLC" : "AVPlayer"
-        diagnostics.redactedURL = IPTVDiagnostics.redact(session.source.streamURLString)
+        try? await Task.sleep(for: .milliseconds(100))
+        engine.vlcBackend?.rebindDrawable()
     }
 
     private func tryNextSource() async {
@@ -430,36 +475,6 @@ struct IPTVPlayerView: View {
         diagnostics.markSourceSwitch(to: next)
         bufferingStarted = nil
         await playCurrent()
-    }
-}
-
-private struct PlayerShell<Content: View>: View {
-    @ViewBuilder var content: Content
-    @Environment(AppEnvironment.self) private var environment
-
-    var body: some View {
-        ZStack {
-            video
-            content
-        }
-        .statusBarHidden(true)
-        .background(Color.black)
-    }
-
-    @ViewBuilder
-    private var video: some View {
-        let engine = environment.playbackEngine
-        if engine.isVLCBackendActive, let vlc = engine.vlcBackend {
-            VLCPlayerContainer(backend: vlc, aspectMode: engine.aspectMode)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-        } else if let player = engine.player {
-            PlayerLayerView(player: player, aspectMode: engine.aspectMode) { _ in }
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-        } else {
-            Color.black.ignoresSafeArea()
-        }
     }
 }
 

@@ -10,6 +10,7 @@ struct ShowDetailView: View {
     @State private var seasons: [PlexMetadata] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var playItem: PlexMetadata?
 
     var body: some View {
         Group {
@@ -24,70 +25,73 @@ struct ShowDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .task { await load() }
+        .playerSheet(item: $playItem)
     }
 
     private func content(_ show: PlexMetadata) -> some View {
-        List {
-            Section {
-                VStack(alignment: .leading, spacing: AppSpacing.md) {
-                    HStack(alignment: .top, spacing: AppSpacing.md) {
-                        PlexImage(
-                            url: PlexImageURL.resolve(
-                                path: show.thumb,
-                                baseURL: environment.serverContext?.baseURL,
-                                token: environment.serverContext?.token,
-                                width: 240,
-                                height: 360
-                            ),
-                            pointSize: CGSize(width: 100, height: 150)
-                        )
-                        .frame(width: 100, height: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.sm))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                MediaDetailHero(
+                    title: show.title,
+                    artPath: show.art,
+                    thumbPath: show.thumb,
+                    baseURL: environment.serverContext?.baseURL,
+                    token: environment.serverContext?.token,
+                    year: show.year,
+                    contentRating: show.contentRating,
+                    durationLabel: show.leafCount.map { "\($0) episodes" },
+                    rating: show.rating,
+                    isInProgress: show.isInProgress,
+                    progress: show.isInProgress ? show.progressFraction : nil,
+                    onPlay: {
+                        // Prefer first in-progress episode from seasons later; for now open show metadata if playable
+                        playItem = show
+                    },
+                    secondaryActions: nil
+                )
 
-                        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                            Text(show.title)
-                                .font(AppTypography.title)
-                            if let year = show.year {
-                                Text(String(year))
-                                    .foregroundStyle(AppColors.secondaryText)
-                            }
-                            if let leaf = show.leafCount {
-                                Text("\(leaf) episodes")
-                                    .font(AppTypography.caption)
-                                    .foregroundStyle(AppColors.secondaryText)
-                            }
-                        }
-                    }
-
-                    if let summary = show.summary {
+                VStack(alignment: .leading, spacing: AppSpacing.lg) {
+                    if let summary = show.summary, !summary.isEmpty {
                         Text(summary)
                             .font(AppTypography.body)
                             .foregroundStyle(AppColors.secondaryText)
+                            .lineSpacing(3)
                     }
-                }
-                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-            }
 
-            Section("Seasons") {
-                ForEach(seasons) { season in
-                    NavigationLink(value: MediaRoute.season(
-                        ratingKey: season.ratingKey,
-                        showTitle: show.title
-                    )) {
-                        HStack {
-                            Text(season.title)
-                            Spacer()
-                            if let leaf = season.leafCount {
-                                Text("\(leaf)")
-                                    .foregroundStyle(AppColors.secondaryText)
+                    if !seasons.isEmpty {
+                        Text("Seasons")
+                            .font(AppTypography.section)
+                            .foregroundStyle(AppColors.primaryText)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHStack(spacing: AppLayout.railSpacing) {
+                                ForEach(seasons) { season in
+                                    NavigationLink(value: MediaRoute.season(
+                                        ratingKey: season.ratingKey,
+                                        showTitle: show.title
+                                    )) {
+                                        PosterCard(
+                                            title: season.title,
+                                            subtitle: season.leafCount.map { "\($0) episodes" },
+                                            imagePath: season.thumb ?? show.thumb,
+                                            progress: nil,
+                                            baseURL: environment.serverContext?.baseURL,
+                                            token: environment.serverContext?.token
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                         }
                     }
                 }
+                .padding(AppSpacing.lg)
             }
         }
-        // MediaRoute destinations are registered on the parent NavigationStack
+        .background(AppColors.background.ignoresSafeArea())
+        .scrollIndicators(.hidden)
     }
 
     private func load() async {
@@ -130,16 +134,22 @@ struct SeasonDetailView: View {
             } else if episodes.isEmpty {
                 EmptyStateView(title: "No episodes", systemImage: "tv")
             } else {
-                List(episodes) { ep in
-                    NavigationLink(value: MediaRoute.episode(ratingKey: ep.ratingKey)) {
-                        EpisodeRow(
-                            episode: ep,
-                            baseURL: environment.serverContext?.baseURL,
-                            token: environment.serverContext?.token
-                        )
+                ScrollView {
+                    LazyVStack(spacing: AppSpacing.md) {
+                        ForEach(episodes) { ep in
+                            NavigationLink(value: MediaRoute.episode(ratingKey: ep.ratingKey)) {
+                                EpisodeRow(
+                                    episode: ep,
+                                    baseURL: environment.serverContext?.baseURL,
+                                    token: environment.serverContext?.token
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
+                    .padding(AppSpacing.lg)
                 }
-                // MediaRoute destinations come from parent NavigationStack
+                .background(AppColors.background.ignoresSafeArea())
             }
         }
         .navigationTitle(showTitle ?? "Season")
@@ -172,131 +182,52 @@ struct EpisodeRow: View {
 
     var body: some View {
         HStack(spacing: AppSpacing.md) {
-            PlexImage(
-                url: PlexImageURL.resolve(
-                    path: episode.thumb,
-                    baseURL: baseURL,
-                    token: token,
-                    width: 320,
-                    height: 180
-                ),
-                pointSize: CGSize(width: 120, height: 68)
-            )
-            .frame(width: 120, height: 68)
-            .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.sm))
+            ZStack(alignment: .bottom) {
+                PlexImage(
+                    url: PlexImageURL.resolve(
+                        path: episode.thumb,
+                        baseURL: baseURL,
+                        token: token,
+                        width: 320,
+                        height: 180
+                    ),
+                    pointSize: CGSize(width: 140, height: 80)
+                )
+                .frame(width: 140, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.sm, style: .continuous))
+
+                if episode.isInProgress, let p = episode.progressFraction, p > 0, p < 1 {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(AppColors.progressTrack)
+                            Capsule().fill(AppColors.accent).frame(width: geo.size.width * p)
+                        }
+                    }
+                    .frame(height: 3)
+                    .padding(6)
+                }
+            }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(episodeLabel)
-                    .font(AppTypography.headline)
+                Text(episode.title)
+                    .font(AppTypography.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.primaryText)
                     .lineLimit(2)
-                if episode.isInProgress {
-                    ProgressView(value: episode.progressFraction)
-                        .tint(AppColors.accent)
-                } else if episode.isWatched {
-                    Text("Watched")
-                        .font(AppTypography.caption2)
+                if let sub = episode.cardSubtitle() {
+                    Text(sub)
+                        .font(AppTypography.caption)
                         .foregroundStyle(AppColors.tertiaryText)
                 }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var episodeLabel: String {
-        if let idx = episode.index {
-            return "E\(idx) · \(episode.title)"
-        }
-        return episode.title
-    }
-}
-
-// MARK: - Episode detail
-
-struct EpisodeDetailView: View {
-    @Environment(AppEnvironment.self) private var environment
-    let ratingKey: String
-
-    @State private var item: PlexMetadata?
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-    @State private var playItem: PlexMetadata?
-
-    var body: some View {
-        Group {
-            if isLoading {
-                LoadingStateView()
-            } else if let item {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: AppSpacing.md) {
-                        PlexImage(
-                            url: PlexImageURL.resolve(
-                                path: item.thumb ?? item.art,
-                                baseURL: environment.serverContext?.baseURL,
-                                token: environment.serverContext?.token,
-                                width: 1280,
-                                height: 720
-                            ),
-                            pointSize: CGSize(width: 400, height: 225)
-                        )
-                        .frame(height: 200)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-
-                        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                            if let show = item.grandparentTitle {
-                                Text(show)
-                                    .font(AppTypography.subheadline)
-                                    .foregroundStyle(AppColors.secondaryText)
-                            }
-                            Text(item.title)
-                                .font(AppTypography.title)
-
-                            Button {
-                                playItem = item
-                            } label: {
-                                Label(
-                                    item.isInProgress ? "Resume" : "Play",
-                                    systemImage: "play.fill"
-                                )
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, AppSpacing.sm)
-                            }
-                            .buttonStyle(.borderedProminent)
-
-                            if let summary = item.summary {
-                                Text(summary)
-                                    .font(AppTypography.body)
-                                    .foregroundStyle(AppColors.secondaryText)
-                            }
-                        }
-                        .padding(AppSpacing.lg)
-                    }
-                }
-            } else {
-                ErrorStateView(message: errorMessage ?? "Not found") {
-                    Task { await load() }
+                if let summary = episode.summary {
+                    Text(summary)
+                        .font(AppTypography.caption2)
+                        .foregroundStyle(AppColors.secondaryText)
+                        .lineLimit(2)
                 }
             }
+            Spacer(minLength: 0)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
-        .playerSheet(item: $playItem)
-    }
-
-    private func load() async {
-        isLoading = true
-        defer { isLoading = false }
-        guard let context = environment.serverContext else {
-            errorMessage = "No server connected"
-            return
-        }
-        do {
-            item = try await environment.metadataRepository.metadata(
-                ratingKey: ratingKey,
-                context: context
-            )
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        .padding(AppSpacing.sm)
+        .background(AppColors.secondaryBackground, in: RoundedRectangle(cornerRadius: AppCornerRadius.md, style: .continuous))
     }
 }

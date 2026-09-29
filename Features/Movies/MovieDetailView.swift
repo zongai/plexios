@@ -23,6 +23,7 @@ struct MovieDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .task { await load() }
         .playerSheet(item: $playItem)
     }
@@ -30,99 +31,59 @@ struct MovieDetailView: View {
     private func detailScroll(_ item: PlexMetadata) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .bottomLeading) {
-                    PlexImage(
-                        url: PlexImageURL.resolve(
-                            path: item.art ?? item.thumb,
-                            baseURL: environment.serverContext?.baseURL,
-                            token: environment.serverContext?.token,
-                            width: 1280,
-                            height: 720
-                        ),
-                        pointSize: CGSize(width: 400, height: 225)
-                    )
-                    .frame(height: 220)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
-
-                    LinearGradient(
-                        colors: [.clear, AppColors.background],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 80)
-                }
-
-                VStack(alignment: .leading, spacing: AppSpacing.md) {
-                    Text(item.title)
-                        .font(AppTypography.largeTitle)
-                        .foregroundStyle(AppColors.primaryText)
-                        .accessibilityAddTraits(.isHeader)
-
-                    metaRow(item)
-
-                    Button {
-                        playItem = item
-                    } label: {
-                        Label(
-                            item.isInProgress ? "Resume" : "Play",
-                            systemImage: "play.fill"
+                MediaDetailHero(
+                    title: item.title,
+                    artPath: item.art,
+                    thumbPath: item.thumb,
+                    baseURL: environment.serverContext?.baseURL,
+                    token: environment.serverContext?.token,
+                    year: item.year,
+                    contentRating: item.contentRating,
+                    durationLabel: item.duration.map(Self.formatDuration),
+                    rating: item.rating,
+                    isInProgress: item.isInProgress,
+                    progress: item.isInProgress ? item.progressFraction : nil,
+                    onPlay: { playItem = item },
+                    secondaryActions: {
+                        AnyView(
+                            HStack(spacing: AppSpacing.sm) {
+                                MediaDetailIconButton(
+                                    systemImage: (item.viewCount ?? 0) > 0 ? "checkmark.circle.fill" : "checkmark.circle",
+                                    label: "Mark watched",
+                                    isOn: (item.viewCount ?? 0) > 0
+                                ) {
+                                    Task {
+                                        guard let context = environment.serverContext else { return }
+                                        await environment.playbackEngine.setWatched(true, item: item, context: context)
+                                        await load()
+                                    }
+                                }
+                                MediaDetailIconButton(
+                                    systemImage: isFavorite ? "star.fill" : "star",
+                                    label: isFavorite ? "Remove favorite" : "Favorite",
+                                    isOn: isFavorite
+                                ) {
+                                    Task {
+                                        guard let context = environment.serverContext else { return }
+                                        let next = !isFavorite
+                                        try? await environment.favoritesRepository.setFavorite(
+                                            next,
+                                            key: item.key,
+                                            context: context
+                                        )
+                                        await environment.metadataRepository.invalidate(
+                                            ratingKey: item.ratingKey,
+                                            machineIdentifier: context.machineIdentifier
+                                        )
+                                        isFavorite = next
+                                    }
+                                }
+                            }
                         )
-                        .font(AppTypography.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, AppSpacing.sm)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .accessibilityHint(item.isInProgress ? "Resumes from last position" : "Starts playback")
+                )
 
-                    HStack(spacing: AppSpacing.md) {
-                        Button {
-                            Task {
-                                guard let context = environment.serverContext else { return }
-                                await environment.playbackEngine.setWatched(true, item: item, context: context)
-                                await load()
-                            }
-                        } label: {
-                            Label("Watched", systemImage: "checkmark.circle")
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button {
-                            Task {
-                                guard let context = environment.serverContext else { return }
-                                await environment.playbackEngine.setWatched(false, item: item, context: context)
-                                await load()
-                            }
-                        } label: {
-                            Label("Unwatched", systemImage: "circle")
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button {
-                            Task {
-                                guard let context = environment.serverContext else { return }
-                                let next = !isFavorite
-                                try? await environment.favoritesRepository.setFavorite(
-                                    next,
-                                    key: item.key,
-                                    context: context
-                                )
-                                await environment.metadataRepository.invalidate(
-                                    ratingKey: item.ratingKey,
-                                    machineIdentifier: context.machineIdentifier
-                                )
-                                isFavorite = next
-                            }
-                        } label: {
-                            Label(
-                                isFavorite ? "Favorited" : "Favorite",
-                                systemImage: isFavorite ? "star.fill" : "star"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
+                VStack(alignment: .leading, spacing: AppSpacing.lg) {
                     if let studio = item.studio, !studio.isEmpty {
                         Text(studio)
                             .font(AppTypography.caption)
@@ -133,27 +94,39 @@ struct MovieDetailView: View {
                         Text(summary)
                             .font(AppTypography.body)
                             .foregroundStyle(AppColors.secondaryText)
+                            .lineSpacing(3)
                     }
 
                     if !item.genres.isEmpty {
-                        taggedSection(title: "Genres", tags: item.genres)
+                        flowTags(title: "Genres", tags: item.genres)
                     }
                     if !item.directors.isEmpty {
-                        taggedSection(title: "Director", tags: item.directors)
+                        flowTags(title: "Director", tags: item.directors)
                     }
                     if !item.writers.isEmpty {
-                        taggedSection(title: "Writers", tags: item.writers)
+                        flowTags(title: "Writers", tags: item.writers)
                     }
+
                     if !item.actors.isEmpty {
                         VStack(alignment: .leading, spacing: AppSpacing.sm) {
                             Text("Cast")
                                 .font(AppTypography.headline)
+                                .foregroundStyle(AppColors.primaryText)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: AppSpacing.md) {
                                     ForEach(item.actors, id: \.tag) { role in
-                                        VStack {
+                                        VStack(spacing: 6) {
+                                            Circle()
+                                                .fill(AppColors.tertiaryBackground)
+                                                .frame(width: 56, height: 56)
+                                                .overlay {
+                                                    Text(String(role.tag.prefix(1)))
+                                                        .font(AppTypography.headline)
+                                                        .foregroundStyle(AppColors.secondaryText)
+                                                }
                                             Text(role.tag)
-                                                .font(AppTypography.caption)
+                                                .font(AppTypography.caption2)
+                                                .foregroundStyle(AppColors.primaryText)
                                                 .lineLimit(1)
                                             if let r = role.role {
                                                 Text(r)
@@ -162,7 +135,7 @@ struct MovieDetailView: View {
                                                     .lineLimit(1)
                                             }
                                         }
-                                        .frame(width: 80)
+                                        .frame(width: 72)
                                     }
                                 }
                             }
@@ -177,45 +150,33 @@ struct MovieDetailView: View {
                 .readableWidth()
             }
         }
-        .background(AppColors.background)
+        .background(AppColors.background.ignoresSafeArea())
+        .scrollIndicators(.hidden)
     }
 
-    private func metaRow(_ item: PlexMetadata) -> some View {
-        HStack(spacing: AppSpacing.sm) {
-            if let year = item.year {
-                Text(String(year))
-            }
-            if let rating = item.contentRating {
-                Text("·")
-                Text(rating)
-            }
-            if let duration = item.duration {
-                Text("·")
-                Text(Self.formatDuration(duration))
-            }
-            if let r = item.rating {
-                Text("·")
-                Label(String(format: "%.1f", r), systemImage: "star.fill")
-            }
-        }
-        .font(AppTypography.subheadline)
-        .foregroundStyle(AppColors.secondaryText)
-    }
-
-    private func taggedSection(title: String, tags: [String]) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+    private func flowTags(title: String, tags: [String]) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text(title)
                 .font(AppTypography.headline)
-            Text(tags.joined(separator: ", "))
-                .font(AppTypography.subheadline)
-                .foregroundStyle(AppColors.secondaryText)
+                .foregroundStyle(AppColors.primaryText)
+            FlowLayout(spacing: 8) {
+                ForEach(tags, id: \.self) { tag in
+                    Text(tag)
+                        .font(AppTypography.caption.weight(.medium))
+                        .foregroundStyle(AppColors.secondaryText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(AppColors.chipBackground, in: Capsule())
+                }
+            }
         }
     }
 
     private func mediaInfo(_ media: PlexMedia) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("Media")
                 .font(AppTypography.headline)
+                .foregroundStyle(AppColors.primaryText)
             let parts = [
                 media.videoResolution,
                 media.videoCodec?.uppercased(),
@@ -224,7 +185,7 @@ struct MovieDetailView: View {
             ].compactMap { $0 }
             Text(parts.joined(separator: " · "))
                 .font(AppTypography.caption)
-                .foregroundStyle(AppColors.secondaryText)
+                .foregroundStyle(AppColors.tertiaryText)
         }
     }
 
@@ -253,5 +214,50 @@ struct MovieDetailView: View {
         let m = (totalSeconds % 3600) / 60
         if h > 0 { return "\(h)h \(m)m" }
         return "\(m)m"
+    }
+}
+
+// Simple wrapping layout for genre chips
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrange(proposal: proposal, subviews: subviews)
+        for (index, origin) in result.origins.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y),
+                proposal: .unspecified
+            )
+        }
+    }
+
+    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
+        let maxWidth = proposal.width ?? .infinity
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var totalWidth: CGFloat = 0
+
+        for sub in subviews {
+            let size = sub.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            totalWidth = max(totalWidth, x)
+            totalHeight = y + rowHeight
+        }
+        return (CGSize(width: totalWidth, height: totalHeight), origins)
     }
 }

@@ -1,33 +1,40 @@
 import SwiftUI
 
-// MARK: - Colors
+// MARK: - Colors (Infuse-inspired cinema palette)
 
 enum AppColors {
-    static let background = Color(.systemBackground)
-    static let secondaryBackground = Color(.secondarySystemBackground)
-    static let tertiaryBackground = Color(.tertiarySystemBackground)
+    /// Near-black stage used by Infuse-style shelves and detail.
+    static let background = Color(red: 0.06, green: 0.06, blue: 0.07)
+    static let secondaryBackground = Color(red: 0.11, green: 0.11, blue: 0.13)
+    static let tertiaryBackground = Color(red: 0.16, green: 0.16, blue: 0.18)
 
-    static let primaryText = Color(.label)
-    static let secondaryText = Color(.secondaryLabel)
-    static let tertiaryText = Color(.tertiaryLabel)
+    static let primaryText = Color.white
+    static let secondaryText = Color.white.opacity(0.72)
+    static let tertiaryText = Color.white.opacity(0.48)
 
-    static let accent = Color.accentColor
-    static let destructive = Color.red
+    /// Infuse-like cool blue accent.
+    static let accent = Color(red: 0.28, green: 0.56, blue: 0.98)
+    static let destructive = Color(red: 0.95, green: 0.35, blue: 0.35)
 
-    static let mediaCardBackground = Color(.secondarySystemBackground)
-    static let posterPlaceholder = Color(.tertiarySystemFill)
+    static let mediaCardBackground = Color(red: 0.12, green: 0.12, blue: 0.14)
+    static let posterPlaceholder = Color(red: 0.18, green: 0.18, blue: 0.20)
+
+    static let chipBackground = Color.white.opacity(0.12)
+    static let progressTrack = Color.white.opacity(0.22)
 }
 
 // MARK: - Typography
 
 enum AppTypography {
-    static let largeTitle = Font.largeTitle.weight(.bold)
-    static let title = Font.title2.weight(.semibold)
-    static let headline = Font.headline
-    static let body = Font.body
-    static let subheadline = Font.subheadline
-    static let caption = Font.caption
-    static let caption2 = Font.caption2
+    static let largeTitle = Font.system(.largeTitle, design: .rounded).weight(.bold)
+    static let title = Font.system(.title2, design: .rounded).weight(.semibold)
+    static let title3 = Font.system(.title3, design: .rounded).weight(.semibold)
+    static let headline = Font.system(.headline, design: .rounded)
+    static let body = Font.system(.body, design: .default)
+    static let subheadline = Font.system(.subheadline, design: .default)
+    static let caption = Font.system(.caption, design: .default)
+    static let caption2 = Font.system(.caption2, design: .default)
+    static let section = Font.system(.title3, design: .rounded).weight(.semibold)
 }
 
 // MARK: - Spacing
@@ -45,10 +52,10 @@ enum AppSpacing {
 // MARK: - Corner Radius
 
 enum AppCornerRadius {
-    static let sm: CGFloat = 6
-    static let md: CGFloat = 10
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 12
     static let lg: CGFloat = 16
-    static let xl: CGFloat = 24
+    static let xl: CGFloat = 22
 }
 
 // MARK: - Layout helpers
@@ -57,19 +64,26 @@ enum AppLayout {
     static let posterAspect: CGFloat = 2.0 / 3.0
     static let backdropAspect: CGFloat = 16.0 / 9.0
     static let gridSpacing: CGFloat = AppSpacing.md
-    static let railSpacing: CGFloat = AppSpacing.sm
+    static let railSpacing: CGFloat = 12
 
     static func posterWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
         switch horizontalSizeClass {
-        case .regular: return 140
-        default: return 120
+        case .regular: return 150
+        default: return 128
+        }
+    }
+
+    static func continueWatchingWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        switch horizontalSizeClass {
+        case .regular: return 280
+        default: return 220
         }
     }
 
     static func gridMinWidth(for horizontalSizeClass: UserInterfaceSizeClass?) -> CGFloat {
         switch horizontalSizeClass {
-        case .regular: return 140
-        default: return 110
+        case .regular: return 150
+        default: return 118
         }
     }
 

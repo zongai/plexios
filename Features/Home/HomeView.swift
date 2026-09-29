@@ -9,6 +9,9 @@ struct HomeView: View {
         NavigationStack(path: $path) {
             content
                 .navigationTitle(environment.connectionManager.activeServer?.name ?? "Home")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbarBackground(AppColors.background, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
                 .navigationDestination(for: MediaRoute.self) { route in
                     MediaDestinationView(route: route)
                 }
@@ -25,7 +28,6 @@ struct HomeView: View {
             }
             await viewModel?.load(context: environment.serverContext)
         }
-        // Reload when server identity **or** preferred connection URL changes (LAN vs relay).
         .onChange(of: environment.connectionManager.activeServer?.machineIdentifier) { _, _ in
             Task { await viewModel?.load(context: environment.serverContext, force: true) }
         }
@@ -63,7 +65,7 @@ struct HomeView: View {
 
     private var hubList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: AppSpacing.xl) {
+            LazyVStack(alignment: .leading, spacing: AppSpacing.xxl) {
                 ForEach(viewModel?.hubs ?? []) { hub in
                     HubRailView(
                         hub: hub,
@@ -74,22 +76,25 @@ struct HomeView: View {
                     }
                 }
             }
-            .padding(.vertical, AppSpacing.md)
+            .padding(.top, AppSpacing.sm)
+            .padding(.bottom, AppSpacing.xxl)
         }
-        .background(AppColors.background)
+        .background(AppColors.background.ignoresSafeArea())
+        .scrollIndicators(.hidden)
     }
 
     private var skeleton: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.xl) {
+            VStack(alignment: .leading, spacing: AppSpacing.xxl) {
                 ForEach(0..<3, id: \.self) { _ in
-                    VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                        SkeletonBlock(width: 120, height: 20)
+                    VStack(alignment: .leading, spacing: AppSpacing.md) {
+                        SkeletonBlock(width: 140, height: 22)
                             .padding(.horizontal, AppSpacing.lg)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: AppLayout.railSpacing) {
                                 ForEach(0..<5, id: \.self) { _ in
-                                    SkeletonBlock(width: 120, height: 180)
+                                    SkeletonBlock(width: 128, height: 192)
+                                        .clipShape(RoundedRectangle(cornerRadius: AppCornerRadius.md))
                                 }
                             }
                             .padding(.horizontal, AppSpacing.lg)
@@ -99,5 +104,6 @@ struct HomeView: View {
             }
             .padding(.vertical, AppSpacing.md)
         }
+        .background(AppColors.background.ignoresSafeArea())
     }
 }

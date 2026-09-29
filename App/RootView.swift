@@ -48,8 +48,7 @@ struct RootView: View {
         // Otherwise Home loads with nil/bad context → brief "Something went wrong".
         if connection.activeServer?.preferredConnection?.baseURL != nil {
             AdaptiveRootView()
-                .preferredColorScheme(.dark)
-        } else if !bootstrapFinished || connection.isRefreshing {
+                        } else if !bootstrapFinished || connection.isRefreshing {
             ProgressView(L10n.connectingServer)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppColors.background)

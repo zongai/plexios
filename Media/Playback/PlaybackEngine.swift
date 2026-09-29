@@ -27,7 +27,9 @@ final class PlaybackEngine {
     /// How video is scaled inside the player layer.
     private(set) var aspectMode: VideoAspectMode = .fit
 
-    var isPlaying: Bool { sessionState == .playing }
+    /// Explicit play intent for UI — not derived from sessionState alone.
+    /// VLC reports `.buffering` often while still "playing"; icon must stay as pause.
+    private(set) var isPlaying: Bool = false
 
     // MARK: - Dependencies
 
@@ -116,6 +118,7 @@ final class PlaybackEngine {
         self.networkClass = network
         self.currentItem = metadata
         self.errorMessage = nil
+        isPlaying = false
         sessionState = .loading
 
         // Always use persisted user defaults for decision + start rate/aspect
@@ -250,11 +253,20 @@ final class PlaybackEngine {
                 vlc.onStateChange = { [weak self] st in
                     guard let self else { return }
                     switch st {
-                    case .playing: self.sessionState = .playing
-                    case .paused: self.sessionState = .paused
-                    case .buffering: self.sessionState = .buffering
-                    case .failed: self.sessionState = .error
-                    default: break
+                    case .playing:
+                        self.sessionState = .playing
+                        self.isPlaying = true
+                    case .paused:
+                        self.sessionState = .paused
+                        self.isPlaying = false
+                    case .buffering:
+                        // Keep isPlaying as-is — buffering is not pause.
+                        self.sessionState = .buffering
+                    case .failed:
+                        self.sessionState = .error
+                        self.isPlaying = false
+                    default:
+                        break
                     }
                 }
                 var headers = identityHeaders
@@ -276,6 +288,7 @@ final class PlaybackEngine {
                 activePlaybackBackend = .vlc
                 playerEngineRouter?.markActive(.vlc)
                 await newSession.updateState(.playing)
+                isPlaying = true
                 sessionState = .playing
                 startPeriodicReporting()
                 publishNowPlaying()
@@ -307,6 +320,7 @@ final class PlaybackEngine {
                 activePlaybackBackend = .nativeMediaEngine
                 router.markActive(.nativeMediaEngine)
                 await newSession.updateState(.playing)
+                isPlaying = true
                 sessionState = .playing
                 if nativeSystemBridge == nil {
                     nativeSystemBridge = NativeSystemMediaBridge(
@@ -352,6 +366,7 @@ final class PlaybackEngine {
 
         avPlayer.play()
         applyRateToPlayer()
+        isPlaying = true
         sessionState = .playing
         await newSession.updateState(.playing)
         await reportTimeline(force: true)
@@ -394,6 +409,7 @@ final class PlaybackEngine {
         } else {
             player?.pause()
         }
+        isPlaying = false
         sessionState = .paused
         nowPlaying.updateProgress(positionMs: positionMs, durationMs: durationMs, isPlaying: false)
         nativeSystemBridge?.updateProgress(
@@ -415,6 +431,7 @@ final class PlaybackEngine {
             player?.play()
             applyRateToPlayer()
         }
+        isPlaying = true
         sessionState = .playing
         nowPlaying.updateProgress(positionMs: positionMs, durationMs: durationMs, isPlaying: true)
         nativeSystemBridge?.updateProgress(
@@ -477,6 +494,7 @@ final class PlaybackEngine {
         player?.replaceCurrentItem(with: nil)
         player = nil
         session = nil
+        isPlaying = false
         sessionState = .idle
         currentItem = nil
         decision = nil
@@ -752,6 +770,7 @@ final class PlaybackEngine {
                 switch item.status {
                 case .readyToPlay:
                     if self.sessionState == .loading {
+                        self.isPlaying = true
                         self.sessionState = .playing
                     }
                     // Apply preferred audio/subtitle once tracks are available
@@ -782,9 +801,11 @@ final class PlaybackEngine {
                     }
                 case .playing:
                     self.isBuffering = false
+                    self.isPlaying = true
                     self.sessionState = .playing
                 case .paused:
                     self.isBuffering = false
+                    // Do not clear isPlaying — user pause()/resume() owns that for UI.
                 @unknown default:
                     break
                 }
@@ -816,6 +837,7 @@ final class PlaybackEngine {
     }
 
     private func handlePlaybackEnded() async {
+        isPlaying = false
         sessionState = .stopped
         await session?.updateState(.stopped)
         await reportTimeline(force: true)

@@ -14,6 +14,7 @@ struct PlayerView: View {
     @State private var isPiPActive = false
     @State private var localError: String?
 
+    /// Prefer @Bindable so session / isPlaying mutations refresh the chrome.
     private var engine: PlaybackEngine { environment.playbackEngine }
 
     /// Always prefer the engine's current item (updates on autoplay / track switch).
@@ -30,6 +31,7 @@ struct PlayerView: View {
     }
 
     var body: some View {
+        @Bindable var engine = environment.playbackEngine
         ZStack {
             Color.black.ignoresSafeArea()
 

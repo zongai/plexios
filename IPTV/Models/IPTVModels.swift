@@ -69,13 +69,13 @@ enum IPTVStreamQuality: String, Codable, CaseIterable, Sendable {
 
     var displayName: String {
         switch self {
-        case .unknown: return "Auto / Unknown"
-        case .lowest: return "Lowest"
-        case .sd: return "480p"
-        case .hd: return "720p"
-        case .fullHD: return "1080p"
-        case .uhd: return "4K"
-        case .highest: return "Highest"
+        case .unknown: return String(localized: "iptv.quality.auto")
+        case .lowest: return String(localized: "iptv.quality.lowest")
+        case .sd: return String(localized: "iptv.quality.sd")
+        case .hd: return String(localized: "iptv.quality.hd")
+        case .fullHD: return String(localized: "iptv.quality.fhd")
+        case .uhd: return String(localized: "iptv.quality.uhd")
+        case .highest: return String(localized: "iptv.quality.highest")
         }
     }
 }

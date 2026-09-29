@@ -97,7 +97,7 @@ enum M3UStreamingParser {
             guard let url = IPTVNetwork.normalizeURL(from: trimmed) else { return }
             let info = pendingInfo
             let attrs = info?.attrs ?? [:]
-            let name = (info?.name.isEmpty == false ? info!.name : (attrs["tvg-name"] ?? "Channel"))
+            let name = (info?.name.isEmpty == false ? info!.name : (attrs["tvg-name"] ?? String(localized: "iptv.channel_fallback")))
             entries.append(
                 M3UEntry(
                     duration: info?.duration,

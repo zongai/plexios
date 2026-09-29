@@ -359,7 +359,7 @@ private struct IPTVChannelRow: View {
                 .padding(6)
             } else {
                 Image(systemName: "tv")
-                    .font(.title3)
+                    .font(AppTypography.title3)
                     .foregroundStyle(PlexColors.tertiaryText)
             }
         }
@@ -545,8 +545,8 @@ struct IPTVPlayerView: View {
                                 VStack(alignment: .leading) {
                                     Text(src.name ?? src.quality.displayName)
                                     Text(src.streamURL?.host ?? "")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .font(AppTypography.caption)
+                                        .foregroundStyle(AppColors.secondaryText)
                                         .lineLimit(1)
                                 }
                                 Spacer()
@@ -782,8 +782,8 @@ private struct IPTVPlayerChrome: View {
             Circle()
                 .fill(Color.red)
                 .frame(width: 8, height: 8)
-            Text("LIVE")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+            Text(String(localized: "iptv.live"))
+                .font(AppTypography.caption.weight(.bold))
                 .foregroundStyle(.white)
             Text(sourceLabel)
                 .font(AppTypography.caption)
@@ -856,23 +856,33 @@ private struct IPTVDiagnosticsHUD: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("IPTV Diagnostics")
-                .font(.caption.bold())
-            row("Channel", diagnostics.channelName)
-            row("Source", diagnostics.sourceName)
-            row("Quality", diagnostics.qualityLabel)
-            row("Backend", diagnostics.backend)
-            row("State", diagnostics.sessionState)
+            Text(String(localized: "iptv.diagnostics_title"))
+                .font(AppTypography.caption.weight(.bold))
+            row(String(localized: "iptv.diag.channel"), diagnostics.channelName)
+            row(String(localized: "iptv.diag.source"), diagnostics.sourceName)
+            row(String(localized: "iptv.diag.quality"), diagnostics.qualityLabel)
+            row(String(localized: "iptv.diag.backend"), diagnostics.backend)
+            row(String(localized: "iptv.diag.state"), diagnostics.sessionState)
             if let mbps = diagnostics.estimatedThroughputMbps {
-                row("Throughput", String(format: "%.1f Mbps", mbps))
+                let value = String(
+                    format: String(localized: "iptv.diag.mbps_format"),
+                    locale: Locale.current,
+                    mbps
+                )
+                row(String(localized: "iptv.diag.throughput"), value)
             }
-            row("Switches", "\(diagnostics.sourceSwitchCount)")
-            row("Buffers", "\(diagnostics.bufferEvents)")
+            row(String(localized: "iptv.diag.switches"), "\(diagnostics.sourceSwitchCount)")
+            row(String(localized: "iptv.diag.buffers"), "\(diagnostics.bufferEvents)")
             if let ms = diagnostics.startupMs {
-                row("Startup", "\(ms) ms")
+                let value = String(
+                    format: String(localized: "iptv.diag.ms_format"),
+                    locale: Locale.current,
+                    ms
+                )
+                row(String(localized: "iptv.diag.startup"), value)
             }
             if let err = diagnostics.lastError {
-                row("Error", err)
+                row(String(localized: "iptv.diag.error"), err)
             }
             Text(diagnostics.redactedURL)
                 .font(.system(size: 9, design: .monospaced))
@@ -881,18 +891,18 @@ private struct IPTVDiagnosticsHUD: View {
         }
         .foregroundStyle(.white)
         .padding(10)
-        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 10))
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: PlexRadius.md))
         .frame(maxWidth: 320, alignment: .leading)
     }
 
     private func row(_ k: String, _ v: String) -> some View {
         HStack(alignment: .top) {
             Text(k + ":")
-                .font(.caption2)
+                .font(AppTypography.caption2)
                 .foregroundStyle(.white.opacity(0.65))
                 .frame(width: 72, alignment: .leading)
             Text(v)
-                .font(.caption2)
+                .font(AppTypography.caption2)
                 .lineLimit(2)
         }
     }

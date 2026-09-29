@@ -117,7 +117,7 @@ enum M3UParser {
             let attrs = info?.attrs ?? [:]
             let display = {
                 if let n = info?.name, !n.isEmpty { return n }
-                return attrs["tvg-name"] ?? "Channel"
+                return attrs["tvg-name"] ?? String(localized: "iptv.channel_fallback")
             }()
 
             entries.append(

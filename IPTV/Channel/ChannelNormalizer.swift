@@ -62,7 +62,7 @@ enum ChannelNormalizer {
                 for i in sources.indices {
                     let host = URL(string: sources[i].streamURLString)?.host
                         ?? sources[i].streamURLString
-                    sources[i].name = "源\(i + 1) · \(host)"
+                    sources[i].name = String(format: String(localized: "iptv.source_n_host"), i + 1, host)
                 }
             }
 
@@ -128,12 +128,14 @@ enum ChannelNormalizer {
             return tvg
         }
         let n = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return n.isEmpty ? "Channel" : n
+        return n.isEmpty ? String(localized: "iptv.channel_fallback") : n
     }
 
     private static func sourceLabel(entry: M3UEntry, index: Int, totalHint: Int) -> String {
         let host = entry.streamURL.host ?? entry.streamURL.absoluteString
-        if totalHint > 1 { return "源\(index) · \(host)" }
+        if totalHint > 1 {
+            return String(format: String(localized: "iptv.source_n_host"), index, host)
+        }
         return host
     }
 

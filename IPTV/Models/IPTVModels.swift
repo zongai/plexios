@@ -101,9 +101,13 @@ struct IPTVSource: Identifiable, Codable, Hashable, Sendable {
         return until > Date()
     }
 
-    /// Human-readable probe result for source lists, e.g. "128 ms · 3.2 Mbps" / "失败".
+    /// Human-readable probe result for source lists, e.g. "128 ms · 3.2 Mbps" / "冷却 3 分".
     var probeResultLabel: String? {
         if isTemporarilyDisabled {
+            if let until = disabledUntil {
+                let mins = max(1, Int(ceil(until.timeIntervalSinceNow / 60)))
+                return String(format: String(localized: "iptv.probe_cooldown_min"), mins)
+            }
             return String(localized: "iptv.probe_failed")
         }
         guard lastProbeAt != nil else { return nil }

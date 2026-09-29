@@ -191,28 +191,29 @@ struct PlayerView: View {
 
             Spacer(minLength: 12)
 
-            // Compact volume slider (reference: top-right)
+            // Compact volume slider (0…200%; boost >100% effective on VLC)
             HStack(spacing: 8) {
                 Text("\(Int((engine.volume * 100).rounded()))%")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(engine.volume > 1.01 ? Color.orange : .white.opacity(0.85))
                     .monospacedDigit()
-                    .frame(width: 36, alignment: .trailing)
+                    .frame(width: 40, alignment: .trailing)
 
                 Slider(
                     value: Binding(
                         get: { Double(engine.volume) },
                         set: { engine.setVolume(Float($0)); bumpControls() }
                     ),
-                    in: 0...1
+                    in: 0...Double(PlaybackEngine.maxVolume)
                 )
-                .tint(.white)
+                .tint(engine.volume > 1.01 ? .orange : .white)
                 .frame(width: 120)
                 .accessibilityLabel(String(localized: "player.volume"))
+                .accessibilityValue("\(Int((engine.volume * 100).rounded()))%")
 
-                Image(systemName: engine.volume < 0.01 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                Image(systemName: volumeIconName)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(engine.volume > 1.01 ? Color.orange : .white.opacity(0.9))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -356,13 +357,14 @@ struct PlayerView: View {
                 settingsRow(
                     title: String(localized: "player.audio_boost"),
                     trailing: "\(Int((engine.volume * 100).rounded()))%",
-                    systemImage: "speaker.wave.2.fill"
+                    systemImage: engine.volume > 1.01 ? "speaker.wave.3.fill" : "speaker.wave.2.fill"
                 ) {
-                    // Cycle volume presets as a lightweight boost control
+                    // Cycle: 100% → 125% → 150% → 200% → 100% (true boost on VLC)
                     let next: Float
-                    if engine.volume < 0.35 { next = 0.55 }
-                    else if engine.volume < 0.7 { next = 1.0 }
-                    else { next = 0.25 }
+                    if engine.volume < 1.05 { next = 1.25 }
+                    else if engine.volume < 1.3 { next = 1.5 }
+                    else if engine.volume < 1.75 { next = 2.0 }
+                    else { next = 1.0 }
                     engine.setVolume(next)
                     bumpControls()
                 }
@@ -662,6 +664,13 @@ struct PlayerView: View {
         case .fill: return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
         case .stretch: return "rectangle.ratio.16.to.9"
         }
+    }
+
+    private var volumeIconName: String {
+        if engine.volume < 0.01 { return "speaker.slash.fill" }
+        if engine.volume > 1.01 { return "speaker.wave.3.fill" }
+        if engine.volume < 0.4 { return "speaker.wave.1.fill" }
+        return "speaker.wave.2.fill"
     }
 
     private func cycleAspectMode() {

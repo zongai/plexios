@@ -180,19 +180,26 @@ actor IPTVRepository {
         updateSourceStats(channelId: channelId, sourceId: sourceId) { src in
             src.successCount += 1
             src.lastSuccess = Date()
+            src.disabledUntil = nil
         }
     }
 
-    func recordSourceFailure(channelId: String, sourceId: UUID) {
+    /// Playback failure: shorter cooldown than probe hard-fail so other sources can recover sooner.
+    /// - Returns: updated source snapshot for the in-memory channel (or nil if not found).
+    @discardableResult
+    func recordSourceFailure(channelId: String, sourceId: UUID) -> IPTVSource? {
         let prefs = preferences()
-        let cooldown = max(15, prefs.probeFailureCooldownMinutes) * 60
+        // Playback switch cooldown: 25% of probe cooldown, clamped 2…15 minutes.
+        let full = max(15, prefs.probeFailureCooldownMinutes) * 60
+        let cooldown = min(15 * 60, max(2 * 60, full * 0.25))
+        var updated: IPTVSource?
         updateSourceStats(channelId: channelId, sourceId: sourceId) { src in
             src.failureCount += 1
             src.lastFailure = Date()
-            src.lastProbeAt = Date()
-            // Ignore until next allowed test window
             src.disabledUntil = Date().addingTimeInterval(cooldown)
+            updated = src
         }
+        return updated
     }
 
     private func updateSourceStats(channelId: String, sourceId: UUID, mutate: (inout IPTVSource) -> Void) {

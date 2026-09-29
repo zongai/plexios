@@ -680,17 +680,33 @@ struct IPTVPlayerView: View {
     private func tryNextSource() async {
         let prefs = await IPTVRepository.shared.preferences()
         guard prefs.autoSwitchSource else { return }
-        await IPTVRepository.shared.recordSourceFailure(
+
+        // Mark current failed + sync local channel so selection honors disabledUntil.
+        session.tried.insert(session.source.id)
+        if let updated = await IPTVRepository.shared.recordSourceFailure(
             channelId: session.channel.id,
             sourceId: session.source.id
-        )
+        ), let idx = session.channel.sources.firstIndex(where: { $0.id == updated.id }) {
+            session.channel.sources[idx] = updated
+            session.source = updated
+        }
+
+        // Cap switches per session to avoid tight loops.
+        guard session.tried.count <= max(session.channel.sources.count, 4) else {
+            diagnostics.markError(String(localized: "iptv.error.all_sources_failed"))
+            return
+        }
+
         let throughput = engine.estimatedThroughputMbps
         guard let next = SourceSelectionEngine.select(
             from: session.channel.sources,
             preferred: prefs.defaultQuality,
             excluding: session.tried,
             estimatedThroughputMbps: prefs.adaptiveQuality ? throughput : nil
-        ) else { return }
+        ) else {
+            diagnostics.markError(String(localized: "iptv.error.all_sources_failed"))
+            return
+        }
         session.tried.insert(next.id)
         session.source = next
         diagnostics.markSourceSwitch(to: next)

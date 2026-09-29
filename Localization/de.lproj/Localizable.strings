@@ -263,3 +263,6 @@
 "player.episodes" = "Folgen";
 "player.advanced" = "Erweitert";
 "player.audio_boost" = "Lautstärkerhöhung";
+
+"iptv.probe_cooldown_min" = "Cooldown %d Min.";
+"iptv.error.all_sources_failed" = "Keine Quellen verfügbar";

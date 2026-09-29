@@ -263,3 +263,6 @@
 "player.episodes" = "选集";
 "player.advanced" = "高级选项";
 "player.audio_boost" = "声音增强";
+
+"iptv.probe_cooldown_min" = "冷却 %d 分";
+"iptv.error.all_sources_failed" = "所有播放源均不可用";

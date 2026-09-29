@@ -263,3 +263,6 @@
 "player.episodes" = "Episodios";
 "player.advanced" = "Avanzado";
 "player.audio_boost" = "Refuerzo de audio";
+
+"iptv.probe_cooldown_min" = "Espera %d min";
+"iptv.error.all_sources_failed" = "No hay fuentes disponibles";

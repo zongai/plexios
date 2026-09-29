@@ -263,3 +263,6 @@
 "player.episodes" = "エピソード";
 "player.advanced" = "詳細設定";
 "player.audio_boost" = "音量ブースト";
+
+"iptv.probe_cooldown_min" = "クールダウン %d 分";
+"iptv.error.all_sources_failed" = "利用可能なソースがありません";

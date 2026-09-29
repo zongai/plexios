@@ -436,17 +436,19 @@ final class PlaybackEngine {
         }
     }
 
-    /// Linear volume 0…1 applied to the active player (not system volume).
+    /// Linear volume 0…2 (100% = 1.0, boost up to 200%). VLC maps to 0…200; AVPlayer caps at 1.0.
     private(set) var volume: Float = 1
+    static let maxVolume: Float = 2.0
 
     func setVolume(_ value: Float) {
-        let v = min(1, max(0, value))
+        let v = min(Self.maxVolume, max(0, value))
         volume = v
         if activePlaybackBackend == .vlc {
             vlcBackend?.setVolume(v)
             return
         }
-        player?.volume = v
+        // AVPlayer only supports 0…1; boost above 100% requires VLC path.
+        player?.volume = min(1, v)
     }
 
     private func applyRateToPlayer() {

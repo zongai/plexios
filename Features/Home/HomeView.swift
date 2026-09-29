@@ -14,7 +14,7 @@ struct HomeView: View {
                     MediaDestinationView(route: route)
                 }
                 .refreshable {
-                    await viewModel?.load(context: environment.serverContext, force: true)
+                    await loadHome(force: true)
                 }
         }
         .task {

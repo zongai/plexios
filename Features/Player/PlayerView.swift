@@ -123,6 +123,7 @@ struct PlayerView: View {
                 controlIconButton("xmark", label: L10n.playerClose) {
                     Task {
                         await engine.stop(report: true)
+                        OrientationLock.unlockAll()
                         dismiss()
                     }
                 }

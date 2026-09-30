@@ -119,6 +119,8 @@ struct PlayerView: View {
             try? await Task.sleep(for: .milliseconds(150))
             engine.vlcBackend?.rebindDrawable()
             bumpControls()
+            // Defer season list so it cannot race with VLC/AVPlayer startup.
+            try? await Task.sleep(for: .milliseconds(400))
             await loadSeasonEpisodes()
         }
         .onAppear {
@@ -726,28 +728,37 @@ struct PlayerView: View {
         localError = nil
         let network = currentNetworkClass()
 
+        // Always force-refresh full metadata. Hub / search / library cards often ship
+        // stub Media (non-empty but missing Parts/Streams); that used to skip refresh
+        // and crash later in VLC/AVPlayer. Episode detail already had complete payloads,
+        // which matched the "library TV works, everything else crashes" report.
         let seed = activeItem
         let full: PlexMetadata
-        if seed.media.isEmpty {
-            do {
-                full = try await environment.metadataRepository.metadata(
-                    ratingKey: seed.ratingKey,
-                    context: context,
-                    force: true
-                )
-            } catch {
+        do {
+            full = try await environment.metadataRepository.metadata(
+                ratingKey: seed.ratingKey,
+                context: context,
+                force: true
+            )
+        } catch {
+            // Fall back to seed only when it already has a playable part.
+            if seed.media.contains(where: { !$0.parts.isEmpty }) {
+                full = seed
+            } else {
                 localError = error.localizedDescription
                 return
             }
-        } else {
-            full = seed
+        }
+
+        guard full.media.contains(where: { !$0.parts.isEmpty }) else {
+            localError = String(localized: "player.media_unavailable")
+            return
         }
 
         await engine.play(metadata: full, context: context, network: network, resume: true)
         if engine.errorMessage == nil {
             bumpControls()
         }
-        await loadSeasonEpisodes()
     }
 
     private func loadSeasonEpisodes() async {

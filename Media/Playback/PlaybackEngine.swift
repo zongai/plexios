@@ -265,10 +265,6 @@ final class PlaybackEngine {
                         case .playing:
                             self.sessionState = .playing
                             self.isPlaying = true
-                            self.applyVLCAudioSelection(self.selectedAudioId)
-                            if let ctx = self.context {
-                                self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
-                            }
                         case .paused:
                             self.sessionState = .paused
                             self.isPlaying = false
@@ -307,27 +303,14 @@ final class PlaybackEngine {
                 vlc.setAspectMode(aspectMode)
                 applyVLCAudioSelection(decision.selectedAudioStreamId)
                 applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
-                // Tracks often appear only after playing — retry for several seconds.
-                vlc.onTracksUpdated = { [weak self] in
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.applyVLCAudioSelection(self.selectedAudioId)
-                        if let ctx = self.context {
-                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
-                        }
-                    }
-                }
+                // Conservative re-apply only — avoid onTracksUpdated + long retry storms
+                // which have hard-crashed VLC on some movie files.
                 Task { @MainActor in
-                    for delay in [300, 700, 1200, 2000, 3500, 5500, 8000] as [UInt64] {
+                    for delay in [500, 1500, 3000] as [UInt64] {
                         try? await Task.sleep(for: .milliseconds(delay))
                         self.applyVLCAudioSelection(self.selectedAudioId)
                         if let ctx = self.context {
                             self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
-                        }
-                        // Stop early if VLC already shows a selected track matching preference
-                        if self.vlcBackend?.tryApplyPendingAudio() == true,
-                           !(self.vlcBackend?.audioTracks.isEmpty ?? true) {
-                            break
                         }
                     }
                 }

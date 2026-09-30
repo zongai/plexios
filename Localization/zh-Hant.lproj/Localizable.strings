@@ -266,3 +266,5 @@
 
 "iptv.probe_cooldown_min" = "冷卻 %d 分";
 "iptv.error.all_sources_failed" = "所有播放源均不可用";
+
+"player.media_unavailable" = "無法播放：缺少媒體檔案";

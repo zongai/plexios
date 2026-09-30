@@ -266,3 +266,5 @@
 
 "iptv.probe_cooldown_min" = "クールダウン %d 分";
 "iptv.error.all_sources_failed" = "利用可能なソースがありません";
+
+"player.media_unavailable" = "再生できません：メディアがありません";

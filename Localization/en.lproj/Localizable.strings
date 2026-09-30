@@ -290,3 +290,5 @@
 
 "iptv.probe_cooldown_min" = "Cooldown %d min";
 "iptv.error.all_sources_failed" = "All sources unavailable";
+
+"player.media_unavailable" = "Unable to play: media unavailable";

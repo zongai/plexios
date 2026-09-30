@@ -266,3 +266,5 @@
 
 "iptv.probe_cooldown_min" = "Pause %d min";
 "iptv.error.all_sources_failed" = "Aucune source disponible";
+
+"player.media_unavailable" = "Lecture impossible : média manquant";

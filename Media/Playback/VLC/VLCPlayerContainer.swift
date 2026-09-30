@@ -19,13 +19,15 @@ struct VLCPlayerContainer: UIViewRepresentable {
         private var ticks = 0
         private var sawVideoSize = false
 
+        var isPolling: Bool { link != nil }
+
         init(backend: VLCPlaybackBackend) {
             self.backend = backend
             super.init()
         }
 
         func startSizePolling() {
-            stopSizePolling()
+            guard link == nil else { return }
             ticks = 0
             sawVideoSize = backend.currentVideoSize.width > 1
             let link = CADisplayLink(target: self, selector: #selector(tick))
@@ -85,6 +87,7 @@ struct VLCPlayerContainer: UIViewRepresentable {
         guard let container = uiView as? AspectContainerView else { return }
         container.clipsToBounds = true
         container.backend = backend
+        let modeChanged = container.mode != aspectMode
         container.mode = aspectMode
         if backend.drawableView.superview !== container {
             backend.drawableView.removeFromSuperview()
@@ -93,17 +96,28 @@ struct VLCPlayerContainer: UIViewRepresentable {
         container.drawable = backend.drawableView
 
         let size = container.bounds.size
+        var sizeChanged = false
         if size.width > 32, size.height > 32 {
             if abs(container.lastBoundSize.width - size.width) > 8
                 || abs(container.lastBoundSize.height - size.height) > 8 {
                 container.lastBoundSize = size
-                backend.rebindDrawable()
+                sizeChanged = true
             }
         }
 
-        backend.setAspectMode(aspectMode)
-        container.reapply(forceRebind: true)
-        context.coordinator.startSizePolling()
+        // Avoid rebinding / aspect thrash on every SwiftUI refresh — that path
+        // is a frequent source of VLC hard crashes during movie open.
+        if modeChanged {
+            backend.setAspectMode(aspectMode)
+        }
+        if sizeChanged || modeChanged {
+            container.reapply(forceRebind: sizeChanged)
+        } else {
+            container.reapply(forceRebind: false)
+        }
+        if !context.coordinator.isPolling {
+            context.coordinator.startSizePolling()
+        }
     }
 
     static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {

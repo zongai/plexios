@@ -266,3 +266,5 @@
 
 "iptv.probe_cooldown_min" = "Cooldown %d Min.";
 "iptv.error.all_sources_failed" = "Keine Quellen verfügbar";
+
+"player.media_unavailable" = "Wiedergabe nicht möglich: Medien fehlen";

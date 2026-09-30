@@ -765,6 +765,11 @@ final class PlaybackEngine {
         guard let metadata = currentItem, let context else { return }
 
         if activePlaybackBackend == .vlc {
+            let label = streamId.flatMap { id in subtitleStreams.first { $0.id == id } }
+                .map { "\($0.displayTitle ?? $0.language ?? $0.codec ?? "?") id=\($0.id) ext=\($0.isExternal)" }
+                ?? "off"
+            logger.playback.info("selectSubtitle VLC → \(label)")
+            FileLogStore.shared.flush()
             applyVLCSubtitleSelection(streamId, context: context)
             return
         }

@@ -236,38 +236,39 @@ final class VLCPlaybackBackend: NSObject {
     func selectAudioIndex(_ index: Int) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         guard let mediaPlayer else { return }
-        // Only write indices VLC currently exposes — invalid values hard-crash some builds.
         if index >= 0 {
             let allowed = audioTracks.map(\.index)
-            guard allowed.isEmpty || allowed.contains(index) else { return }
+            if !allowed.isEmpty && !allowed.contains(index) { return }
         }
+        if selectedAudioIndex == index { return }
+        // Pause → set → resume: setting currentAudioTrackIndex while decoding hard-crashes.
+        let wasPlaying = mediaPlayer.isPlaying
+        if wasPlaying { mediaPlayer.pause() }
         mediaPlayer.currentAudioTrackIndex = Int32(index)
         selectedAudioIndex = index
+        if wasPlaying { mediaPlayer.play() }
 #endif
     }
 
-    /// Select audio using Plex metadata (#62-style: match once + one short retry).
+    /// Select audio using Plex metadata — index only, minimal retry.
     func applyPlexAudio(stream: PlexStream?, allAudioStreams: [PlexStream]) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         pendingAudioStream = stream
         pendingAudioAll = allAudioStreams
         pendingAudioPlexId = stream?.id
-        refreshTracks()
         guard let stream else { return }
+        refreshTracks()
         if let idx = matchAudioTrack(for: stream, all: allAudioStreams) {
             selectAudioIndex(idx)
             return
         }
-        // Tracks may not be enumerated yet — single delayed retry (no storm).
-        trackApplyTask?.cancel()
-        trackApplyTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
-            guard !Task.isCancelled else { return }
-            self.refreshTracks()
-            if let idx = self.matchAudioTrack(for: stream, all: allAudioStreams) {
-                self.selectAudioIndex(idx)
-            } else if self.audioTracks.count == 1 {
-                self.selectAudioIndex(self.audioTracks[0].index)
+        if audioTracks.isEmpty {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(800))
+                self.refreshTracks()
+                if let idx = self.matchAudioTrack(for: stream, all: allAudioStreams) {
+                    self.selectAudioIndex(idx)
+                }
             }
         }
 #endif
@@ -353,14 +354,22 @@ final class VLCPlaybackBackend: NSObject {
         guard let mediaPlayer else { return }
         if let index {
             let allowed = subtitleTracks.map(\.index)
-            guard allowed.isEmpty || allowed.contains(index) else { return }
+            if !allowed.isEmpty && !allowed.contains(index) { return }
+            if selectedSubtitleIndex == index { return }
+            let wasPlaying = mediaPlayer.isPlaying
+            if wasPlaying { mediaPlayer.pause() }
             mediaPlayer.currentVideoSubTitleIndex = Int32(index)
             selectedSubtitleIndex = index
+            if wasPlaying { mediaPlayer.play() }
         } else {
+            if selectedSubtitleIndex == -1 { return }
+            let wasPlaying = mediaPlayer.isPlaying
+            if wasPlaying { mediaPlayer.pause() }
             mediaPlayer.currentVideoSubTitleIndex = -1
             selectedSubtitleIndex = -1
             pendingSubtitlePlexId = nil
             pendingSubtitleStream = nil
+            if wasPlaying { mediaPlayer.play() }
         }
 #endif
     }
@@ -395,42 +404,35 @@ final class VLCPlaybackBackend: NSObject {
             return
         }
 
-        let codec = (stream.codec ?? stream.format ?? "").lowercased()
+        // Only true Plex sidecars — never treat embedded ASS/SRT as external just by codec
+        // (that path used to download+slave and crash on track switch).
         let key = stream.key ?? ""
         let treatExternal = stream.isExternal
-            || key.contains("/streams/")
-            || key.contains("subtitle")
-            || ["srt", "ass", "ssa", "vtt", "subrip", "webvtt"].contains(codec)
+            || key.contains("/library/streams/")
 
         if treatExternal {
             pendingEnforceExternal = true
             guard let url = resolveExternalURL(stream) else { return }
             Task { @MainActor in
-                await self.attachExternalSubtitle(url: url, enforce: true)
-                try? await Task.sleep(for: .milliseconds(350))
+                await self.attachExternalSubtitle(url: url, enforce: false)
+                try? await Task.sleep(for: .milliseconds(400))
                 self.refreshTracks()
                 if let last = self.subtitleTracks.last {
                     self.selectSubtitleIndex(last.index)
-                } else {
-                    try? await Task.sleep(for: .milliseconds(500))
-                    self.refreshTracks()
-                    if let last = self.subtitleTracks.last {
-                        self.selectSubtitleIndex(last.index)
-                    }
                 }
             }
             return
         }
 
-        // Embedded: one delayed retry like #62
+        // Embedded text track — index select only; one delayed retry if list empty.
         pendingEnforceExternal = false
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
-            self.refreshTracks()
-            if let matched = self.matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
-                self.selectSubtitleIndex(matched)
-            } else if let first = self.subtitleTracks.first {
-                self.selectSubtitleIndex(first.index)
+        if subtitleTracks.isEmpty {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                self.refreshTracks()
+                if let matched = self.matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
+                    self.selectSubtitleIndex(matched)
+                }
             }
         }
 #endif

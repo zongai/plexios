@@ -296,12 +296,20 @@ final class PlaybackEngine {
                     || videoCodec.contains("vp9") || videoCodec == "av1"
                 // Mid-stream resume seek during HEVC open also correlates with crashes.
                 let prepareStartMs: Int64 = forceSW && startMs > 0 ? 0 : startMs
-                // #62: preload external sidecars at open so UI switching is mostly index select.
-                let externalSubs = Self.externalSubtitleURLs(
-                    streams: subtitleStreams,
-                    baseURL: context.baseURL,
-                    token: context.token
-                )
+                // Preload at most the preferred sidecar — attaching many slaves at open
+                // left VLC unstable and correlated with later audio-track crashes.
+                let externalSubs: [URL] = {
+                    guard let pref = decision.selectedSubtitleStreamId,
+                          let stream = subtitleStreams.first(where: { $0.id == pref }),
+                          Self.isSidecarSubtitle(stream),
+                          let url = Self.externalSubtitleURL(
+                            stream: stream,
+                            baseURL: context.baseURL,
+                            token: context.token
+                          )
+                    else { return [] }
+                    return [url]
+                }()
                 logger.playback.info(
                     "VLC prepare begin codec=\(videoCodec) forceSW=\(forceSW) startMs=\(startMs) prepareStartMs=\(prepareStartMs) externalSubs=\(externalSubs.count) url=\(LogRedaction.redactURL(url))"
                 )
@@ -813,15 +821,11 @@ final class PlaybackEngine {
         }
     }
 
-    /// Sidecar text subs from PMS (SRT/ASS/VTT) — by flag, codec, or /library/streams key.
+    /// True only for Plex sidecar files (not embedded ASS/SRT text tracks).
     static func isSidecarSubtitle(_ stream: PlexStream) -> Bool {
         guard stream.streamType == .subtitle else { return false }
         if stream.isExternal { return true }
-        let codec = (stream.codec ?? stream.format ?? "").lowercased()
-        if ["srt", "ass", "ssa", "vtt", "subrip", "webvtt", "mov_text"].contains(codec) {
-            return true
-        }
-        if let key = stream.key, key.contains("/streams/") || key.contains("subtitle") {
+        if let key = stream.key, key.contains("/library/streams/") {
             return true
         }
         return false

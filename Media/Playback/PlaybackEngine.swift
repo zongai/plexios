@@ -286,45 +286,40 @@ final class PlaybackEngine {
                 }
                 var headers = identityHeaders
                 headers["X-Plex-Token"] = context.token
-                // External SRT attach during prepare has hard-crashed VLC on some HEVC
-                // titles (log: Decision VLC/hevc + srt, never reached "Playing via VLC").
-                // Defer sidecars until the player is stable.
-                let externalSubs = Self.externalSubtitleURLs(
-                    streams: subtitleStreams,
-                    baseURL: context.baseURL,
-                    token: context.token
-                )
+                let videoCodec = (media.videoCodec
+                    ?? media.parts.first?.streams.first(where: { $0.streamType == .video })?.codec
+                    ?? "")
+                    .lowercased()
+                // Logs: HEVC dies after "VLC prepare returned OK"; H264/VP9 survive.
+                // MobileVLCKit + VideoToolbox HEVC is a known hard-crash path — force SW.
+                let forceSW = videoCodec.contains("hevc") || videoCodec.contains("h265")
+                    || videoCodec.contains("vp9") || videoCodec == "av1"
+                // Mid-stream resume seek during HEVC open also correlates with crashes.
+                let prepareStartMs: Int64 = forceSW && startMs > 0 ? 0 : startMs
                 logger.playback.info(
-                    "VLC prepare begin url=\(LogRedaction.redactURL(url)) startMs=\(startMs) externalSubs=\(externalSubs.count)"
+                    "VLC prepare begin codec=\(videoCodec) forceSW=\(forceSW) startMs=\(startMs) prepareStartMs=\(prepareStartMs) url=\(LogRedaction.redactURL(url))"
                 )
-                // Let SwiftUI attach VLCPlayerContainer before VLC draws (same as IPTV).
                 try? await Task.sleep(for: .milliseconds(80))
                 try await vlc.prepare(
                     url: url,
                     headers: headers,
-                    startPositionMs: startMs,
+                    startPositionMs: prepareStartMs,
                     externalSubtitles: [],
                     preferredSubtitlePlexId: nil,
-                    preferredAudioPlexId: decision.selectedAudioStreamId,
-                    forceSoftwareDecode: false
+                    preferredAudioPlexId: nil,
+                    forceSoftwareDecode: forceSW
                 )
-                logger.playback.info("VLC prepare returned OK")
+                logger.playback.info("VLC prepare returned OK forceSW=\(forceSW)")
+                FileLogStore.shared.flush()
                 vlc.setRate(playbackRate)
                 vlc.setAspectMode(aspectMode)
-                applyVLCAudioSelection(decision.selectedAudioStreamId)
-                // Conservative track re-apply (no onTracksUpdated storm).
-                Task { @MainActor in
-                    for delay in [600, 1500, 3000] as [UInt64] {
-                        try? await Task.sleep(for: .milliseconds(delay))
-                        self.applyVLCAudioSelection(self.selectedAudioId)
-                    }
-                    // Sidecar subtitles after demux is warm.
-                    if !externalSubs.isEmpty || decision.selectedSubtitleStreamId != nil {
-                        try? await Task.sleep(for: .milliseconds(500))
-                        self.logger.playback.info(
-                            "VLC deferred subtitle apply id=\(decision.selectedSubtitleStreamId.map(String.init) ?? "nil") externals=\(externalSubs.count)"
-                        )
-                        self.applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
+                // Do not auto-select audio/subs here — track enumeration during HEVC
+                // open has crashed. User can pick tracks once UI is up.
+                if forceSW, startMs > 0 {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(1200))
+                        self.logger.playback.info("VLC deferred resume seek to \(startMs)ms")
+                        await self.vlcBackend?.seek(toMs: startMs)
                     }
                 }
                 activePlaybackBackend = .vlc
@@ -335,8 +330,9 @@ final class PlaybackEngine {
                 startPeriodicReporting()
                 publishNowPlaying()
                 logger.playback.info(
-                    "Playing via MobileVLCKit (audio=\(decision.selectedAudioStreamId.map(String.init) ?? "auto") subs=\(decision.selectedSubtitleStreamId.map(String.init) ?? "off"))"
+                    "Playing via MobileVLCKit codec=\(videoCodec) forceSW=\(forceSW)"
                 )
+                FileLogStore.shared.flush()
                 return
             } catch {
                 logger.playback.info("VLC failed, trying other backends: \(error.localizedDescription)")

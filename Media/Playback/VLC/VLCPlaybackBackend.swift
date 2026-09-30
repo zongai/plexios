@@ -152,16 +152,22 @@ final class VLCPlaybackBackend: NSObject {
 
         player.play()
 
-        // Download external sidecars to temp files then attach — remote HTTP slaves
-        // often fail without the same session headers VLC uses for the media URL.
+        // #62 behavior: after play starts, download external sidecars to temp files
+        // and attach as VLC slaves. Delay slightly so demux is stable first.
         let enforceFirst = preferredSubtitlePlexId != nil
+        let subsToAttach = externalSubtitles
         Task { @MainActor in
-            for (i, subURL) in externalSubtitles.enumerated() {
+            try? await Task.sleep(for: .milliseconds(700))
+            guard self.mediaPlayer != nil else { return }
+            for (i, subURL) in subsToAttach.enumerated() {
                 await self.attachExternalSubtitle(url: subURL, enforce: enforceFirst && i == 0)
+                try? await Task.sleep(for: .milliseconds(200))
             }
             self.refreshTracks()
             if preferredSubtitlePlexId != nil, let last = self.subtitleTracks.last {
                 self.selectSubtitleIndex(last.index)
+            } else {
+                _ = self.tryApplyPendingSubtitle()
             }
         }
 
@@ -174,7 +180,7 @@ final class VLCPlaybackBackend: NSObject {
         state = .playing
         onStateChange?(.playing)
 
-        // Tracks often appear slightly after play starts.
+        // Light preference apply for audio; subs handled by the attach task above.
         scheduleTrackRefreshAndApply()
 #else
         throw PlaybackFailure(stage: .unknown, reason: "MobileVLCKit not linked", underlying: nil)
@@ -341,31 +347,38 @@ final class VLCPlaybackBackend: NSObject {
 #endif
     }
 
-    /// Select subtitle using Plex metadata (language / order / external URL).
-    /// External files are downloaded to disk then attached once — no retry storms
-    /// (those hard-crashed MobileVLCKit while the user toggled subs in the UI).
+    /// Select subtitle using Plex metadata (#62-style, safer attach).
     func applyPlexSubtitle(
         stream: PlexStream?,
         allSubtitleStreams: [PlexStream],
         resolveExternalURL: @escaping (PlexStream) -> URL?
     ) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-        trackApplyTask?.cancel()
+        guard mediaPlayer != nil else { return }
+        refreshTracks()
         pendingSubtitleAll = allSubtitleStreams
         pendingSubtitleResolve = resolveExternalURL
+
         guard let stream else {
             pendingSubtitleStream = nil
             pendingSubtitlePlexId = nil
+            pendingEnforceExternal = false
             selectSubtitleIndex(nil)
             return
         }
+
         pendingSubtitleStream = stream
         pendingSubtitlePlexId = stream.id
 
+        // Prefer already-loaded VLC track (from prepare-time attach) — index only, no re-download.
+        if let matched = matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
+            pendingEnforceExternal = false
+            selectSubtitleIndex(matched)
+            return
+        }
+
         let codec = (stream.codec ?? stream.format ?? "").lowercased()
         let key = stream.key ?? ""
-        // Only true sidecars — `stream.key != nil` alone matches embedded tracks and
-        // previously forced a dangerous HTTP slave path for every selection.
         let treatExternal = stream.isExternal
             || key.contains("/streams/")
             || key.contains("subtitle")
@@ -375,71 +388,32 @@ final class VLCPlaybackBackend: NSObject {
             pendingEnforceExternal = true
             guard let url = resolveExternalURL(stream) else { return }
             Task { @MainActor in
-                await self.attachExternalSubtitleSafely(url: url)
+                await self.attachExternalSubtitle(url: url, enforce: true)
+                try? await Task.sleep(for: .milliseconds(350))
+                self.refreshTracks()
+                if let last = self.subtitleTracks.last {
+                    self.selectSubtitleIndex(last.index)
+                } else {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    self.refreshTracks()
+                    if let last = self.subtitleTracks.last {
+                        self.selectSubtitleIndex(last.index)
+                    }
+                }
             }
             return
         }
 
+        // Embedded: one delayed retry like #62
         pendingEnforceExternal = false
-        refreshTracks()
-        if !tryApplyPendingSubtitle() {
-            // One short retry only — do not schedule multi-second storms.
-            trackApplyTask = Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(800))
-                guard !Task.isCancelled else { return }
-                self.refreshTracks()
-                _ = self.tryApplyPendingSubtitle()
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            self.refreshTracks()
+            if let matched = self.matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
+                self.selectSubtitleIndex(matched)
+            } else if let first = self.subtitleTracks.first {
+                self.selectSubtitleIndex(first.index)
             }
-        }
-#endif
-    }
-
-    /// Download → temp file → single addPlaybackSlave. Avoids concurrent slave attaches.
-    @MainActor
-    private func attachExternalSubtitleSafely(url: URL) async {
-#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-        guard let mediaPlayer else { return }
-        let ext: String = {
-            let path = url.path.lowercased()
-            if path.hasSuffix(".ass") || path.hasSuffix(".ssa") { return "ass" }
-            if path.hasSuffix(".vtt") { return "vtt" }
-            return "srt"
-        }()
-        do {
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 20
-            for (k, v) in httpHeaders {
-                request.setValue(v, forHTTPHeaderField: k)
-            }
-            if request.value(forHTTPHeaderField: "X-Plex-Token") == nil,
-               let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                .queryItems?.first(where: { $0.name == "X-Plex-Token" })?.value {
-                request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
-            }
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                return
-            }
-            guard !data.isEmpty else { return }
-            let tmp = FileManager.default.temporaryDirectory
-                .appendingPathComponent("plex-sub-\(UUID().uuidString).\(ext)")
-            try data.write(to: tmp, options: .atomic)
-            attachedExternalFileURLs.append(tmp)
-            // Brief pause reduces races between demuxer and slave registration.
-            let wasPlaying = mediaPlayer.isPlaying
-            if wasPlaying { mediaPlayer.pause() }
-            try? await Task.sleep(for: .milliseconds(120))
-            _ = mediaPlayer.addPlaybackSlave(tmp, type: .subtitle, enforce: false)
-            try? await Task.sleep(for: .milliseconds(400))
-            refreshTracks()
-            if let last = subtitleTracks.last {
-                selectSubtitleIndex(last.index)
-            } else {
-                _ = tryApplyPendingSubtitle()
-            }
-            if wasPlaying { mediaPlayer.play() }
-        } catch {
-            // Do not fall back to remote HTTP slave URL — that path has crashed VLC.
         }
 #endif
     }
@@ -515,17 +489,13 @@ final class VLCPlaybackBackend: NSObject {
                     .appendingPathComponent("plex-sub-\(UUID().uuidString).\(ext)")
                 try data.write(to: tmp, options: .atomic)
                 attachedExternalFileURLs.append(tmp)
+                // Local file only — remote HTTP slave URLs have hard-crashed MobileVLCKit.
                 _ = mediaPlayer.addPlaybackSlave(tmp, type: .subtitle, enforce: enforce)
-                // Give VLC a moment to register the slave track
                 try? await Task.sleep(for: .milliseconds(250))
                 refreshTracks()
                 return
             } catch {
-                if attempt == attempts - 1 {
-                    _ = mediaPlayer.addPlaybackSlave(url, type: .subtitle, enforce: enforce)
-                    try? await Task.sleep(for: .milliseconds(300))
-                    refreshTracks()
-                }
+                // Retry loop; no remote-URL fallback.
             }
         }
 #endif

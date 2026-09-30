@@ -296,25 +296,29 @@ final class PlaybackEngine {
                     || videoCodec.contains("vp9") || videoCodec == "av1"
                 // Mid-stream resume seek during HEVC open also correlates with crashes.
                 let prepareStartMs: Int64 = forceSW && startMs > 0 ? 0 : startMs
+                // #62: preload external sidecars at open so UI switching is mostly index select.
+                let externalSubs = Self.externalSubtitleURLs(
+                    streams: subtitleStreams,
+                    baseURL: context.baseURL,
+                    token: context.token
+                )
                 logger.playback.info(
-                    "VLC prepare begin codec=\(videoCodec) forceSW=\(forceSW) startMs=\(startMs) prepareStartMs=\(prepareStartMs) url=\(LogRedaction.redactURL(url))"
+                    "VLC prepare begin codec=\(videoCodec) forceSW=\(forceSW) startMs=\(startMs) prepareStartMs=\(prepareStartMs) externalSubs=\(externalSubs.count) url=\(LogRedaction.redactURL(url))"
                 )
                 try? await Task.sleep(for: .milliseconds(80))
                 try await vlc.prepare(
                     url: url,
                     headers: headers,
                     startPositionMs: prepareStartMs,
-                    externalSubtitles: [],
-                    preferredSubtitlePlexId: nil,
-                    preferredAudioPlexId: nil,
+                    externalSubtitles: externalSubs,
+                    preferredSubtitlePlexId: decision.selectedSubtitleStreamId,
+                    preferredAudioPlexId: decision.selectedAudioStreamId,
                     forceSoftwareDecode: forceSW
                 )
                 logger.playback.info("VLC prepare returned OK forceSW=\(forceSW)")
                 FileLogStore.shared.flush()
                 vlc.setRate(playbackRate)
                 vlc.setAspectMode(aspectMode)
-                // Do not auto-select audio/subs here — track enumeration during HEVC
-                // open has crashed. User can pick tracks once UI is up.
                 if forceSW, startMs > 0 {
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(1200))
@@ -330,7 +334,7 @@ final class PlaybackEngine {
                 startPeriodicReporting()
                 publishNowPlaying()
                 logger.playback.info(
-                    "Playing via MobileVLCKit codec=\(videoCodec) forceSW=\(forceSW)"
+                    "Playing via MobileVLCKit codec=\(videoCodec) forceSW=\(forceSW) subs=\(decision.selectedSubtitleStreamId.map(String.init) ?? "off") externals=\(externalSubs.count)"
                 )
                 FileLogStore.shared.flush()
                 return

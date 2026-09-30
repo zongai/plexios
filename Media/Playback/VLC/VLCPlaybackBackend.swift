@@ -62,10 +62,9 @@ final class VLCPlaybackBackend: NSObject {
     /// Call after rotation / container layout so VLC uses non-zero landscape bounds.
     func rebindDrawable() {
         rebindDrawablePreservingAspect()
-        applyAspectMode(aspectMode)
     }
 
-    /// Re-attach drawable without re-entering aspect layout (avoids feedback loops).
+    /// Re-attach drawable without touching VLC aspect/crop C-string APIs.
     func rebindDrawablePreservingAspect() {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         guard let mediaPlayer else { return }
@@ -76,58 +75,15 @@ final class VLCPlaybackBackend: NSObject {
 #endif
     }
 
-    /// Fit / fill / stretch. VLC ignores UIView.contentMode — use crop + aspect ratio APIs.
+    /// Fit / fill / stretch are applied by `VLCPlayerContainer` frame layout only.
+    /// Do **not** write `videoAspectRatio` / `videoCropGeometry` (MobileVLCKit
+    /// `char *` setters — strdup ownership is unsafe and has caused hard crashes
+    /// on the shared Plex + IPTV VLC path since e706b0a).
     func setAspectMode(_ mode: VideoAspectMode) {
         aspectMode = mode
-        applyAspectMode(mode)
     }
-
-    private func applyAspectMode(_ mode: VideoAspectMode) {
-#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-        guard let mediaPlayer else { return }
-        drawableView.setNeedsLayout()
-        drawableView.layoutIfNeeded()
-
-        // Layout in VLCPlayerContainer owns fit/fill frames. Here we only force
-        // stretch to fill the drawable; fit/fill clear crop/ratio.
-        mediaPlayer.scaleFactor = 0
-        applyVLCStringProperty(nil, to: mediaPlayer, crop: true)
-        applyVLCStringProperty(nil, to: mediaPlayer, crop: false)
-
-        let viewSize = drawableView.bounds.size
-        let hasView = viewSize.width > 1 && viewSize.height > 1
-
-        switch mode {
-        case .fit, .fill:
-            break
-        case .stretch:
-            if hasView {
-                let w = max(1, Int(viewSize.width.rounded()))
-                let h = max(1, Int(viewSize.height.rounded()))
-                applyVLCStringProperty("\(w):\(h)", to: mediaPlayer, crop: false)
-            }
-        }
-#endif
-    }
-
 
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-    /// MobileVLCKit exposes `char *` properties. Always `strdup` so the buffer outlives the call.
-    private func applyVLCStringProperty(_ value: String?, to player: VLCMediaPlayer, crop: Bool) {
-        if let value {
-            let ptr = strdup(value)
-            if crop {
-                player.videoCropGeometry = ptr
-            } else {
-                player.videoAspectRatio = ptr
-            }
-        } else if crop {
-            player.videoCropGeometry = nil
-        } else {
-            player.videoAspectRatio = nil
-        }
-    }
-
     private var mediaPlayer: VLCMediaPlayer?
 #endif
 
@@ -722,8 +678,6 @@ extension VLCPlaybackBackend: VLCMediaPlayerDelegate {
                 state = .playing
                 onStateChange?(.playing)
                 refreshTracks()
-                // Video size is often 0 until playing — re-apply fill/stretch crop.
-                applyAspectMode(aspectMode)
             case .paused:
                 state = .paused
                 onStateChange?(.paused)

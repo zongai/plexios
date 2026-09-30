@@ -314,6 +314,13 @@ final class PlaybackEngine {
                     "VLC prepare begin codec=\(videoCodec) forceSW=\(forceSW) startMs=\(startMs) prepareStartMs=\(prepareStartMs) externalSubs=\(externalSubs.count) url=\(LogRedaction.redactURL(url))"
                 )
                 try? await Task.sleep(for: .milliseconds(80))
+                let audioOrder = decision.selectedAudioStreamId.flatMap { id in
+                    audioStreams.firstIndex(where: { $0.id == id })
+                }
+                let embeddedSubs = subtitleStreams.filter { !Self.isSidecarSubtitle($0) }
+                let subOrder = decision.selectedSubtitleStreamId.flatMap { id in
+                    embeddedSubs.firstIndex(where: { $0.id == id })
+                }
                 try await vlc.prepare(
                     url: url,
                     headers: headers,
@@ -321,6 +328,8 @@ final class PlaybackEngine {
                     externalSubtitles: externalSubs,
                     preferredSubtitlePlexId: decision.selectedSubtitleStreamId,
                     preferredAudioPlexId: decision.selectedAudioStreamId,
+                    preferredAudioOrder: audioOrder,
+                    preferredSubtitleOrder: subOrder,
                     forceSoftwareDecode: forceSW
                 )
                 logger.playback.info("VLC prepare returned OK forceSW=\(forceSW)")
@@ -743,12 +752,26 @@ final class PlaybackEngine {
         guard let metadata = currentItem, let context else { return }
 
         if activePlaybackBackend == .vlc {
+            // Live currentAudioTrackIndex hard-crashes MobileVLCKit (device logs).
+            // Soft-restart with forced preference and restore position.
             let label = audioStreams.first { $0.id == streamId }
                 .map { "\($0.displayTitle ?? $0.language ?? $0.codec ?? "?") id=\($0.id)" }
                 ?? "id=\(streamId)"
-            logger.playback.info("selectAudio VLC → \(label)")
+            logger.playback.info("selectAudio VLC soft-restart → \(label)")
             FileLogStore.shared.flush()
-            applyVLCAudioSelection(streamId)
+            let resumeFrom = positionMs
+            await play(
+                metadata: metadata,
+                context: context,
+                network: networkClass,
+                resume: false,
+                forcedAudioId: streamId,
+                forcedSubtitleId: selectedSubtitleId
+            )
+            if resumeFrom > 0 {
+                try? await Task.sleep(for: .milliseconds(500))
+                await seek(toMs: resumeFrom)
+            }
             return
         }
 
@@ -777,12 +800,25 @@ final class PlaybackEngine {
         guard let metadata = currentItem, let context else { return }
 
         if activePlaybackBackend == .vlc {
+            // Same as audio — never mutate live subtitle index on MobileVLCKit.
             let label = streamId.flatMap { id in subtitleStreams.first { $0.id == id } }
                 .map { "\($0.displayTitle ?? $0.language ?? $0.codec ?? "?") id=\($0.id) ext=\($0.isExternal)" }
                 ?? "off"
-            logger.playback.info("selectSubtitle VLC → \(label)")
+            logger.playback.info("selectSubtitle VLC soft-restart → \(label)")
             FileLogStore.shared.flush()
-            applyVLCSubtitleSelection(streamId, context: context)
+            let resumeFrom = positionMs
+            await play(
+                metadata: metadata,
+                context: context,
+                network: networkClass,
+                resume: false,
+                forcedAudioId: selectedAudioId,
+                forcedSubtitleId: streamId ?? -1
+            )
+            if resumeFrom > 0 {
+                try? await Task.sleep(for: .milliseconds(500))
+                await seek(toMs: resumeFrom)
+            }
             return
         }
 

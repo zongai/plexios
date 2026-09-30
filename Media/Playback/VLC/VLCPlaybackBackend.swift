@@ -112,6 +112,10 @@ final class VLCPlaybackBackend: NSObject {
         externalSubtitles: [URL] = [],
         preferredSubtitlePlexId: Int? = nil,
         preferredAudioPlexId: Int? = nil,
+        /// 0-based index among audio streams (for VLC `audio-track` option before play).
+        preferredAudioOrder: Int? = nil,
+        /// 0-based index among embedded subtitle streams (for VLC `sub-track` option).
+        preferredSubtitleOrder: Int? = nil,
         forceSoftwareDecode: Bool = false
     ) async throws {
         guard VLCKitImport.available else {
@@ -137,6 +141,14 @@ final class VLCPlaybackBackend: NSObject {
             "sub-fps": 25,
             "freetype-rel-fontsize": 16
         ]
+        // Prefer tracks via media options *before* play — mutating
+        // currentAudioTrackIndex after play hard-crashes MobileVLCKit.
+        if let preferredAudioOrder, preferredAudioOrder >= 0 {
+            opts["audio-track"] = String(preferredAudioOrder)
+        }
+        if let preferredSubtitleOrder, preferredSubtitleOrder >= 0 {
+            opts["sub-track"] = String(preferredSubtitleOrder)
+        }
         // VP9 / problematic HW paths: disable hardware decode to avoid green/artifact frames.
         if forceSoftwareDecode {
             opts["avcodec-hw"] = "none"
@@ -152,23 +164,19 @@ final class VLCPlaybackBackend: NSObject {
 
         player.play()
 
-        // #62 behavior: after play starts, download external sidecars to temp files
-        // and attach as VLC slaves. Delay slightly so demux is stable first.
-        let enforceFirst = preferredSubtitlePlexId != nil
+        // Sidecar attach only (no currentVideoSubTitleIndex / currentAudioTrackIndex writes).
+        // Live track index mutation hard-crashes MobileVLCKit; soft-restart + pre-play
+        // options handle preferred tracks instead.
         let subsToAttach = externalSubtitles
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(700))
+            try? await Task.sleep(for: .milliseconds(800))
             guard self.mediaPlayer != nil else { return }
-            for (i, subURL) in subsToAttach.enumerated() {
-                await self.attachExternalSubtitle(url: subURL, enforce: enforceFirst && i == 0)
+            for subURL in subsToAttach {
+                await self.attachExternalSubtitle(url: subURL, enforce: false)
                 try? await Task.sleep(for: .milliseconds(200))
             }
             self.refreshTracks()
-            if preferredSubtitlePlexId != nil, let last = self.subtitleTracks.last {
-                self.selectSubtitleIndex(last.index)
-            } else {
-                _ = self.tryApplyPendingSubtitle()
-            }
+            self.onTracksUpdated?()
         }
 
         if startPositionMs > 0 {
@@ -179,9 +187,6 @@ final class VLCPlaybackBackend: NSObject {
         rate = 1.0
         state = .playing
         onStateChange?(.playing)
-
-        // Light preference apply for audio; subs handled by the attach task above.
-        scheduleTrackRefreshAndApply()
 #else
         throw PlaybackFailure(stage: .unknown, reason: "MobileVLCKit not linked", underlying: nil)
 #endif
@@ -586,18 +591,15 @@ final class VLCPlaybackBackend: NSObject {
     }
 
     private func scheduleTrackRefreshAndApply() {
+        // Intentionally minimal: only refresh track lists for UI. Never re-apply
+        // currentAudioTrackIndex / subtitle index in a loop (hard-crashes VLC).
         trackApplyTask?.cancel()
         trackApplyTask = Task { @MainActor in
-            // Keep short — long multi-attempt loops + re-download caused VLC hard crashes.
-            for delay in [400, 1200, 2500] as [UInt64] {
+            for delay in [500, 1500] as [UInt64] {
                 try? await Task.sleep(for: .milliseconds(delay))
                 guard !Task.isCancelled else { return }
-                refreshTracks()
-                let audioOK = tryApplyPendingAudio()
-                let subOK = tryApplyPendingSubtitle()
-                if (pendingAudioStream == nil || audioOK), (pendingSubtitleStream == nil || subOK) {
-                    return
-                }
+                self.refreshTracks()
+                self.onTracksUpdated?()
             }
         }
     }

@@ -52,6 +52,14 @@ struct SettingsTabView: View {
                     }
                 }
 
+                Section(String(localized: "settings.section_diagnostics")) {
+                    NavigationLink {
+                        DiagnosticsLogView()
+                    } label: {
+                        Label(String(localized: "settings.logs"), systemImage: "doc.text.magnifyingglass")
+                    }
+                }
+
                 Section(String(localized: "settings.section_about")) {
                     NavigationLink {
                         AboutSettingsView()

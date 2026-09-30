@@ -721,12 +721,16 @@ struct PlayerView: View {
     private func startPlayback() async {
         guard let context = environment.serverContext else {
             localError = L10n.noServer
+            environment.logger.playback.error("startPlayback: no server context")
             return
         }
         localError = nil
         let network = currentNetworkClass()
-
         let seed = activeItem
+        environment.logger.playback.info(
+            "startPlayback seed type=\(seed.type.rawValue) key=\(seed.ratingKey) mediaCount=\(seed.media.count) parts=\(seed.media.map { $0.parts.count }) network=\(String(describing: network))"
+        )
+
         let full: PlexMetadata
         if seed.media.isEmpty {
             do {
@@ -735,16 +739,32 @@ struct PlayerView: View {
                     context: context,
                     force: true
                 )
+                environment.logger.playback.info(
+                    "startPlayback fetched metadata mediaCount=\(full.media.count) parts=\(full.media.map { $0.parts.count })"
+                )
             } catch {
                 localError = error.localizedDescription
+                environment.logger.playback.error(
+                    "startPlayback metadata fetch failed: \(error.localizedDescription)"
+                )
                 return
             }
         } else {
             full = seed
+            environment.logger.playback.info("startPlayback using seed media (non-empty)")
         }
 
         await engine.play(metadata: full, context: context, network: network, resume: true)
-        if engine.errorMessage == nil {
+        if let err = engine.errorMessage {
+            environment.logger.playback.error("startPlayback engine error: \(err)")
+        } else {
+            let backend: String
+            if engine.isVLCBackendActive { backend = "vlc" }
+            else if engine.isNativeBackendActive { backend = "native" }
+            else { backend = "avplayer" }
+            environment.logger.playback.info(
+                "startPlayback engine OK backend=\(backend) state=\(String(describing: engine.sessionState))"
+            )
             bumpControls()
         }
         await loadSeasonEpisodes()

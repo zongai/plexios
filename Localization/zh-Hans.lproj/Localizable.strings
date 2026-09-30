@@ -266,3 +266,16 @@
 
 "iptv.probe_cooldown_min" = "冷却 %d 分";
 "iptv.error.all_sources_failed" = "所有播放源均不可用";
+
+
+"settings.section_diagnostics" = "诊断";
+"settings.logs" = "运行日志";
+"settings.logs_empty" = "暂无日志";
+"settings.logs_empty_hint" = "播放或使用应用后再回来查看。";
+"settings.logs_refresh" = "刷新";
+"settings.logs_export" = "导出";
+"settings.logs_auto_refresh" = "自动刷新";
+"settings.logs_clear" = "清空日志";
+"settings.logs_clear_confirm" = "删除本机全部日志文件？";
+"settings.logs_size_kb" = "磁盘占用 %.1f KB";
+"settings.logs_size_mb" = "磁盘占用 %.2f MB";

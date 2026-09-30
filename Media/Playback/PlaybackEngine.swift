@@ -118,6 +118,9 @@ final class PlaybackEngine {
         forcedSubtitleId: Int? = nil
     ) async {
         // Do not fan out Home "continue watching" refresh while opening the player.
+        logger.playback.info(
+            "play() begin type=\(metadata.type.rawValue) key=\(metadata.ratingKey) title=\(metadata.title) mediaCount=\(metadata.media.count) parts=\(metadata.media.map { $0.parts.count }) network=\(String(describing: network)) resume=\(resume)"
+        )
         await stop(report: true, notifyLibraryProgress: false)
 
         self.context = context
@@ -140,7 +143,9 @@ final class PlaybackEngine {
             forcedSubtitleId: forcedSubtitleId
         )
         self.decision = decision
-        logger.playback.info("Decision: \(decision.mode.rawValue) — \(decision.reason)")
+        logger.playback.info(
+            "Decision: \(decision.mode.rawValue) — \(decision.reason) mediaIdx=\(decision.mediaIndex) partIdx=\(decision.partIndex) vlcAllowed=\(effectivePrefs.allowVLCPlayer) preferSystem=\(effectivePrefs.preferSystemPlayer)"
+        )
         if let router = playerEngineRouter {
             let report = router.resolve(metadata: metadata, decision: decision, network: network)
             // Metadata-only probe on the play path. Full HTTP Range/container sniffing has

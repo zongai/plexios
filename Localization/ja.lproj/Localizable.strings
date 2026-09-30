@@ -266,3 +266,16 @@
 
 "iptv.probe_cooldown_min" = "クールダウン %d 分";
 "iptv.error.all_sources_failed" = "利用可能なソースがありません";
+
+
+"settings.section_diagnostics" = "Diagnostics";
+"settings.logs" = "Runtime logs";
+"settings.logs_empty" = "No logs yet";
+"settings.logs_empty_hint" = "Play media or use the app, then return here.";
+"settings.logs_refresh" = "Refresh";
+"settings.logs_export" = "Export";
+"settings.logs_auto_refresh" = "Auto-refresh";
+"settings.logs_clear" = "Clear logs";
+"settings.logs_clear_confirm" = "Delete all on-device log files?";
+"settings.logs_size_kb" = "%.1f KB on disk";
+"settings.logs_size_mb" = "%.2f MB on disk";

@@ -580,11 +580,6 @@ final class PlaybackEngine {
                     case .playing:
                         self.sessionState = .playing
                         self.isPlaying = true
-                        // Audio tracks frequently become valid at first playing transition
-                        self.applyVLCAudioSelection(self.selectedAudioId)
-                        if let ctx = self.context {
-                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
-                        }
                     case .paused:
                         self.sessionState = .paused
                         self.isPlaying = false
@@ -740,6 +735,11 @@ final class PlaybackEngine {
         guard let metadata = currentItem, let context else { return }
 
         if activePlaybackBackend == .vlc {
+            let label = audioStreams.first { $0.id == streamId }
+                .map { "\($0.displayTitle ?? $0.language ?? $0.codec ?? "?") id=\($0.id)" }
+                ?? "id=\(streamId)"
+            logger.playback.info("selectAudio VLC → \(label)")
+            FileLogStore.shared.flush()
             applyVLCAudioSelection(streamId)
             return
         }

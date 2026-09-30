@@ -235,24 +235,41 @@ final class VLCPlaybackBackend: NSObject {
 
     func selectAudioIndex(_ index: Int) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-        mediaPlayer?.currentAudioTrackIndex = Int32(index)
+        guard let mediaPlayer else { return }
+        // Only write indices VLC currently exposes — invalid values hard-crash some builds.
+        if index >= 0 {
+            let allowed = audioTracks.map(\.index)
+            guard allowed.isEmpty || allowed.contains(index) else { return }
+        }
+        mediaPlayer.currentAudioTrackIndex = Int32(index)
         selectedAudioIndex = index
 #endif
     }
 
-    /// Select audio using Plex metadata (language / title / embedded order).
-    /// If tracks are not enumerated yet, keeps `pending*` and retries via `scheduleTrackRefreshAndApply`.
+    /// Select audio using Plex metadata (#62-style: match once + one short retry).
     func applyPlexAudio(stream: PlexStream?, allAudioStreams: [PlexStream]) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
         pendingAudioStream = stream
         pendingAudioAll = allAudioStreams
         pendingAudioPlexId = stream?.id
         refreshTracks()
-        if tryApplyPendingAudio() {
+        guard let stream else { return }
+        if let idx = matchAudioTrack(for: stream, all: allAudioStreams) {
+            selectAudioIndex(idx)
             return
         }
-        // Tracks not ready — schedule aggressive retries
-        scheduleTrackRefreshAndApply()
+        // Tracks may not be enumerated yet — single delayed retry (no storm).
+        trackApplyTask?.cancel()
+        trackApplyTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            self.refreshTracks()
+            if let idx = self.matchAudioTrack(for: stream, all: allAudioStreams) {
+                self.selectAudioIndex(idx)
+            } else if self.audioTracks.count == 1 {
+                self.selectAudioIndex(self.audioTracks[0].index)
+            }
+        }
 #endif
     }
 
@@ -265,7 +282,6 @@ final class VLCPlaybackBackend: NSObject {
         guard !audioTracks.isEmpty else { return false }
         if let idx = matchAudioTrack(for: stream, all: pendingAudioAll) {
             selectAudioIndex(idx)
-            // Keep pending so late track-list reshuffles can re-assert preference
             return true
         }
         return false
@@ -334,12 +350,14 @@ final class VLCPlaybackBackend: NSObject {
 
     func selectSubtitleIndex(_ index: Int?) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
+        guard let mediaPlayer else { return }
         if let index {
-            mediaPlayer?.currentVideoSubTitleIndex = Int32(index)
+            let allowed = subtitleTracks.map(\.index)
+            guard allowed.isEmpty || allowed.contains(index) else { return }
+            mediaPlayer.currentVideoSubTitleIndex = Int32(index)
             selectedSubtitleIndex = index
-            // Keep pending* so late track reshuffles can re-assert preference
         } else {
-            mediaPlayer?.currentVideoSubTitleIndex = -1
+            mediaPlayer.currentVideoSubTitleIndex = -1
             selectedSubtitleIndex = -1
             pendingSubtitlePlexId = nil
             pendingSubtitleStream = nil

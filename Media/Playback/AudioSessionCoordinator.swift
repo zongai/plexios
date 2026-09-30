@@ -21,13 +21,31 @@ final class AudioSessionCoordinator {
 
     func activate() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(
-            .playback,
-            mode: .moviePlayback,
-            options: [.allowAirPlay, .allowBluetoothA2DP]
-        )
+        // Prefer full options; OSStatus -50 (paramErr) is common when the
+        // previous route/category combination is incompatible — fall back.
+        do {
+            try session.setCategory(
+                .playback,
+                mode: .moviePlayback,
+                options: [.allowAirPlay, .allowBluetoothA2DP]
+            )
+            try session.setActive(true)
+            logger.playback.debug("Audio session activated (moviePlayback + AirPlay/A2DP)")
+            return
+        } catch {
+            logger.playback.warning("Audio session primary activate failed: \(error.localizedDescription)")
+        }
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.allowAirPlay])
+            try session.setActive(true)
+            logger.playback.debug("Audio session activated (fallback default + AirPlay)")
+            return
+        } catch {
+            logger.playback.warning("Audio session fallback activate failed: \(error.localizedDescription)")
+        }
+        try session.setCategory(.playback)
         try session.setActive(true)
-        logger.playback.debug("Audio session activated")
+        logger.playback.debug("Audio session activated (minimal playback)")
     }
 
     func deactivate(notifyOthers: Bool = false) {

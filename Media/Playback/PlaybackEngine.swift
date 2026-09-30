@@ -218,7 +218,8 @@ final class PlaybackEngine {
         do {
             try audioSession.activate()
         } catch {
-            logger.playback.error("Audio session: \(error.localizedDescription)")
+            // Non-fatal — VLC/AVPlayer can still open; log and continue.
+            logger.playback.error("Audio session: \(error.localizedDescription) (continuing)")
         }
 
         artworkURL = PlexImageURL.resolve(
@@ -270,10 +271,6 @@ final class PlaybackEngine {
                         case .playing:
                             self.sessionState = .playing
                             self.isPlaying = true
-                            self.applyVLCAudioSelection(self.selectedAudioId)
-                            if let ctx = self.context {
-                                self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
-                            }
                         case .paused:
                             self.sessionState = .paused
                             self.isPlaying = false
@@ -289,51 +286,45 @@ final class PlaybackEngine {
                 }
                 var headers = identityHeaders
                 headers["X-Plex-Token"] = context.token
+                // External SRT attach during prepare has hard-crashed VLC on some HEVC
+                // titles (log: Decision VLC/hevc + srt, never reached "Playing via VLC").
+                // Defer sidecars until the player is stable.
                 let externalSubs = Self.externalSubtitleURLs(
                     streams: subtitleStreams,
                     baseURL: context.baseURL,
                     token: context.token
                 )
+                logger.playback.info(
+                    "VLC prepare begin url=\(LogRedaction.redactURL(url)) startMs=\(startMs) externalSubs=\(externalSubs.count)"
+                )
                 // Let SwiftUI attach VLCPlayerContainer before VLC draws (same as IPTV).
                 try? await Task.sleep(for: .milliseconds(80))
-                // Do not force software decode by default — VP9 played fine before landscape
-                // lock; glitches were from drawable size during rotation. Soft-decode remains
-                // available via forceSoftwareDecode if needed later.
                 try await vlc.prepare(
                     url: url,
                     headers: headers,
                     startPositionMs: startMs,
-                    externalSubtitles: externalSubs,
-                    preferredSubtitlePlexId: decision.selectedSubtitleStreamId,
+                    externalSubtitles: [],
+                    preferredSubtitlePlexId: nil,
                     preferredAudioPlexId: decision.selectedAudioStreamId,
                     forceSoftwareDecode: false
                 )
+                logger.playback.info("VLC prepare returned OK")
                 vlc.setRate(playbackRate)
                 vlc.setAspectMode(aspectMode)
                 applyVLCAudioSelection(decision.selectedAudioStreamId)
-                applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
-                // Tracks often appear only after playing — retry for several seconds.
-                vlc.onTracksUpdated = { [weak self] in
-                    Task { @MainActor in
-                        guard let self else { return }
-                        self.applyVLCAudioSelection(self.selectedAudioId)
-                        if let ctx = self.context {
-                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
-                        }
-                    }
-                }
+                // Conservative track re-apply (no onTracksUpdated storm).
                 Task { @MainActor in
-                    for delay in [300, 700, 1200, 2000, 3500, 5500, 8000] as [UInt64] {
+                    for delay in [600, 1500, 3000] as [UInt64] {
                         try? await Task.sleep(for: .milliseconds(delay))
                         self.applyVLCAudioSelection(self.selectedAudioId)
-                        if let ctx = self.context {
-                            self.applyVLCSubtitleSelection(self.selectedSubtitleId, context: ctx)
-                        }
-                        // Stop early if VLC already shows a selected track matching preference
-                        if self.vlcBackend?.tryApplyPendingAudio() == true,
-                           !(self.vlcBackend?.audioTracks.isEmpty ?? true) {
-                            break
-                        }
+                    }
+                    // Sidecar subtitles after demux is warm.
+                    if !externalSubs.isEmpty || decision.selectedSubtitleStreamId != nil {
+                        try? await Task.sleep(for: .milliseconds(500))
+                        self.logger.playback.info(
+                            "VLC deferred subtitle apply id=\(decision.selectedSubtitleStreamId.map(String.init) ?? "nil") externals=\(externalSubs.count)"
+                        )
+                        self.applyVLCSubtitleSelection(decision.selectedSubtitleStreamId, context: context)
                     }
                 }
                 activePlaybackBackend = .vlc

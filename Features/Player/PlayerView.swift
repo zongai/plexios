@@ -142,7 +142,7 @@ struct PlayerView: View {
     }
 
     // MARK: - Controls (reference layout)
-    // Top: close · aspect ········· volume slider
+    // Top: close · aspect
     // Center: −10 · play/pause · +10
     // Bottom: title/meta ····· gear · AirPlay · episodes
     //         progress bar
@@ -190,37 +190,6 @@ struct PlayerView: View {
             }
 
             Spacer(minLength: 12)
-
-            // Compact volume slider (0…200%; boost >100% effective on VLC)
-            HStack(spacing: 8) {
-                Text("\(Int((engine.volume * 100).rounded()))%")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(engine.volume > 1.01 ? Color.orange : .white.opacity(0.85))
-                    .monospacedDigit()
-                    .frame(width: 40, alignment: .trailing)
-
-                Slider(
-                    value: Binding(
-                        get: { Double(engine.volume) },
-                        set: { engine.setVolume(Float($0)); bumpControls() }
-                    ),
-                    in: 0...Double(PlaybackEngine.maxVolume)
-                )
-                .tint(engine.volume > 1.01 ? .orange : .white)
-                .frame(width: 120)
-                .accessibilityLabel(String(localized: "player.volume"))
-                .accessibilityValue("\(Int((engine.volume * 100).rounded()))%")
-
-                Image(systemName: volumeIconName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(engine.volume > 1.01 ? Color.orange : .white.opacity(0.9))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(.black.opacity(0.35))
-            )
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -354,21 +323,6 @@ struct PlayerView: View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 0) {
-                settingsRow(
-                    title: String(localized: "player.audio_boost"),
-                    trailing: "\(Int((engine.volume * 100).rounded()))%",
-                    systemImage: engine.volume > 1.01 ? "speaker.wave.3.fill" : "speaker.wave.2.fill"
-                ) {
-                    // Cycle: 100% → 125% → 150% → 200% → 100% (true boost on VLC)
-                    let next: Float
-                    if engine.volume < 1.05 { next = 1.25 }
-                    else if engine.volume < 1.3 { next = 1.5 }
-                    else if engine.volume < 1.75 { next = 2.0 }
-                    else { next = 1.0 }
-                    engine.setVolume(next)
-                    bumpControls()
-                }
-
                 settingsMenuRow(
                     title: rateLabel(engine.playbackRate),
                     systemImage: "clock.arrow.circlepath"
@@ -664,13 +618,6 @@ struct PlayerView: View {
         case .fill: return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
         case .stretch: return "rectangle.ratio.16.to.9"
         }
-    }
-
-    private var volumeIconName: String {
-        if engine.volume < 0.01 { return "speaker.slash.fill" }
-        if engine.volume > 1.01 { return "speaker.wave.3.fill" }
-        if engine.volume < 0.4 { return "speaker.wave.1.fill" }
-        return "speaker.wave.2.fill"
     }
 
     private func cycleAspectMode() {

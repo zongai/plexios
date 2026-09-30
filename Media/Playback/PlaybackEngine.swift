@@ -416,7 +416,6 @@ final class PlaybackEngine {
             await avPlayer.seek(to: time)
         }
 
-        avPlayer.volume = min(1, max(0, volume))
         avPlayer.play()
         applyRateToPlayer()
         isPlaying = true
@@ -445,21 +444,6 @@ final class PlaybackEngine {
         if activePlaybackBackend == .vlc {
             vlcBackend?.setAspectMode(mode)
         }
-    }
-
-    /// Linear volume 0…2 (100% = 1.0, boost up to 200%). VLC maps to 0…200; AVPlayer caps at 1.0.
-    private(set) var volume: Float = 1
-    static let maxVolume: Float = 2.0
-
-    func setVolume(_ value: Float) {
-        let v = min(Self.maxVolume, max(0, value))
-        volume = v
-        if activePlaybackBackend == .vlc {
-            vlcBackend?.setVolume(v)
-            return
-        }
-        // AVPlayer only supports 0…1; boost above 100% requires VLC path.
-        player?.volume = min(1, v)
     }
 
     private func applyRateToPlayer() {
@@ -613,7 +597,6 @@ final class PlaybackEngine {
                     forceSoftwareDecode: false
                 )
                 vlc.rebindDrawable()
-                vlc.setVolume(volume)
                 vlc.setAspectMode(aspectMode)
                 isPlaying = true
                 sessionState = .playing
@@ -634,7 +617,6 @@ final class PlaybackEngine {
         activePlaybackBackend = .avPlayer
         observe(player: avPlayer, item: item)
         startAccessLogMonitoring(item: item)
-        avPlayer.volume = min(1, max(0, volume))
         avPlayer.play()
         isPlaying = true
         sessionState = .playing

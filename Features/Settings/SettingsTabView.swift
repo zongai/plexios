@@ -406,7 +406,7 @@ struct AboutSettingsView: View {
                     .font(AppTypography.caption)
                     .foregroundStyle(AppColors.secondaryText)
                 LabeledContent(String(localized: "settings.app_name"), value: "PlexiOS")
-                LabeledContent(L10n.version, value: "0.1.0")
+                LabeledContent(L10n.version, value: AppVersion.displayString)
             }
             Section(String(localized: "settings.native_caps_title")) {
                 Text(String(localized: "settings.native_caps_np"))

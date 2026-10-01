@@ -95,6 +95,11 @@
 "settings.language_note" = "El idioma sigue el del sistema.";
 "settings.version" = "Versión";
 "settings.subtitles_default" = "Subtítulos activados por defecto";
+"settings.subtitle_size" = "Tamaño de subtítulos";
+"settings.subtitle_size_small" = "Pequeño";
+"settings.subtitle_size_medium" = "Mediano";
+"settings.subtitle_size_large" = "Grande";
+"settings.subtitle_size_xlarge" = "Muy grande";
 "settings.default_audio" = "Idioma de audio predeterminado";
 "settings.default_subtitle" = "Idioma de subtítulos predeterminado";
 "settings.audio_priority" = "Prioridad de audio %d";

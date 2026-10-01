@@ -116,6 +116,8 @@ final class VLCPlaybackBackend: NSObject {
         preferredAudioOrder: Int? = nil,
         /// 0-based index among embedded subtitle streams (for VLC `sub-track` option).
         preferredSubtitleOrder: Int? = nil,
+        /// VLC freetype-rel-fontsize (smaller → larger on-screen text). Default 16.
+        subtitleFontSize: Int = 16,
         forceSoftwareDecode: Bool = false
     ) async throws {
         guard VLCKitImport.available else {
@@ -139,7 +141,7 @@ final class VLCPlaybackBackend: NSObject {
             "network-caching": 1500,
             "http-reconnect": true,
             "sub-fps": 25,
-            "freetype-rel-fontsize": 16,
+            "freetype-rel-fontsize": subtitleFontSize,
             // Ensure text subs are rendered.
             "sub-autodetect-file": true
         ]

@@ -95,6 +95,11 @@
 "settings.language_note" = "言語はシステム言語に従います。";
 "settings.version" = "バージョン";
 "settings.subtitles_default" = "字幕をデフォルトでオン";
+"settings.subtitle_size" = "字幕サイズ";
+"settings.subtitle_size_small" = "小";
+"settings.subtitle_size_medium" = "標準";
+"settings.subtitle_size_large" = "大";
+"settings.subtitle_size_xlarge" = "特大";
 "settings.default_audio" = "デフォルト音声言語";
 "settings.default_subtitle" = "デフォルト字幕言語";
 "settings.audio_priority" = "音声優先度 %d";

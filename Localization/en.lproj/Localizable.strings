@@ -112,6 +112,11 @@
 "settings.language_note" = "Language follows the system language.";
 "settings.version" = "Version";
 "settings.subtitles_default" = "Subtitles on by default";
+"settings.subtitle_size" = "Subtitle size";
+"settings.subtitle_size_small" = "Small";
+"settings.subtitle_size_medium" = "Medium";
+"settings.subtitle_size_large" = "Large";
+"settings.subtitle_size_xlarge" = "Extra large";
 "settings.default_audio" = "Default audio language";
 "settings.default_subtitle" = "Default subtitle language";
 "settings.audio_priority" = "Audio priority %d";

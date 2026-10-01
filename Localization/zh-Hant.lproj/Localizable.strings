@@ -95,6 +95,11 @@
 "settings.language_note" = "語言跟隨系統語言。";
 "settings.version" = "版本";
 "settings.subtitles_default" = "預設開啟字幕";
+"settings.subtitle_size" = "字幕大小";
+"settings.subtitle_size_small" = "小";
+"settings.subtitle_size_medium" = "標準";
+"settings.subtitle_size_large" = "大";
+"settings.subtitle_size_xlarge" = "特大";
 "settings.default_audio" = "預設音軌語言";
 "settings.default_subtitle" = "預設字幕語言";
 "settings.audio_priority" = "音軌優先 %d";

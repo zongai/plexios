@@ -237,6 +237,34 @@ enum VideoAspectMode: String, Sendable, CaseIterable, Identifiable {
     }
 }
 
+/// Relative subtitle text size for VLC `freetype-rel-fontsize`
+/// (smaller number → larger on-screen text).
+enum SubtitleTextSize: String, CaseIterable, Sendable {
+    case small
+    case medium
+    case large
+    case extraLarge
+
+    /// VLC freetype-rel-fontsize value.
+    var freetypeRelFontsize: Int {
+        switch self {
+        case .small: return 22
+        case .medium: return 16
+        case .large: return 12
+        case .extraLarge: return 9
+        }
+    }
+
+    var labelKey: String {
+        switch self {
+        case .small: return "settings.subtitle_size_small"
+        case .medium: return "settings.subtitle_size_medium"
+        case .large: return "settings.subtitle_size_large"
+        case .extraLarge: return "settings.subtitle_size_xlarge"
+        }
+    }
+}
+
 struct PlaybackPreferences: Sendable {
     /// nil = original / auto
     var maxVideoBitrateKbps: Int?
@@ -245,6 +273,8 @@ struct PlaybackPreferences: Sendable {
     var preferredAudioLanguages: [String]
     var preferredSubtitleLanguages: [String]
     var subtitlesEnabled: Bool
+    /// On-screen subtitle text size (VLC freetype).
+    var subtitleTextSize: SubtitleTextSize
 
     /// Convenience: first audio preference (legacy single-value access).
     var preferredAudioLanguage: String? { preferredAudioLanguages.first }
@@ -265,6 +295,7 @@ struct PlaybackPreferences: Sendable {
         preferredAudioLanguages: [],
         preferredSubtitleLanguages: [],
         subtitlesEnabled: true,
+        subtitleTextSize: .medium,
         defaultPlaybackRate: 1.0,
         defaultAspectMode: .fit,
         allowNativeMediaEngine: false,
@@ -308,6 +339,7 @@ final class PlaybackSettingsStore {
         static let maxBitrate = "playback.maxBitrateKbps"
         static let autoplay = "playback.autoPlayNext"
         static let subsEnabled = "playback.subtitlesEnabled"
+        static let subTextSize = "playback.subtitleTextSize"
         static let rate = "playback.defaultRate"
         static let aspect = "playback.aspectMode"
         static let nativeEngine = "playback.allowNativeMediaEngine"
@@ -343,6 +375,7 @@ final class PlaybackSettingsStore {
                 preferredAudioLanguages: Self.loadLangList(defaults, listKey: Keys.audioLangs, legacyKey: Keys.audioLang),
                 preferredSubtitleLanguages: Self.loadLangList(defaults, listKey: Keys.subLangs, legacyKey: Keys.subLang),
                 subtitlesEnabled: defaults.object(forKey: Keys.subsEnabled) as? Bool ?? true,
+                subtitleTextSize: SubtitleTextSize(rawValue: defaults.string(forKey: Keys.subTextSize) ?? "") ?? .medium,
                 defaultPlaybackRate: defaults.object(forKey: Keys.rate) as? Float ?? 1.0,
                 defaultAspectMode: VideoAspectMode(rawValue: defaults.string(forKey: Keys.aspect) ?? "") ?? .fit,
                 allowNativeMediaEngine: defaults.object(forKey: Keys.nativeEngine) as? Bool ?? false,
@@ -358,6 +391,7 @@ final class PlaybackSettingsStore {
             }
             defaults.set(newValue.autoPlayNextEpisode, forKey: Keys.autoplay)
             defaults.set(newValue.subtitlesEnabled, forKey: Keys.subsEnabled)
+            defaults.set(newValue.subtitleTextSize.rawValue, forKey: Keys.subTextSize)
             defaults.set(newValue.defaultPlaybackRate, forKey: Keys.rate)
             defaults.set(newValue.defaultAspectMode.rawValue, forKey: Keys.aspect)
             defaults.set(newValue.allowNativeMediaEngine, forKey: Keys.nativeEngine)

@@ -333,6 +333,7 @@ final class PlaybackEngine {
                     preferredAudioPlexId: decision.selectedAudioStreamId,
                     preferredAudioOrder: audioOrder,
                     preferredSubtitleOrder: subOrder,
+                    subtitleFontSize: effectivePrefs.subtitleTextSize.freetypeRelFontsize,
                     forceSoftwareDecode: forceSW
                 )
                 logger.playback.info("VLC prepare returned OK forceSW=\(forceSW)")

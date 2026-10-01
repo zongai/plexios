@@ -250,6 +250,14 @@ struct PlaybackSettingsDetailView: View {
                 Toggle(String(localized: "settings.subtitles_default"), isOn: $prefs.subtitlesEnabled)
                     .onChange(of: prefs.subtitlesEnabled) { _, _ in save() }
 
+                Picker(String(localized: "settings.subtitle_size"), selection: $prefs.subtitleTextSize) {
+                    ForEach(SubtitleTextSize.allCases, id: \.self) { size in
+                        Text(String(localized: String.LocalizationValue(size.labelKey))).tag(size)
+                    }
+                }
+                .onChange(of: prefs.subtitleTextSize) { _, _ in save() }
+                .disabled(!prefs.subtitlesEnabled)
+
                 NavigationLink {
                     LanguagePriorityListView(kind: .audio)
                 } label: {

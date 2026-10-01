@@ -95,6 +95,11 @@
 "settings.language_note" = "언어는 시스템 언어를 따릅니다.";
 "settings.version" = "버전";
 "settings.subtitles_default" = "기본적으로 자막 켜기";
+"settings.subtitle_size" = "자막 크기";
+"settings.subtitle_size_small" = "작게";
+"settings.subtitle_size_medium" = "보통";
+"settings.subtitle_size_large" = "크게";
+"settings.subtitle_size_xlarge" = "매우 크게";
 "settings.default_audio" = "기본 오디오 언어";
 "settings.default_subtitle" = "기본 자막 언어";
 "settings.audio_priority" = "오디오 우선순위 %d";

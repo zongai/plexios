@@ -13,8 +13,8 @@ options:
 
 settings:
   base:
-    # Match Xcode 26.3 toolchain (Swift 6.2.4). Bump to 6.3 when linking SwiftVLC on 26.4+.
-    SWIFT_VERSION: "6.2"
+    # Language mode 5.9 (same as main) under Xcode 26.3 SDK. Bump when linking SwiftVLC on 26.4+.
+    SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "1,2"
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     DEVELOPMENT_TEAM: ""

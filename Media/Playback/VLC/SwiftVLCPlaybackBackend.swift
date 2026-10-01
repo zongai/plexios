@@ -181,7 +181,17 @@ final class SwiftVLCPlaybackBackend: NSObject {
     }
 
     func stop() async {
+#if canImport(SwiftVLC)
         await stopInternal()
+#else
+        state = .idle
+        audioTracks = []
+        subtitleTracks = []
+        selectedAudioIndex = -1
+        selectedSubtitleIndex = -1
+        positionMs = 0
+        durationMs = 0
+#endif
         state = .stopped
         onStateChange?(.stopped)
     }

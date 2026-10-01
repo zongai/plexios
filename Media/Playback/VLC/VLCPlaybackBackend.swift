@@ -145,23 +145,18 @@ final class VLCPlaybackBackend: NSObject {
             // Ensure text subs are rendered.
             "sub-autodetect-file": true
         ]
-        // Prefer tracks via media options *before* play — mutating
-        // currentAudioTrackIndex after play hard-crashes MobileVLCKit.
+        // Prefer audio via media option *before* play.
         if let preferredAudioOrder, preferredAudioOrder >= 0 {
             opts["audio-track"] = String(preferredAudioOrder)
         }
-        // Embedded text: set before play. (Live currentVideoSubTitleIndex hard-crashes.)
+        // Hint embedded sub track (VLC often ignores this for MKV — we also apply after demux).
         if let preferredSubtitleOrder, preferredSubtitleOrder >= 0 {
             opts["sub-track"] = String(preferredSubtitleOrder)
-            opts["sub-track-id"] = String(preferredSubtitleOrder)
         }
         // External SRT/ASS: download to disk *before* play and bind with sub-file.
-        // Post-play addPlaybackSlave without selecting a track left sidecars invisible;
-        // selecting tracks live hard-crashes MobileVLCKit.
         if let firstSub = externalSubtitles.first,
            let localSub = await downloadSubtitleToTemp(url: firstSub) {
             opts["sub-file"] = localSub.path
-            // Also as input-slave for builds that ignore sub-file.
             opts["input-slave"] = localSub.absoluteString
         }
         // VP9 / problematic HW paths: disable hardware decode to avoid green/artifact frames.
@@ -188,11 +183,23 @@ final class VLCPlaybackBackend: NSObject {
         state = .playing
         onStateChange?(.playing)
 
-        // Enumerate tracks for UI only (no live index writes).
+        // After demux enumerates tracks, select preferred embedded sub by order among
+        // VLC subtitle tracks (sub-track media option is unreliable for MKV).
+        let wantSubOrder = preferredSubtitleOrder
+        let wantSubOff = preferredSubtitlePlexId == nil && externalSubtitles.isEmpty
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
+            try? await Task.sleep(for: .milliseconds(900))
             guard self.mediaPlayer != nil else { return }
             self.refreshTracks()
+            if wantSubOff {
+                self.selectSubtitleIndex(nil)
+            } else if let order = wantSubOrder, order >= 0, order < self.subtitleTracks.count {
+                let idx = self.subtitleTracks[order].index
+                self.selectSubtitleIndex(idx)
+            } else if externalSubtitles.isEmpty == false, let last = self.subtitleTracks.last {
+                // Sidecar attached via sub-file — enable last enumerated text track.
+                self.selectSubtitleIndex(last.index)
+            }
             self.onTracksUpdated?()
         }
 #else
@@ -472,14 +479,25 @@ final class VLCPlaybackBackend: NSObject {
             return
         }
 
-        // Embedded text track — index select only; one delayed retry if list empty.
+        // Embedded: delayed match against VLC track list (names / order).
         pendingEnforceExternal = false
-        if subtitleTracks.isEmpty {
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(600))
+        Task { @MainActor in
+            for delay in [700, 1500] as [UInt64] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard self.mediaPlayer != nil else { return }
                 self.refreshTracks()
                 if let matched = self.matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
                     self.selectSubtitleIndex(matched)
+                    return
+                }
+                // Fallback: same order among embedded Plex streams vs VLC subtitle tracks.
+                let embedded = allSubtitleStreams.filter {
+                    !$0.isExternal && !($0.key?.contains("/library/streams/") ?? false)
+                }
+                if let order = embedded.firstIndex(where: { $0.id == stream.id }),
+                   order < self.subtitleTracks.count {
+                    self.selectSubtitleIndex(self.subtitleTracks[order].index)
+                    return
                 }
             }
         }

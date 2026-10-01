@@ -177,7 +177,9 @@ struct PlayerView: View {
             controlIconButton("xmark", label: L10n.playerClose) {
                 Task {
                     await engine.stop(report: true)
+                    // Portrait first so the underlying UI is already upright before dismiss.
                     OrientationLock.unlockAll()
+                    try? await Task.sleep(for: .milliseconds(280))
                     dismiss()
                 }
             }

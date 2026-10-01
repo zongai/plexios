@@ -1,15 +1,15 @@
 import UIKit
 
-/// Controls preferred interface orientation while the video player is open.
+/// App chrome stays portrait-only. Landscape is allowed only while a video player is open.
 /// Requires `AppDelegate.application(_:supportedInterfaceOrientationsFor:)` to read `mask`.
 @MainActor
 enum OrientationLock {
-    /// Current mask returned to UIKit. Defaults to phone: all but upside-down.
-    static var mask: UIInterfaceOrientationMask = .allButUpsideDown
+    /// Default: portrait app UI. Player calls `lockLandscape()` while presented.
+    static var mask: UIInterfaceOrientationMask = .portrait
 
     private static var unlockTask: Task<Void, Never>?
 
-    /// Lock to landscape and request a geometry update so playback opens sideways.
+    /// Enter player / IPTV fullscreen: allow landscape and request sideways geometry.
     static func lockLandscape() {
         unlockTask?.cancel()
         unlockTask = nil
@@ -17,24 +17,19 @@ enum OrientationLock {
         requestGeometry(.landscape)
     }
 
-    /// Leave the player: force portrait, then restore free rotation shortly after.
+    /// Leave player: return to portrait and **keep** portrait (do not re-enable free rotation).
     static func unlockAll() {
         unlockTask?.cancel()
-        // Temporarily allow only portrait so the system must rotate back.
+        unlockTask = nil
         mask = .portrait
         requestGeometry(.portrait)
-
-        unlockTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled else { return }
-            // App UI may rotate freely again (except upside-down on phone).
-            mask = .allButUpsideDown
-            notifyOrientationChange()
-        }
     }
 
     private static func requestGeometry(_ orientations: UIInterfaceOrientationMask) {
-        guard let scene = activeWindowScene() else { return }
+        guard let scene = activeWindowScene() else {
+            notifyOrientationChange()
+            return
+        }
 
         let prefs = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: orientations)
         scene.requestGeometryUpdate(prefs) { _ in

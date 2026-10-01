@@ -454,6 +454,7 @@ struct IPTVPlayerView: View {
                         Task {
                             await engine.stop(report: false)
                             OrientationLock.unlockAll()
+                            try? await Task.sleep(for: .milliseconds(280))
                             dismiss()
                         }
                     },

@@ -375,15 +375,9 @@ final class PlaybackEngine {
                 FileLogStore.shared.flush()
                 vlc.setRate(playbackRate)
                 vlc.setAspectMode(aspectMode)
-                // Soft-restart / forced embedded sub: apply after VLC lists tracks (see prepare Task).
-                // Also seed pending match from Plex stream for language-based fallback.
-                if let subId = decision.selectedSubtitleStreamId,
-                   let stream = subtitleStreams.first(where: { $0.id == subId }),
-                   !Self.isSidecarSubtitle(stream) {
-                    vlc.applyPlexSubtitle(stream: stream, allSubtitleStreams: subtitleStreams) { s in
-                        Self.externalSubtitleURL(stream: s, baseURL: context.baseURL, token: context.token)
-                    }
-                }
+                // Do not call applyPlexSubtitle / selectSubtitleIndex after play —
+                // those write currentVideoSubTitleIndex and hard-crash. Preference is
+                // already in preferredSubtitleOrder / externalSubtitles for prepare.
                 if forceSW, startMs > 0 {
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(1200))

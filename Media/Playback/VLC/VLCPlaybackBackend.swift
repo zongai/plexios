@@ -145,13 +145,15 @@ final class VLCPlaybackBackend: NSObject {
             // Ensure text subs are rendered.
             "sub-autodetect-file": true
         ]
-        // Prefer audio via media option *before* play.
+        // Prefer tracks via media options *before* play only.
         if let preferredAudioOrder, preferredAudioOrder >= 0 {
             opts["audio-track"] = String(preferredAudioOrder)
         }
-        // Hint embedded sub track (VLC often ignores this for MKV — we also apply after demux).
+        // Embedded text: 0-based among subtitle streams. Soft-restart re-prepare when user switches.
         if let preferredSubtitleOrder, preferredSubtitleOrder >= 0 {
             opts["sub-track"] = String(preferredSubtitleOrder)
+            // Some VLC builds use 1-based; set both when order > 0 is rare — keep 0-based primary.
+            opts["sub-language"] = "any"
         }
         // External SRT/ASS: download to disk *before* play and bind with sub-file.
         if let firstSub = externalSubtitles.first,
@@ -183,23 +185,12 @@ final class VLCPlaybackBackend: NSObject {
         state = .playing
         onStateChange?(.playing)
 
-        // After demux enumerates tracks, select preferred embedded sub by order among
-        // VLC subtitle tracks (sub-track media option is unreliable for MKV).
-        let wantSubOrder = preferredSubtitleOrder
-        let wantSubOff = preferredSubtitlePlexId == nil && externalSubtitles.isEmpty
+        // Track list for UI only — never write currentVideoSubTitleIndex (hard-crashes
+        // MobileVLCKit). Embedded/external preference is applied only via pre-play options.
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: .milliseconds(800))
             guard self.mediaPlayer != nil else { return }
             self.refreshTracks()
-            if wantSubOff {
-                self.selectSubtitleIndex(nil)
-            } else if let order = wantSubOrder, order >= 0, order < self.subtitleTracks.count {
-                let idx = self.subtitleTracks[order].index
-                self.selectSubtitleIndex(idx)
-            } else if externalSubtitles.isEmpty == false, let last = self.subtitleTracks.last {
-                // Sidecar attached via sub-file — enable last enumerated text track.
-                self.selectSubtitleIndex(last.index)
-            }
             self.onTracksUpdated?()
         }
 #else
@@ -404,103 +395,36 @@ final class VLCPlaybackBackend: NSObject {
         return Array(set).filter { $0.count >= 2 }
     }
 
+    /// UI bookkeeping only. Writing `currentVideoSubTitleIndex` hard-crashes MobileVLCKit
+    /// on this device set — real selection is pre-play `sub-track` / `sub-file` + soft-restart.
     func selectSubtitleIndex(_ index: Int?) {
-#if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-        guard let mediaPlayer else { return }
         if let index {
-            let allowed = subtitleTracks.map(\.index)
-            if !allowed.isEmpty && !allowed.contains(index) { return }
-            if selectedSubtitleIndex == index { return }
-            let wasPlaying = mediaPlayer.isPlaying
-            if wasPlaying { mediaPlayer.pause() }
-            mediaPlayer.currentVideoSubTitleIndex = Int32(index)
             selectedSubtitleIndex = index
-            if wasPlaying { mediaPlayer.play() }
         } else {
-            if selectedSubtitleIndex == -1 { return }
-            let wasPlaying = mediaPlayer.isPlaying
-            if wasPlaying { mediaPlayer.pause() }
-            mediaPlayer.currentVideoSubTitleIndex = -1
             selectedSubtitleIndex = -1
             pendingSubtitlePlexId = nil
             pendingSubtitleStream = nil
-            if wasPlaying { mediaPlayer.play() }
         }
-#endif
     }
 
-    /// Select subtitle using Plex metadata (#62-style, safer attach).
+    /// Prefer soft-restart from PlaybackEngine. This method only updates pending state /
+    /// UI bookkeeping and must not touch live VLC subtitle indices.
     func applyPlexSubtitle(
         stream: PlexStream?,
         allSubtitleStreams: [PlexStream],
         resolveExternalURL: @escaping (PlexStream) -> URL?
     ) {
 #if canImport(VLCKitSPM) || canImport(MobileVLCKit)
-        guard mediaPlayer != nil else { return }
-        refreshTracks()
         pendingSubtitleAll = allSubtitleStreams
         pendingSubtitleResolve = resolveExternalURL
-
-        guard let stream else {
-            pendingSubtitleStream = nil
-            pendingSubtitlePlexId = nil
-            pendingEnforceExternal = false
-            selectSubtitleIndex(nil)
-            return
-        }
-
         pendingSubtitleStream = stream
-        pendingSubtitlePlexId = stream.id
-
-        // Prefer already-loaded VLC track (from prepare-time attach) — index only, no re-download.
-        if let matched = matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
-            pendingEnforceExternal = false
-            selectSubtitleIndex(matched)
-            return
-        }
-
-        // Only true Plex sidecars — never treat embedded ASS/SRT as external just by codec
-        // (that path used to download+slave and crash on track switch).
-        let key = stream.key ?? ""
-        let treatExternal = stream.isExternal
-            || key.contains("/library/streams/")
-
-        if treatExternal {
-            pendingEnforceExternal = true
-            guard let url = resolveExternalURL(stream) else { return }
-            Task { @MainActor in
-                await self.attachExternalSubtitle(url: url, enforce: false)
-                try? await Task.sleep(for: .milliseconds(400))
-                self.refreshTracks()
-                if let last = self.subtitleTracks.last {
-                    self.selectSubtitleIndex(last.index)
-                }
-            }
-            return
-        }
-
-        // Embedded: delayed match against VLC track list (names / order).
+        pendingSubtitlePlexId = stream?.id
         pendingEnforceExternal = false
-        Task { @MainActor in
-            for delay in [700, 1500] as [UInt64] {
-                try? await Task.sleep(for: .milliseconds(delay))
-                guard self.mediaPlayer != nil else { return }
-                self.refreshTracks()
-                if let matched = self.matchEmbeddedTrack(for: stream, all: allSubtitleStreams) {
-                    self.selectSubtitleIndex(matched)
-                    return
-                }
-                // Fallback: same order among embedded Plex streams vs VLC subtitle tracks.
-                let embedded = allSubtitleStreams.filter {
-                    !$0.isExternal && !($0.key?.contains("/library/streams/") ?? false)
-                }
-                if let order = embedded.firstIndex(where: { $0.id == stream.id }),
-                   order < self.subtitleTracks.count {
-                    self.selectSubtitleIndex(self.subtitleTracks[order].index)
-                    return
-                }
-            }
+        if stream == nil {
+            selectedSubtitleIndex = -1
         }
+        refreshTracks()
+        onTracksUpdated?()
 #endif
     }
 

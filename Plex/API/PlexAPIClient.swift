@@ -206,7 +206,10 @@ actor PlexAPIClient {
         var request = try makeRequest(
             base: baseURL,
             path: "library/collections",
-            query: [URLQueryItem(name: "includeCollections", value: "1")]
+            query: [
+                URLQueryItem(name: "includeCollections", value: "1"),
+                URLQueryItem(name: "includeMeta", value: "1")
+            ]
         )
         applyPMSHeaders(to: &request, token: token)
         let response = try await perform(request)
@@ -214,9 +217,22 @@ actor PlexAPIClient {
         return (container.mediaContainer.metadata ?? []).compactMap(PlexAPIMapper.metadata(from:))
     }
 
-    /// Fallback: per-section collections when global path is empty.
+    /// Fallback: per-section collections when global path is empty or 404.
     func fetchSectionCollections(sectionKey: String, baseURL: URL, token: String) async throws -> [PlexMetadata] {
         guard let url = PlexURL.join(baseURL, path: "library/sections/\(sectionKey)/collections") else {
+            throw PlexError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        applyPMSHeaders(to: &request, token: token)
+        let response = try await perform(request)
+        let container = try decode(APIMediaContainer<APIMetadataContainer>.self, from: response.data)
+        return (container.mediaContainer.metadata ?? []).compactMap(PlexAPIMapper.metadata(from:))
+    }
+
+    /// Items inside a collection. PMS expects `/library/collections/{id}/children`
+    /// (metadata/children often 404 for collection rating keys).
+    func fetchCollectionChildren(ratingKey: String, baseURL: URL, token: String) async throws -> [PlexMetadata] {
+        guard let url = PlexURL.join(baseURL, path: "library/collections/\(ratingKey)/children") else {
             throw PlexError.invalidResponse
         }
         var request = URLRequest(url: url)

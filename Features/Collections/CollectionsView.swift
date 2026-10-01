@@ -84,6 +84,7 @@ struct CollectionDetailView: View {
     let title: String
     @State private var children: [PlexMetadata] = []
     @State private var isLoading = true
+    @State private var errorMessage: String?
 
     private var columns: [GridItem] {
         [GridItem(.adaptive(minimum: 110), spacing: AppLayout.gridSpacing)]
@@ -93,6 +94,10 @@ struct CollectionDetailView: View {
         Group {
             if isLoading {
                 LoadingStateView()
+            } else if let errorMessage {
+                ErrorStateView(message: errorMessage) {
+                    Task { await loadChildren() }
+                }
             } else if children.isEmpty {
                 EmptyStateView(title: "Empty collection", systemImage: "tray")
             } else {
@@ -118,20 +123,25 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            guard let context = environment.serverContext else {
-                isLoading = false
-                return
-            }
-            do {
-                children = try await environment.collectionsRepository.children(
-                    ratingKey: ratingKey,
-                    context: context
-                )
-            } catch {
-                // soft-fail; empty state
-            }
+        .task { await loadChildren() }
+    }
+
+    private func loadChildren() async {
+        guard let context = environment.serverContext else {
+            errorMessage = L10n.noServer
             isLoading = false
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            children = try await environment.collectionsRepository.children(
+                ratingKey: ratingKey,
+                context: context
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

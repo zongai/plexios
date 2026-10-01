@@ -186,18 +186,21 @@ actor CollectionsRepository {
         if !force, let cached: [PlexMetadata] = await cache.value(forKey: key) {
             return cached
         }
-        var list = try await api.fetchCollections(baseURL: context.baseURL, token: context.token)
+        // Global path 404s on some PMS builds — treat as empty and fall back to sections.
+        var list = (try? await api.fetchCollections(baseURL: context.baseURL, token: context.token)) ?? []
         if list.isEmpty {
-            // Aggregate from each library section
-            let sections = try await api.fetchLibrarySections(baseURL: context.baseURL, token: context.token)
+            let sections = (try? await api.fetchLibrarySections(baseURL: context.baseURL, token: context.token)) ?? []
             var aggregated: [PlexMetadata] = []
+            var seen = Set<String>()
             for section in sections {
                 let part = (try? await api.fetchSectionCollections(
                     sectionKey: section.key,
                     baseURL: context.baseURL,
                     token: context.token
                 )) ?? []
-                aggregated.append(contentsOf: part)
+                for item in part where seen.insert(item.ratingKey).inserted {
+                    aggregated.append(item)
+                }
             }
             list = aggregated
         }
@@ -206,7 +209,19 @@ actor CollectionsRepository {
     }
 
     func children(ratingKey: String, context: ServerContext) async throws -> [PlexMetadata] {
-        try await api.fetchChildren(ratingKey: ratingKey, baseURL: context.baseURL, token: context.token)
+        // Collections use a dedicated children path; metadata/children often 404.
+        if let items = try? await api.fetchCollectionChildren(
+            ratingKey: ratingKey,
+            baseURL: context.baseURL,
+            token: context.token
+        ), !items.isEmpty {
+            return items
+        }
+        return try await api.fetchChildren(
+            ratingKey: ratingKey,
+            baseURL: context.baseURL,
+            token: context.token
+        )
     }
 }
 

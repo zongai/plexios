@@ -4,8 +4,8 @@ Native Swift / SwiftUI Plex Media Server client for iOS.
 
 ## Requirements
 
-- iOS 17+
-- Xcode 15+
+- **main / released path:** iOS 17+ / Xcode 15+ / Swift 5.9
+- **`feature/swiftvlc-migration` only:** iOS 18+ / Xcode 26.4+ / Swift 6.3+ (required by [SwiftVLC 1.0](https://github.com/harflabs/SwiftVLC))
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
 ## Generate & open
@@ -42,10 +42,11 @@ Re-sign the IPA with your Apple team before installing on a device (or use AltSt
 
 | Backend | When used |
 |---------|-----------|
-| **MobileVLCKit** | Default Direct Play when linked (`allowVLCPlayer`, not `preferSystemPlayer`) |
+| **MobileVLCKit** | Default Direct Play when linked (`allowVLCPlayer`, not `preferSystemPlayer`) — **main** |
+| **SwiftVLC** | libVLC 4 Direct Play — **in progress on `feature/swiftvlc-migration`** (scaffold only until later phases) |
 | **AVPlayer** | HLS / transcode, or when system player is preferred (PiP / AirPlay Video) |
 | **Native (FFmpeg)** | Experimental toggle |
 
-### License note (MobileVLCKit)
+### License note (MobileVLCKit / SwiftVLC)
 
-MobileVLCKit is **LGPLv2.1+**. This app links it as a dynamic framework via SPM. Source for VideoLAN components is available from [videolan.org](https://www.videolan.org/). App-specific changes to this repository remain under the project license.
+MobileVLCKit and the libVLC binary inside SwiftVLC are **LGPLv2.1+**. Linked dynamically via SPM. Source for VideoLAN components is available from [videolan.org](https://www.videolan.org/). App-specific changes to this repository remain under the project license.

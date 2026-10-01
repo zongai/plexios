@@ -4,8 +4,10 @@ import Foundation
 enum PlaybackBackend: String, Sendable, Equatable {
     case avPlayer
     case nativeMediaEngine
-    /// MobileVLCKit Direct Play (broad container/codec support).
+    /// MobileVLCKit (libVLC 3.x) Direct Play — legacy path during migration.
     case vlc
+    /// SwiftVLC (libVLC 4.0) Direct Play — feature/swiftvlc-migration.
+    case swiftVLC
 }
 
 /// High-level path chosen before (and possibly revised after) runtime failures.

@@ -16,6 +16,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Name outputs (branch-aware)
+        id: meta
+        run: |
+          set -euo pipefail
+          REF="${{ github.ref_name }}"
+          # Sanitize branch for filenames/tags (keep alnum, dot, underscore, hyphen).
+          SLUG=$(echo "$REF" | sed 's#^feature/##' | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g' | cut -c1-48)
+          RUN="${{ github.run_number }}"
+          if [ "$REF" = "main" ]; then
+            IPA="PlexiOS-unsigned-${RUN}.ipa"
+            ARTIFACT="plexios-unsigned-ipa"
+            TAG="build-${RUN}"
+            TITLE="Build ${RUN}"
+          else
+            IPA="PlexiOS-unsigned-${SLUG}-${RUN}.ipa"
+            ARTIFACT="plexios-unsigned-ipa-${SLUG}"
+            TAG="build-${SLUG}-${RUN}"
+            TITLE="Build ${RUN} (${REF})"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "ipa=$IPA" >> "$GITHUB_OUTPUT"
+          echo "artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "IPA=$IPA ARTIFACT=$ARTIFACT TAG=$TAG"
+
       - name: Select Xcode
         run: |
           # Prefer Xcode 26.3 (current Actions max); 26.4 when available.
@@ -65,7 +92,6 @@ jobs:
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build
 
-
       - name: Package unsigned IPA
         run: |
           set -euo pipefail
@@ -79,27 +105,32 @@ jobs:
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
-          IPA_NAME="PlexiOS-unsigned-${{ github.run_number }}.ipa"
+          IPA_NAME="${{ steps.meta.outputs.ipa }}"
           zip -r "$IPA_NAME" Payload
           ls -lh "$IPA_NAME"
+          # Stable path for upload step
+          echo "IPA_PATH=$IPA_NAME" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: plexios-unsigned-ipa
-          path: PlexiOS-unsigned-*.ipa
+          name: ${{ steps.meta.outputs.artifact }}
+          path: ${{ steps.meta.outputs.ipa }}
           if-no-files-found: error
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: Build ${{ github.run_number }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
           body: |
             Unsigned IPA from `${{ github.sha }}` on `${{ github.ref_name }}`.
 
+            - IPA: `${{ steps.meta.outputs.ipa }}`
+            - Artifact: `${{ steps.meta.outputs.artifact }}`
+
             Not code-signed. Install via AltStore / Sideloadly / TrollStore, or re-sign with your team.
-          files: PlexiOS-unsigned-*.ipa
+          files: ${{ steps.meta.outputs.ipa }}
           generate_release_notes: true
           fail_on_unmatched_files: true
         env:

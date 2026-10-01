@@ -857,11 +857,17 @@ final class PlaybackEngine {
         }
     }
 
-    /// True only for Plex sidecar files (not embedded ASS/SRT text tracks).
+    /// True for Plex sidecar files (external SRT/ASS), not embedded text tracks.
     static func isSidecarSubtitle(_ stream: PlexStream) -> Bool {
         guard stream.streamType == .subtitle else { return false }
         if stream.isExternal { return true }
-        if let key = stream.key, key.contains("/library/streams/") {
+        if let key = stream.key, key.contains("/library/streams/") || key.contains("/streams/") {
+            return true
+        }
+        // Plex sometimes omits isExternal but marks format/codec as text sidecar.
+        let codec = (stream.codec ?? stream.format ?? "").lowercased()
+        if stream.key != nil,
+           ["srt", "ass", "ssa", "vtt", "subrip", "webvtt"].contains(codec) {
             return true
         }
         return false

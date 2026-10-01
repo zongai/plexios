@@ -139,7 +139,9 @@ final class VLCPlaybackBackend: NSObject {
             "network-caching": 1500,
             "http-reconnect": true,
             "sub-fps": 25,
-            "freetype-rel-fontsize": 16
+            "freetype-rel-fontsize": 16,
+            // Ensure text subs are rendered.
+            "sub-autodetect-file": true
         ]
         // Prefer tracks via media options *before* play — mutating
         // currentAudioTrackIndex after play hard-crashes MobileVLCKit.
@@ -148,6 +150,15 @@ final class VLCPlaybackBackend: NSObject {
         }
         if let preferredSubtitleOrder, preferredSubtitleOrder >= 0 {
             opts["sub-track"] = String(preferredSubtitleOrder)
+        }
+        // External SRT/ASS: download to disk *before* play and bind with sub-file.
+        // Post-play addPlaybackSlave without selecting a track left sidecars invisible;
+        // selecting tracks live hard-crashes MobileVLCKit.
+        if let firstSub = externalSubtitles.first,
+           let localSub = await downloadSubtitleToTemp(url: firstSub) {
+            opts["sub-file"] = localSub.path
+            // Also as input-slave for builds that ignore sub-file.
+            opts["input-slave"] = localSub.absoluteString
         }
         // VP9 / problematic HW paths: disable hardware decode to avoid green/artifact frames.
         if forceSoftwareDecode {
@@ -164,21 +175,6 @@ final class VLCPlaybackBackend: NSObject {
 
         player.play()
 
-        // Sidecar attach only (no currentVideoSubTitleIndex / currentAudioTrackIndex writes).
-        // Live track index mutation hard-crashes MobileVLCKit; soft-restart + pre-play
-        // options handle preferred tracks instead.
-        let subsToAttach = externalSubtitles
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(800))
-            guard self.mediaPlayer != nil else { return }
-            for subURL in subsToAttach {
-                await self.attachExternalSubtitle(url: subURL, enforce: false)
-                try? await Task.sleep(for: .milliseconds(200))
-            }
-            self.refreshTracks()
-            self.onTracksUpdated?()
-        }
-
         if startPositionMs > 0 {
             player.time = VLCTime(int: Int32(clamping: startPositionMs))
         }
@@ -187,9 +183,52 @@ final class VLCPlaybackBackend: NSObject {
         rate = 1.0
         state = .playing
         onStateChange?(.playing)
+
+        // Enumerate tracks for UI only (no live index writes).
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard self.mediaPlayer != nil else { return }
+            self.refreshTracks()
+            self.onTracksUpdated?()
+        }
 #else
         throw PlaybackFailure(stage: .unknown, reason: "MobileVLCKit not linked", underlying: nil)
 #endif
+    }
+
+    /// Download a remote subtitle (with Plex token headers) to a temp file.
+    @MainActor
+    private func downloadSubtitleToTemp(url: URL) async -> URL? {
+        let ext: String = {
+            let path = url.path.lowercased()
+            if path.hasSuffix(".ass") || path.hasSuffix(".ssa") { return "ass" }
+            if path.hasSuffix(".vtt") { return "vtt" }
+            return "srt"
+        }()
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 20
+            for (k, v) in httpHeaders {
+                request.setValue(v, forHTTPHeaderField: k)
+            }
+            if request.value(forHTTPHeaderField: "X-Plex-Token") == nil,
+               let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "X-Plex-Token" })?.value {
+                request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                return nil
+            }
+            guard !data.isEmpty else { return nil }
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent("plex-sub-\(UUID().uuidString).\(ext)")
+            try data.write(to: tmp, options: .atomic)
+            attachedExternalFileURLs.append(tmp)
+            return tmp
+        } catch {
+            return nil
+        }
     }
 
     func play() {

@@ -162,13 +162,37 @@ final class PlaybackEngine {
         }
 
         // Prefer a media entry that actually has parts (library stubs can be empty).
-        var playableMedia = metadata.media[safe: decision.mediaIndex]
-        var playablePart = playableMedia.flatMap { $0.parts[safe: decision.partIndex] }
+        var resolvedMetadata = metadata
+        var activeDecision = decision
+        var playableMedia = resolvedMetadata.media[safe: activeDecision.mediaIndex]
+        var playablePart = playableMedia.flatMap { $0.parts[safe: activeDecision.partIndex] }
         if playablePart == nil {
-            for m in metadata.media where !m.parts.isEmpty {
+            for m in resolvedMetadata.media where !m.parts.isEmpty {
                 playableMedia = m
                 playablePart = m.parts[0]
                 break
+            }
+        }
+        // Hub/library seeds often include parts without Stream arrays → empty subtitle menu.
+        if playablePart?.streams.isEmpty == true {
+            logger.playback.info("play() part has empty streams — force-fetching metadata key=\(metadata.ratingKey)")
+            if let full = try? await fetchFullMetadata(ratingKey: metadata.ratingKey, context: context) {
+                resolvedMetadata = full
+                currentItem = full
+                playableMedia = full.media[safe: activeDecision.mediaIndex] ?? full.media.first
+                playablePart = playableMedia.flatMap { m in
+                    m.parts[safe: activeDecision.partIndex] ?? m.parts.first
+                }
+                activeDecision = PlaybackDecisionEngine.make(preferences: effectivePrefs).decide(
+                    metadata: full,
+                    network: network,
+                    forcedAudioId: forcedAudioId,
+                    forcedSubtitleId: forcedSubtitleId
+                )
+                self.decision = activeDecision
+                logger.playback.info(
+                    "play() metadata refresh streams audio=\(playablePart?.streams.filter { $0.streamType == .audio }.count ?? 0) sub=\(playablePart?.streams.filter { $0.streamType == .subtitle }.count ?? 0)"
+                )
             }
         }
         guard let media = playableMedia, let part = playablePart else {
@@ -178,14 +202,17 @@ final class PlaybackEngine {
 
         audioStreams = part.streams.filter { $0.streamType == .audio }
         subtitleStreams = part.streams.filter { $0.streamType == .subtitle }
-        selectedAudioId = decision.selectedAudioStreamId
-        selectedSubtitleId = decision.selectedSubtitleStreamId
+        selectedAudioId = activeDecision.selectedAudioStreamId
+        selectedSubtitleId = activeDecision.selectedSubtitleStreamId
+        logger.playback.info(
+            "play() track lists audio=\(audioStreams.count) subtitle=\(subtitleStreams.count)"
+        )
 
-        let duration = metadata.duration ?? part.duration ?? media.duration ?? 0
+        let duration = resolvedMetadata.duration ?? part.duration ?? media.duration ?? 0
         durationMs = duration
 
         let startMs: Int64 = {
-            guard resume, let offset = metadata.viewOffset, offset > 0 else { return 0 }
+            guard resume, let offset = resolvedMetadata.viewOffset, offset > 0 else { return 0 }
             if duration > 0, Double(offset) / Double(duration) > 0.95 { return 0 }
             return offset
         }()
@@ -200,7 +227,7 @@ final class PlaybackEngine {
 
         let sessionId = UUID().uuidString.lowercased()
         guard let url = builder.playbackURL(
-            metadata: metadata,
+            metadata: resolvedMetadata,
             part: part,
             decision: decision,
             sessionId: sessionId,
@@ -1371,13 +1398,25 @@ final class PlaybackEngine {
     }
 
     private func fetchFullMetadata(ratingKey: String, context: ServerContext) async throws -> PlexMetadata {
-        guard let url = PlexURL.join(context.baseURL, path: "library/metadata/\(ratingKey)") else {
+        // Query flags mirror metadataRepository so Part.Stream (audio/subs) is populated.
+        guard let url = PlexURL.join(
+            context.baseURL,
+            path: "library/metadata/\(ratingKey)",
+            query: [
+                URLQueryItem(name: "includeMarkers", value: "1"),
+                URLQueryItem(name: "includeChapters", value: "1"),
+                URLQueryItem(name: "includeChildren", value: "0")
+            ]
+        ) else {
             throw PlexError.invalidResponse
         }
         var request = URLRequest(url: url)
         request.setValue(context.token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        for (k, v) in identityHeaders {
+            request.setValue(v, forHTTPHeaderField: k)
+        }
         let response = try await http.data(for: request, allowNon2xx: false, retryCount: 1)
         let decoded = try JSONDecoder().decode(APIMediaContainer<APIMetadataContainer>.self, from: response.data)
         guard let item = (decoded.mediaContainer.metadata ?? []).compactMap(PlexAPIMapper.metadata(from:)).first else {

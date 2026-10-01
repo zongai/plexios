@@ -733,11 +733,14 @@ struct PlayerView: View {
             "startPlayback seed type=\(seed.type.rawValue) key=\(seed.ratingKey) mediaCount=\(seed.media.count) parts=\(seed.media.map { $0.parts.count }) network=\(String(describing: network))"
         )
 
-        // Library children / continue hubs often include a media stub with empty parts.
-        // Only full /library/metadata/{id} has playable part keys — force-fetch then.
+        // Library / hub / search seeds often omit Part.Stream arrays and empty parts.
+        // Full /library/metadata/{id} is required for audio/subtitle pickers and part keys.
         let seedIncomplete = seed.media.isEmpty
             || seed.media.contains(where: { $0.parts.isEmpty })
             || seed.media.allSatisfy({ media in media.parts.allSatisfy { $0.key.isEmpty } })
+            || seed.media.contains(where: { media in
+                media.parts.contains(where: { $0.streams.isEmpty })
+            })
 
         let full: PlexMetadata
         if seedIncomplete {

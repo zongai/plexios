@@ -737,7 +737,7 @@ struct PlayerView: View {
         // Only full /library/metadata/{id} has playable part keys — force-fetch then.
         let seedIncomplete = seed.media.isEmpty
             || seed.media.contains(where: { $0.parts.isEmpty })
-            || seed.media.allSatisfy({ partCount in partCount.parts.allSatisfy { $0.key == nil || $0.key?.isEmpty == true } })
+            || seed.media.allSatisfy({ media in media.parts.allSatisfy { $0.key.isEmpty } })
 
         let full: PlexMetadata
         if seedIncomplete {

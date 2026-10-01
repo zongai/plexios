@@ -65,9 +65,12 @@ final class PlaybackEngine {
 
     var isNativeBackendActive: Bool { activePlaybackBackend == .nativeMediaEngine }
     var isVLCBackendActive: Bool { activePlaybackBackend == .vlc }
+    var isSwiftVLCBackendActive: Bool { activePlaybackBackend == .swiftVLC }
 
     /// Shared VLC backend instance (drawable bound by PlayerView).
     private(set) var vlcBackend: VLCPlaybackBackend?
+    /// SwiftVLC (libVLC 4) backend — migration path behind `useSwiftVLC` preference.
+    private(set) var swiftVLCBackend: SwiftVLCPlaybackBackend?
 
     var nativeVideoFrameSink: VideoFrameSink? {
         guard isNativeBackendActive else { return nil }
@@ -265,11 +268,130 @@ final class PlaybackEngine {
             height: 900
         )
 
-        // Prefer MobileVLCKit Direct Play when enabled (broad codec/container support).
-        let useVLC = decision.mode == .directPlay
+        // Prefer VLC Direct Play when enabled (broad codec/container support).
+        // Migration: `useSwiftVLC` routes to SwiftVLC (libVLC 4); default stays MobileVLCKit.
+        let wantVLCDirect = decision.mode == .directPlay
             && effectivePrefs.allowVLCPlayer
             && !effectivePrefs.preferSystemPlayer
+        let useSwiftVLC = wantVLCDirect
+            && effectivePrefs.useSwiftVLC
+            && SwiftVLCPlaybackBackend.isLinked
+        let useVLC = wantVLCDirect
+            && !useSwiftVLC
             && VLCPlaybackBackend.isLinked
+
+        if useSwiftVLC {
+            do {
+                let svlc = swiftVLCBackend ?? SwiftVLCPlaybackBackend()
+                swiftVLCBackend = svlc
+                activePlaybackBackend = .swiftVLC
+                playerEngineRouter?.markActive(.swiftVLC)
+                svlc.onTimeChange = { [weak self] pos, dur in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.positionMs = pos
+                        if dur > 0 { self.durationMs = dur }
+                        self.nowPlaying.updateProgress(
+                            positionMs: pos, durationMs: self.durationMs, isPlaying: self.isPlaying
+                        )
+                    }
+                }
+                svlc.onEnded = { [weak self] in
+                    Task { await self?.handlePlaybackEnded() }
+                }
+                svlc.onError = { [weak self] message in
+                    Task { @MainActor in
+                        self?.logger.playback.error("SwiftVLC: \(message)")
+                        self?.errorMessage = message
+                        self?.sessionState = .error
+                        self?.isPlaying = false
+                    }
+                }
+                svlc.onStateChange = { [weak self] st in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        switch st {
+                        case .playing:
+                            self.sessionState = .playing
+                            self.isPlaying = true
+                        case .paused:
+                            self.sessionState = .paused
+                            self.isPlaying = false
+                        case .buffering:
+                            self.sessionState = .buffering
+                        case .failed:
+                            self.sessionState = .error
+                            self.isPlaying = false
+                        default:
+                            break
+                        }
+                    }
+                }
+                var headers = identityHeaders
+                headers["X-Plex-Token"] = context.token
+                let videoCodec = (media.videoCodec
+                    ?? media.parts.first?.streams.first(where: { $0.streamType == .video })?.codec
+                    ?? "")
+                    .lowercased()
+                let forceSW = videoCodec.contains("hevc") || videoCodec.contains("h265")
+                    || videoCodec.contains("vp9") || videoCodec == "av1"
+                let prepareStartMs: Int64 = forceSW && startMs > 0 ? 0 : startMs
+                let externalSubs: [URL] = {
+                    guard let pref = decision.selectedSubtitleStreamId,
+                          let stream = subtitleStreams.first(where: { $0.id == pref }),
+                          Self.isSidecarSubtitle(stream),
+                          let url = Self.externalSubtitleURL(
+                            stream: stream,
+                            baseURL: context.baseURL,
+                            token: context.token
+                          )
+                    else { return [] }
+                    return [url]
+                }()
+                let audioOrder = decision.selectedAudioStreamId.flatMap { id in
+                    audioStreams.firstIndex(where: { $0.id == id })
+                }
+                let embeddedSubs = subtitleStreams.filter { !Self.isSidecarSubtitle($0) }
+                let subOrder = decision.selectedSubtitleStreamId.flatMap { id in
+                    embeddedSubs.firstIndex(where: { $0.id == id })
+                }
+                logger.playback.info(
+                    "SwiftVLC prepare begin codec=\(videoCodec) forceSW=\(forceSW) startMs=\(startMs)"
+                )
+                try await svlc.prepare(
+                    url: url,
+                    headers: headers,
+                    startPositionMs: prepareStartMs,
+                    externalSubtitles: externalSubs,
+                    preferredSubtitlePlexId: decision.selectedSubtitleStreamId,
+                    preferredAudioPlexId: decision.selectedAudioStreamId,
+                    preferredAudioOrder: audioOrder,
+                    preferredSubtitleOrder: subOrder,
+                    subtitleFontSize: effectivePrefs.subtitleTextSize.freetypeRelFontsize,
+                    forceSoftwareDecode: forceSW
+                )
+                svlc.setRate(playbackRate)
+                svlc.setAspectMode(aspectMode)
+                if forceSW, startMs > 0 {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(1200))
+                        await self.swiftVLCBackend?.seek(toMs: startMs)
+                    }
+                }
+                activePlaybackBackend = .swiftVLC
+                playerEngineRouter?.markActive(.swiftVLC)
+                await newSession.updateState(.playing)
+                isPlaying = true
+                sessionState = .playing
+                startPeriodicReporting()
+                publishNowPlaying()
+                logger.playback.info("Playing via SwiftVLC codec=\(videoCodec)")
+                return
+            } catch {
+                logger.playback.info("SwiftVLC failed, falling through: \(error.localizedDescription)")
+                activePlaybackBackend = .avPlayer
+            }
+        }
 
         if useVLC {
             do {
@@ -499,6 +621,8 @@ final class PlaybackEngine {
         // AVPlayer path reacts via PlayerLayerView(aspectMode:); VLC needs an explicit call.
         if activePlaybackBackend == .vlc {
             vlcBackend?.setAspectMode(mode)
+        } else if activePlaybackBackend == .swiftVLC {
+            swiftVLCBackend?.setAspectMode(mode)
         }
     }
 
@@ -513,6 +637,10 @@ final class PlaybackEngine {
             vlcBackend?.setVolume(v)
             return
         }
+        if activePlaybackBackend == .swiftVLC {
+            swiftVLCBackend?.setVolume(v)
+            return
+        }
         // AVPlayer only supports 0…1; boost above 100% requires VLC path.
         player?.volume = min(1, v)
     }
@@ -520,6 +648,10 @@ final class PlaybackEngine {
     private func applyRateToPlayer() {
         if activePlaybackBackend == .vlc {
             vlcBackend?.setRate(playbackRate)
+            return
+        }
+        if activePlaybackBackend == .swiftVLC {
+            swiftVLCBackend?.setRate(playbackRate)
             return
         }
         if activePlaybackBackend == .nativeMediaEngine {
@@ -537,6 +669,8 @@ final class PlaybackEngine {
     func pause() {
         if activePlaybackBackend == .vlc {
             vlcBackend?.pause()
+        } else if activePlaybackBackend == .swiftVLC {
+            swiftVLCBackend?.pause()
         } else if activePlaybackBackend == .nativeMediaEngine {
             playerEngineRouter?.nativeBackendInstance().pause()
         } else {
@@ -557,6 +691,9 @@ final class PlaybackEngine {
     func resume() {
         if activePlaybackBackend == .vlc {
             vlcBackend?.play()
+            applyRateToPlayer()
+        } else if activePlaybackBackend == .swiftVLC {
+            swiftVLCBackend?.play()
             applyRateToPlayer()
         } else if activePlaybackBackend == .nativeMediaEngine {
             playerEngineRouter?.nativeBackendInstance().play()
@@ -731,6 +868,8 @@ final class PlaybackEngine {
     func seek(toMs ms: Int64) async {
         if activePlaybackBackend == .vlc {
             await vlcBackend?.seek(toMs: ms)
+        } else if activePlaybackBackend == .swiftVLC {
+            await swiftVLCBackend?.seek(toMs: ms)
         } else if activePlaybackBackend == .nativeMediaEngine {
             await playerEngineRouter?.nativeBackendInstance().seek(toMs: ms)
         } else {
@@ -758,6 +897,8 @@ final class PlaybackEngine {
         nativeTimelineTask = nil
         if activePlaybackBackend == .vlc {
             await vlcBackend?.stop()
+        } else if activePlaybackBackend == .swiftVLC {
+            await swiftVLCBackend?.stop()
         }
         if activePlaybackBackend == .nativeMediaEngine {
             await playerEngineRouter?.nativeBackendInstance().stop()
@@ -1136,6 +1277,10 @@ final class PlaybackEngine {
             Task { await vlc.stop() }
         }
         vlcBackend = nil
+        if let svlc = swiftVLCBackend {
+            Task { await svlc.stop() }
+        }
+        swiftVLCBackend = nil
         player?.pause()
         player = nil
         logger.playback.error("\(message)")

@@ -288,6 +288,9 @@ struct PlaybackPreferences: Sendable {
     var allowVLCPlayer: Bool
     /// Force AVPlayer path (better PiP / AirPlay Video) even when VLC is linked.
     var preferSystemPlayer: Bool
+    /// Migration flag: use SwiftVLC (libVLC 4) instead of MobileVLCKit when both are linked.
+    /// Default false so main behavior stays on MobileVLCKit until validated.
+    var useSwiftVLC: Bool
 
     static let `default` = PlaybackPreferences(
         maxVideoBitrateKbps: nil,
@@ -300,7 +303,8 @@ struct PlaybackPreferences: Sendable {
         defaultAspectMode: .fit,
         allowNativeMediaEngine: false,
         allowVLCPlayer: true,
-        preferSystemPlayer: false
+        preferSystemPlayer: false,
+        useSwiftVLC: false
     )
 
     static let rateOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
@@ -345,6 +349,7 @@ final class PlaybackSettingsStore {
         static let nativeEngine = "playback.allowNativeMediaEngine"
         static let allowVLC = "playback.allowVLCPlayer"
         static let preferSystem = "playback.preferSystemPlayer"
+        static let useSwiftVLC = "playback.useSwiftVLC"
         static let audioLang = "playback.audioLang"       // legacy single
         static let subLang = "playback.subLang"           // legacy single
         static let audioLangs = "playback.audioLangs"     // ordered list
@@ -380,7 +385,8 @@ final class PlaybackSettingsStore {
                 defaultAspectMode: VideoAspectMode(rawValue: defaults.string(forKey: Keys.aspect) ?? "") ?? .fit,
                 allowNativeMediaEngine: defaults.object(forKey: Keys.nativeEngine) as? Bool ?? false,
                 allowVLCPlayer: defaults.object(forKey: Keys.allowVLC) as? Bool ?? true,
-                preferSystemPlayer: defaults.object(forKey: Keys.preferSystem) as? Bool ?? false
+                preferSystemPlayer: defaults.object(forKey: Keys.preferSystem) as? Bool ?? false,
+                useSwiftVLC: defaults.object(forKey: Keys.useSwiftVLC) as? Bool ?? false
             )
         }
         set {
@@ -397,6 +403,7 @@ final class PlaybackSettingsStore {
             defaults.set(newValue.allowNativeMediaEngine, forKey: Keys.nativeEngine)
             defaults.set(newValue.allowVLCPlayer, forKey: Keys.allowVLC)
             defaults.set(newValue.preferSystemPlayer, forKey: Keys.preferSystem)
+            defaults.set(newValue.useSwiftVLC, forKey: Keys.useSwiftVLC)
             defaults.set(newValue.preferredAudioLanguages, forKey: Keys.audioLangs)
             defaults.set(newValue.preferredSubtitleLanguages, forKey: Keys.subLangs)
             // Keep legacy keys in sync for older builds

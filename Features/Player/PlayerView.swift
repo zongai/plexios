@@ -30,6 +30,7 @@ struct PlayerView: View {
         engine.player != nil
             || engine.isNativeBackendActive
             || engine.isVLCBackendActive
+            || engine.isSwiftVLCBackendActive
             || engine.sessionState == .playing
             || engine.sessionState == .paused
             || engine.sessionState == .buffering
@@ -62,6 +63,8 @@ struct PlayerView: View {
                     )
                 } else if engine.isVLCBackendActive, let vlc = engine.vlcBackend {
                     VLCPlayerContainer(backend: vlc, aspectMode: engine.aspectMode)
+                } else if engine.isSwiftVLCBackendActive, let svlc = engine.swiftVLCBackend {
+                    SwiftVLCPlayerContainer(backend: svlc, aspectMode: engine.aspectMode)
                 } else if let player = engine.player {
                     PlayerLayerView(player: player, aspectMode: engine.aspectMode) { active in
                         isPiPActive = active

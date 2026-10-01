@@ -328,6 +328,13 @@ struct PlayerEngineSettingsView: View {
                     .onChange(of: prefs.allowVLCPlayer) { _, _ in save() }
                 Toggle(String(localized: "settings.prefer_system_player"), isOn: $prefs.preferSystemPlayer)
                     .onChange(of: prefs.preferSystemPlayer) { _, _ in save() }
+                if SwiftVLCPlaybackBackend.isLinked {
+                    Toggle("SwiftVLC (libVLC 4, experimental)", isOn: $prefs.useSwiftVLC)
+                        .onChange(of: prefs.useSwiftVLC) { _, _ in save() }
+                    Text("When on, Direct Play uses SwiftVLC instead of MobileVLCKit. Requires iOS 18+.")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(AppColors.secondaryText)
+                }
                 Text(vlcHelpText)
                     .font(AppTypography.caption)
                     .foregroundStyle(AppColors.secondaryText)

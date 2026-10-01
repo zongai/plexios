@@ -743,10 +743,74 @@ final class PlaybackEngine {
         aspectMode = effectivePrefs.defaultAspectMode
 
         // Prefer VLC for TS / exotic IPTV; HLS often works on AVPlayer
-        let useVLC = preferVLC
+        let wantVLC = preferVLC
             && effectivePrefs.allowVLCPlayer
             && !effectivePrefs.preferSystemPlayer
+        let useSwiftVLC = wantVLC
+            && effectivePrefs.useSwiftVLC
+            && SwiftVLCPlaybackBackend.isLinked
+        let useVLC = wantVLC
+            && !useSwiftVLC
             && VLCPlaybackBackend.isLinked
+
+        if useSwiftVLC {
+            do {
+                let svlc = swiftVLCBackend ?? SwiftVLCPlaybackBackend()
+                swiftVLCBackend = svlc
+                activePlaybackBackend = .swiftVLC
+                svlc.onTimeChange = { [weak self] pos, dur in
+                    guard let self else { return }
+                    self.positionMs = pos
+                    if dur > 0 { self.durationMs = dur }
+                }
+                svlc.onEnded = { [weak self] in
+                    Task { await self?.handlePlaybackEnded() }
+                }
+                svlc.onError = { [weak self] message in
+                    self?.errorMessage = message
+                    self?.sessionState = .error
+                    self?.isPlaying = false
+                }
+                svlc.onStateChange = { [weak self] st in
+                    guard let self else { return }
+                    switch st {
+                    case .playing:
+                        self.sessionState = .playing
+                        self.isPlaying = true
+                    case .paused:
+                        self.sessionState = .paused
+                        self.isPlaying = false
+                    case .buffering:
+                        self.sessionState = .buffering
+                    case .failed:
+                        self.sessionState = .error
+                        self.isPlaying = false
+                    default:
+                        break
+                    }
+                }
+                try? await Task.sleep(for: .milliseconds(50))
+                try await svlc.prepare(
+                    url: url,
+                    headers: headers,
+                    startPositionMs: 0,
+                    externalSubtitles: [],
+                    preferredSubtitlePlexId: nil,
+                    preferredAudioPlexId: nil,
+                    forceSoftwareDecode: false
+                )
+                svlc.setVolume(volume)
+                svlc.setAspectMode(aspectMode)
+                isPlaying = true
+                sessionState = .playing
+                nowPlaying.updateTitle(title, subtitle: "IPTV")
+                logger.playback.info("IPTV via SwiftVLC: \(url.absoluteString.prefix(80))")
+                return
+            } catch {
+                logger.playback.error("IPTV SwiftVLC failed: \(error.localizedDescription)")
+                activePlaybackBackend = .avPlayer
+            }
+        }
 
         if useVLC {
             do {
@@ -934,6 +998,16 @@ final class PlaybackEngine {
         selectedAudioId = streamId
         guard let metadata = currentItem, let context else { return }
 
+        if activePlaybackBackend == .swiftVLC {
+            // SwiftVLC supports live track selection (selectedAudioTrack) — no soft-restart.
+            let stream = audioStreams.first { $0.id == streamId }
+            logger.playback.info(
+                "selectAudio SwiftVLC live → \(stream?.displayTitle ?? stream?.language ?? "id=\(streamId)")"
+            )
+            swiftVLCBackend?.applyPlexAudio(stream: stream, allAudioStreams: audioStreams)
+            return
+        }
+
         if activePlaybackBackend == .vlc {
             // Live currentAudioTrackIndex hard-crashes MobileVLCKit (device logs).
             // Soft-restart with forced preference and restore position.
@@ -981,6 +1055,22 @@ final class PlaybackEngine {
     func selectSubtitle(streamId: Int?) async {
         selectedSubtitleId = streamId
         guard let metadata = currentItem, let context else { return }
+
+        if activePlaybackBackend == .swiftVLC {
+            // Live selectedSubtitleTrack + addExternalTrack for sidecars.
+            let stream = streamId.flatMap { id in subtitleStreams.first { $0.id == id } }
+            let label = stream
+                .map { "\($0.displayTitle ?? $0.language ?? "?") id=\($0.id) ext=\($0.isExternal)" }
+                ?? "off"
+            logger.playback.info("selectSubtitle SwiftVLC live → \(label)")
+            swiftVLCBackend?.applyPlexSubtitle(
+                stream: stream,
+                allSubtitleStreams: subtitleStreams
+            ) { s in
+                Self.externalSubtitleURL(stream: s, baseURL: context.baseURL, token: context.token)
+            }
+            return
+        }
 
         if activePlaybackBackend == .vlc {
             // Same as audio — never mutate live subtitle index on MobileVLCKit.

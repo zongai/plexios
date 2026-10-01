@@ -5,7 +5,7 @@ Native Swift / SwiftUI Plex Media Server client for iOS.
 ## Requirements
 
 - **main / released path:** iOS 17+ / Xcode 15+ / Swift 5.9
-- **`feature/swiftvlc-migration` only:** iOS 18+ / Xcode 26.4+ / Swift 6.3+ (required by [SwiftVLC 1.0](https://github.com/harflabs/SwiftVLC))
+- **`feature/swiftvlc-migration`:** iOS 18+ / **Xcode 26.3+ (Swift 6.2)** for CI (MobileVLCKit). Full [SwiftVLC 1.0](https://github.com/harflabs/SwiftVLC) needs **Xcode 26.4+ / Swift 6.3** — re-enable SPM in `project.yml` then.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
 ## Generate & open

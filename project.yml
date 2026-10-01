@@ -2,17 +2,19 @@ name: PlexiOS
 options:
   bundleIdPrefix: com.plexios
   deploymentTarget:
-    # Raised for SwiftVLC (libVLC 4) on feature/swiftvlc-migration — main stays iOS 17 until merge.
+    # Raised on feature/swiftvlc-migration — main stays iOS 17 until merge.
     iOS: "18.0"
-  xcodeVersion: "26.4"
+  # CI / GitHub macos-15 currently tops out at Xcode 26.3 (Swift 6.2.4).
+  # SwiftVLC 1.0 needs tools 6.3 / Xcode 26.4+ — package is not linked until that is available.
+  xcodeVersion: "26.3"
   objectVersion: 56
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
 settings:
   base:
-    # SwiftVLC 1.0 requires Swift 6.3+ / Xcode 26.4+.
-    SWIFT_VERSION: "6.3"
+    # Match Xcode 26.3 toolchain (Swift 6.2.4). Bump to 6.3 when linking SwiftVLC on 26.4+.
+    SWIFT_VERSION: "6.2"
     TARGETED_DEVICE_FAMILY: "1,2"
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     DEVELOPMENT_TEAM: ""
@@ -27,10 +29,13 @@ packages:
   VLCKitSPM:
     url: https://github.com/tylerjonesio/vlckit-spm
     from: "3.6.0"
-  # Stable only — do not use 1.1.0-beta (XCFramework not release-qualified).
-  SwiftVLC:
-    url: https://github.com/harflabs/SwiftVLC.git
-    from: "1.0.0"
+  # SwiftVLC SPM intentionally omitted for Xcode 26.3 CI:
+  #   from: "1.0.0" requires // swift-tools-version: 6.3
+  # Re-add when runner / local has Xcode 26.4+ with Swift 6.3:
+  #   SwiftVLC:
+  #     url: https://github.com/harflabs/SwiftVLC.git
+  #     from: "1.0.0"
+  #   and target dependency product: SwiftVLC
 
 targets:
   PlexiOS:
@@ -54,8 +59,6 @@ targets:
         product: PlexFFmpeg
       - package: VLCKitSPM
         product: VLCKitSPM
-      - package: SwiftVLC
-        product: SwiftVLC
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.plexios.app
@@ -72,7 +75,7 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: ""
         DEVELOPMENT_TEAM: ""
-        # USE_SWIFT_VLC enables the new backend stub; default path still MobileVLCKit until later phases.
+        # SwiftVLC backend compiles behind canImport(SwiftVLC); without the package it is a no-link stub.
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: NATIVE_FFMPEG
         OTHER_LDFLAGS: "$(inherited) -lbz2 -lz -liconv"
       configs:

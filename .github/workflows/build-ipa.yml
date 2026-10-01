@@ -18,9 +18,8 @@ jobs:
 
       - name: Select Xcode
         run: |
-          # SwiftVLC 1.0 requires Swift 6.3 / Xcode 26.4+. Prefer newest 26.x on the runner.
-          # Fall back through 26 → 16 for branches that do not need SwiftVLC.
-          for v in 26.4 26.3 26.2 26.1 26.0 16.4 16.3 16.2 16.1 16.0; do
+          # Prefer Xcode 26.3 (current Actions max); 26.4 when available.
+          for v in 26.3 26.4 26.2 26.1 26.0 16.4 16.3 16.2 16.1 16.0; do
             if [ -d "/Applications/Xcode_${v}.app" ]; then
               sudo xcode-select -s "/Applications/Xcode_${v}.app"
               break

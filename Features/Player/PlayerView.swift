@@ -781,7 +781,8 @@ struct PlayerView: View {
             environment.logger.playback.error("startPlayback engine error: \(err)")
         } else {
             let backend: String
-            if engine.isVLCBackendActive { backend = "vlc" }
+            if engine.isSwiftVLCBackendActive { backend = "swiftvlc" }
+            else if engine.isVLCBackendActive { backend = "vlc" }
             else if engine.isNativeBackendActive { backend = "native" }
             else { backend = "avplayer" }
             environment.logger.playback.info(

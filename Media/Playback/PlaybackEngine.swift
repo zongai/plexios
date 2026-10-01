@@ -372,6 +372,7 @@ final class PlaybackEngine {
                 )
                 svlc.setRate(playbackRate)
                 svlc.setAspectMode(aspectMode)
+                svlc.setVolume(volume)
                 if forceSW, startMs > 0 {
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(1200))
@@ -390,6 +391,7 @@ final class PlaybackEngine {
             } catch {
                 logger.playback.info("SwiftVLC failed, falling through: \(error.localizedDescription)")
                 activePlaybackBackend = .avPlayer
+                swiftVLCBackend = nil
             }
         }
 
@@ -961,8 +963,10 @@ final class PlaybackEngine {
         nativeTimelineTask = nil
         if activePlaybackBackend == .vlc {
             await vlcBackend?.stop()
+            vlcBackend = nil
         } else if activePlaybackBackend == .swiftVLC {
             await swiftVLCBackend?.stop()
+            swiftVLCBackend = nil
         }
         if activePlaybackBackend == .nativeMediaEngine {
             await playerEngineRouter?.nativeBackendInstance().stop()

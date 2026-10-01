@@ -321,6 +321,9 @@ final class PlaybackEngine {
                 let subOrder = decision.selectedSubtitleStreamId.flatMap { id in
                     embeddedSubs.firstIndex(where: { $0.id == id })
                 }
+                logger.playback.info(
+                    "VLC track prefs audioOrder=\(audioOrder.map(String.init) ?? "nil") subOrder=\(subOrder.map(String.init) ?? "nil") subId=\(decision.selectedSubtitleStreamId.map(String.init) ?? "off") embeddedSubs=\(embeddedSubs.count) sidecar=\(externalSubs.count)"
+                )
                 try await vlc.prepare(
                     url: url,
                     headers: headers,
@@ -857,17 +860,14 @@ final class PlaybackEngine {
         }
     }
 
-    /// True for Plex sidecar files (external SRT/ASS), not embedded text tracks.
+    /// True only for Plex *file* sidecars. Embedded SRT/ASS inside MKV/MP4 must
+    /// stay false — they are selected via VLC `sub-track`, not sub-file download.
     static func isSidecarSubtitle(_ stream: PlexStream) -> Bool {
         guard stream.streamType == .subtitle else { return false }
+        // Explicit external flag from PMS
         if stream.isExternal { return true }
-        if let key = stream.key, key.contains("/library/streams/") || key.contains("/streams/") {
-            return true
-        }
-        // Plex sometimes omits isExternal but marks format/codec as text sidecar.
-        let codec = (stream.codec ?? stream.format ?? "").lowercased()
-        if stream.key != nil,
-           ["srt", "ass", "ssa", "vtt", "subrip", "webvtt"].contains(codec) {
+        // Plex external stream endpoint (sidecar file on disk)
+        if let key = stream.key, key.contains("/library/streams/") {
             return true
         }
         return false

@@ -148,8 +148,10 @@ final class VLCPlaybackBackend: NSObject {
         if let preferredAudioOrder, preferredAudioOrder >= 0 {
             opts["audio-track"] = String(preferredAudioOrder)
         }
+        // Embedded text: set before play. (Live currentVideoSubTitleIndex hard-crashes.)
         if let preferredSubtitleOrder, preferredSubtitleOrder >= 0 {
             opts["sub-track"] = String(preferredSubtitleOrder)
+            opts["sub-track-id"] = String(preferredSubtitleOrder)
         }
         // External SRT/ASS: download to disk *before* play and bind with sub-file.
         // Post-play addPlaybackSlave without selecting a track left sidecars invisible;

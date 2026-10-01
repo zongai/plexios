@@ -245,14 +245,15 @@ struct PlaybackDecisionEngine: Sendable {
     }
 
     private func selectSubtitle(_ streams: [PlexStream], forced: Int?) -> (Int?, Bool) {
-        if !preferences.subtitlesEnabled {
-            return (nil, false)
-        }
+        // Explicit user pick (or off) always wins — even if global subtitles toggle is off.
         if let forced {
             if forced < 0 { return (nil, false) }
             if let stream = streams.first(where: { $0.id == forced }) {
                 return (forced, capabilities.requiresBurnIn(stream))
             }
+        }
+        if !preferences.subtitlesEnabled {
+            return (nil, false)
         }
         // 1) User priority list
         for pref in preferences.preferredSubtitleLanguages where !pref.isEmpty {

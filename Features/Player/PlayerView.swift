@@ -41,8 +41,19 @@ struct PlayerView: View {
             Color.black.ignoresSafeArea()
 
             // Video surface — no hit testing; taps handled by clear layer above.
+            // Errors first so a failed open is never stuck behind loading/black video.
             Group {
-                if engine.isNativeBackendActive {
+                if let error = localError ?? engine.errorMessage,
+                   engine.sessionState == .error || localError != nil {
+                    VStack(spacing: AppSpacing.md) {
+                        Text(error)
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                        Button(L10n.close) { dismiss() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                } else if engine.isNativeBackendActive {
                     MetalVideoView(
                         aspectMode: engine.aspectMode,
                         sink: engine.nativeVideoFrameSink,
@@ -60,15 +71,6 @@ struct PlayerView: View {
                     ProgressView()
                         .tint(.white)
                         .accessibilityLabel(L10n.loadingPlayback)
-                } else if let error = localError ?? engine.errorMessage {
-                    VStack(spacing: AppSpacing.md) {
-                        Text(error)
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
-                        Button(L10n.close) { dismiss() }
-                            .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
                 }
             }
             .ignoresSafeArea()
@@ -731,8 +733,14 @@ struct PlayerView: View {
             "startPlayback seed type=\(seed.type.rawValue) key=\(seed.ratingKey) mediaCount=\(seed.media.count) parts=\(seed.media.map { $0.parts.count }) network=\(String(describing: network))"
         )
 
+        // Library children / continue hubs often include a media stub with empty parts.
+        // Only full /library/metadata/{id} has playable part keys — force-fetch then.
+        let seedIncomplete = seed.media.isEmpty
+            || seed.media.contains(where: { $0.parts.isEmpty })
+            || seed.media.allSatisfy({ partCount in partCount.parts.allSatisfy { $0.key == nil || $0.key?.isEmpty == true } })
+
         let full: PlexMetadata
-        if seed.media.isEmpty {
+        if seedIncomplete {
             do {
                 full = try await environment.metadataRepository.metadata(
                     ratingKey: seed.ratingKey,
@@ -742,6 +750,11 @@ struct PlayerView: View {
                 environment.logger.playback.info(
                     "startPlayback fetched metadata mediaCount=\(full.media.count) parts=\(full.media.map { $0.parts.count })"
                 )
+                if full.media.isEmpty || full.media.allSatisfy({ $0.parts.isEmpty }) {
+                    localError = String(localized: "player.media_part_unavailable")
+                    environment.logger.playback.error("startPlayback: fetched metadata still has no parts")
+                    return
+                }
             } catch {
                 localError = error.localizedDescription
                 environment.logger.playback.error(
@@ -756,6 +769,7 @@ struct PlayerView: View {
 
         await engine.play(metadata: full, context: context, network: network, resume: true)
         if let err = engine.errorMessage {
+            localError = err
             environment.logger.playback.error("startPlayback engine error: \(err)")
         } else {
             let backend: String

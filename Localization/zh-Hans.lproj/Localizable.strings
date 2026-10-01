@@ -84,6 +84,7 @@
 "player.back_10" = "后退 10 秒";
 "player.forward_10" = "前进 10 秒";
 "player.loading" = "正在加载播放";
+"player.media_part_unavailable" = "无法获取媒体文件，请稍后重试";
 "player.position" = "播放位置";
 "settings.title" = "设置";
 "settings.playback" = "播放";

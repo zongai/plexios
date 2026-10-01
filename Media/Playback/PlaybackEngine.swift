@@ -161,10 +161,18 @@ final class PlaybackEngine {
             }
         }
 
-        guard let media = metadata.media[safe: decision.mediaIndex],
-              let part = media.parts[safe: decision.partIndex]
-        else {
-            fail("Media part unavailable")
+        // Prefer a media entry that actually has parts (library stubs can be empty).
+        var playableMedia = metadata.media[safe: decision.mediaIndex]
+        var playablePart = playableMedia.flatMap { $0.parts[safe: decision.partIndex] }
+        if playablePart == nil {
+            for m in metadata.media where !m.parts.isEmpty {
+                playableMedia = m
+                playablePart = m.parts[0]
+                break
+            }
+        }
+        guard let media = playableMedia, let part = playablePart else {
+            fail(String(localized: "player.media_part_unavailable"))
             return
         }
 
@@ -1092,7 +1100,16 @@ final class PlaybackEngine {
     private func fail(_ message: String) {
         errorMessage = message
         sessionState = .error
+        isPlaying = false
+        // Tear down any half-started backend so UI is not stuck on a black surface.
+        if let vlc = vlcBackend {
+            Task { await vlc.stop() }
+        }
+        vlcBackend = nil
+        player?.pause()
+        player = nil
         logger.playback.error("\(message)")
+        FileLogStore.shared.flush()
     }
 
     private func observe(player: AVPlayer, item: AVPlayerItem) {

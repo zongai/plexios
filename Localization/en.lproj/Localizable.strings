@@ -99,6 +99,7 @@
 "player.back_10" = "Back 10 seconds";
 "player.forward_10" = "Forward 10 seconds";
 "player.loading" = "Loading playback";
+"player.media_part_unavailable" = "Media part unavailable";
 "player.position" = "Playback position";
 
 /* Settings */

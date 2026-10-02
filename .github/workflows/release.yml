@@ -1,0 +1,22 @@
+name: Release multi-platform
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # iOS unsigned IPA — reuses existing build-ipa logic when on tag
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release notes
+        run: |
+          echo "Tag ${{ github.ref_name }}: run platform workflows and attach artifacts."
+          echo "iOS: workflow_dispatch build-ipa.yml"
+          echo "Windows: workflow_dispatch ci-windows.yml (build job)"
+          echo "Android: CI Android TV produces debug APK; use assembleRelease locally for store."

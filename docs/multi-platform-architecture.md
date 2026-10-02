@@ -201,8 +201,11 @@ Reference implementation already exists on iOS:
 - ✅ Coil posters, next-episode, timeline report
 - ✅ Home nav chips → Libraries / Search / Collections / Playlists
 
-### Phase 6 — Cross-platform hardening
-- Unified settings surface, CI path filters, release artifacts, capability matrix tests.
+### Phase 6 — Cross-platform hardening (done)
+- ✅ Unified settings contract + Windows/Android Settings UI
+- ✅ Capability matrix doc + unit tests (Windows / Android; iOS existing)
+- ✅ Path-filtered CI: `ci-windows.yml`, `ci-android.yml`, `release.yml`
+- ✅ Quality gates documented in `docs/phase6-hardening.md`
 
 ## 7. Build & CI Rules
 

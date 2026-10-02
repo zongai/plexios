@@ -17,46 +17,74 @@ public sealed partial class ShellPage : Page
         ViewModel = App.Services.GetRequiredService<ShellViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
-        Loaded += async (_, _) => await ViewModel.InitializeAsync();
-        ContentFrame.Navigate(typeof(HomePage));
+        Loaded += ShellPage_Loaded;
+    }
+
+    private async void ShellPage_Loaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= ShellPage_Loaded;
+        try
+        {
+            // Discover servers BEFORE first Home load so hubs have a context
+            await ViewModel.InitializeAsync();
+            if (ContentFrame.Content is null)
+                ContentFrame.Navigate(typeof(HomePage));
+            else if (ContentFrame.Content is HomePage)
+                ContentFrame.Navigate(typeof(HomePage)); // refresh after discover
+            else
+                ContentFrame.Navigate(typeof(HomePage));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine("ShellPage_Loaded: " + ex);
+            ViewModel.ActiveServerName = "Error: " + ex.Message;
+            try { ContentFrame.Navigate(typeof(HomePage)); } catch { /* ignore */ }
+        }
     }
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (args.IsSettingsSelected)
+        try
         {
-            ContentFrame.Navigate(typeof(SettingsPage));
-            return;
-        }
+            if (args.IsSettingsSelected)
+            {
+                ContentFrame.Navigate(typeof(SettingsPage));
+                return;
+            }
 
-        if (args.SelectedItem is not NavigationViewItem item) return;
-        var tag = item.Tag as string;
-        switch (tag)
+            if (args.SelectedItem is not NavigationViewItem item) return;
+            var tag = item.Tag as string;
+            switch (tag)
+            {
+                case "home":
+                    ContentFrame.Navigate(typeof(HomePage));
+                    break;
+                case "movies":
+                    ContentFrame.Navigate(typeof(LibrariesPage), PlexLibraryType.Movie);
+                    break;
+                case "shows":
+                    ContentFrame.Navigate(typeof(LibrariesPage), PlexLibraryType.Show);
+                    break;
+                case "music":
+                    ContentFrame.Navigate(typeof(LibrariesPage), PlexLibraryType.Artist);
+                    break;
+                case "collections":
+                    ContentFrame.Navigate(typeof(CollectionsPage));
+                    break;
+                case "playlists":
+                    ContentFrame.Navigate(typeof(PlaylistsPage));
+                    break;
+                case "favorites":
+                    ContentFrame.Navigate(typeof(FavoritesPage));
+                    break;
+                case "signout":
+                    App.Services.GetRequiredService<AuthenticationService>().SignOut();
+                    break;
+            }
+        }
+        catch (Exception ex)
         {
-            case "home":
-                ContentFrame.Navigate(typeof(HomePage));
-                break;
-            case "movies":
-                ContentFrame.Navigate(typeof(LibrariesPage), PlexLibraryType.Movie);
-                break;
-            case "shows":
-                ContentFrame.Navigate(typeof(LibrariesPage), PlexLibraryType.Show);
-                break;
-            case "music":
-                ContentFrame.Navigate(typeof(LibrariesPage), PlexLibraryType.Artist);
-                break;
-            case "collections":
-                ContentFrame.Navigate(typeof(CollectionsPage));
-                break;
-            case "playlists":
-                ContentFrame.Navigate(typeof(PlaylistsPage));
-                break;
-            case "favorites":
-                ContentFrame.Navigate(typeof(FavoritesPage));
-                break;
-            case "signout":
-                App.Services.GetRequiredService<AuthenticationService>().SignOut();
-                break;
+            System.Diagnostics.Debug.WriteLine("NavView_SelectionChanged: " + ex);
         }
     }
 
@@ -65,8 +93,16 @@ public sealed partial class ShellPage : Page
         var connections = App.Services.GetRequiredService<ConnectionManager>();
         var auth = App.Services.GetRequiredService<AuthenticationService>();
 
-        if (!string.IsNullOrEmpty(auth.AuthToken))
-            await connections.DiscoverAsync(auth.AuthToken);
+        try
+        {
+            if (!string.IsNullOrEmpty(auth.AuthToken))
+                await connections.DiscoverAsync(auth.AuthToken);
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ActiveServerName = "Discover failed: " + ex.Message;
+            return;
+        }
 
         var list = new ListView
         {
@@ -79,7 +115,8 @@ public sealed partial class ShellPage : Page
         {
             foreach (var conn in server.Connections.OrderBy(c => c.RankScore))
             {
-                var label = $"{server.Name}  ·  {(conn.Local ? "LAN" : conn.Relay ? "Relay" : "Remote")}  ·  {conn.ProtocolName}://{conn.Address}:{conn.Port}";
+                var label =
+                    $"{server.Name}  ·  {(conn.Local ? "LAN" : conn.Relay ? "Relay" : "Remote")}  ·  {conn.ProtocolName}://{conn.Address}:{conn.Port}";
                 list.Items.Add(new ServerPickItem
                 {
                     Label = label,
@@ -89,18 +126,17 @@ public sealed partial class ShellPage : Page
             }
         }
 
-        list.ItemTemplate = null;
-        // Display via ToString
         for (var i = 0; i < list.Items.Count; i++)
         {
-            if (list.Items[i] is ServerPickItem pi)
+            if (list.Items[i] is ServerPickItem pi &&
+                connections.ActiveServer?.MachineIdentifier == pi.Server.MachineIdentifier &&
+                connections.ActiveServer?.PreferredConnection?.Uri == pi.Connection.Uri)
             {
-                // Prefer active
-                if (connections.ActiveServer?.MachineIdentifier == pi.Server.MachineIdentifier &&
-                    connections.ActiveServer?.PreferredConnection?.Uri == pi.Connection.Uri)
-                    list.SelectedIndex = i;
+                list.SelectedIndex = i;
             }
         }
+
+        list.DisplayMemberPath = nameof(ServerPickItem.Label);
 
         var dialog = new ContentDialog
         {
@@ -112,18 +148,13 @@ public sealed partial class ShellPage : Page
             DefaultButton = ContentDialogButton.Primary
         };
 
-        // Simple text presentation
-        list.DisplayMemberPath = nameof(ServerPickItem.Label);
-
         var result = await dialog.ShowAsync();
         if (result != ContentDialogResult.Primary) return;
         if (list.SelectedItem is not ServerPickItem pick) return;
 
         connections.SelectConnection(pick.Server, pick.Connection);
         ViewModel.ActiveServerName = pick.Server.Name;
-        // Refresh current page content
-        if (ContentFrame.Content is HomePage)
-            ContentFrame.Navigate(typeof(HomePage));
+        ContentFrame.Navigate(typeof(HomePage));
     }
 
     private void Search_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)

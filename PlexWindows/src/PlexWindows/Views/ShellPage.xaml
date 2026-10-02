@@ -21,14 +21,15 @@
             <NavigationViewItem Content="Music" Tag="music" Icon="Audio" AccessKey="U" />
             <NavigationViewItemSeparator />
             <NavigationViewItem Content="Collections" Tag="collections" Icon="List" />
-            <NavigationViewItem Content="Playlists" Tag="playlists" Icon="MusicInfo" />
+            <NavigationViewItem Content="Playlists" Tag="playlists" Icon="Audio" />
             <NavigationViewItem Content="Favorites" Tag="favorites" Icon="Favorite" AccessKey="F" />
         </NavigationView.MenuItems>
         <NavigationView.FooterMenuItems>
-            <NavigationViewItem Content="Sign out" Tag="signout" Icon="LeaveChat" />
+            <!-- LeaveChat is not a valid Symbol on all SDK builds and can crash XAML load -->
+            <NavigationViewItem Content="Sign out" Tag="signout" Icon="Contact" />
         </NavigationView.FooterMenuItems>
 
-        <Grid>
+        <Grid Background="{StaticResource PlexBackgroundBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -53,7 +54,8 @@
                                 QuerySubmitted="Search_QuerySubmitted"
                                 AutomationProperties.Name="Search" />
             </Grid>
-            <Frame x:Name="ContentFrame" Grid.Row="1" />
+            <Frame x:Name="ContentFrame" Grid.Row="1"
+                   Background="{StaticResource PlexBackgroundBrush}" />
         </Grid>
     </NavigationView>
 </Page>

@@ -19,7 +19,29 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        UnhandledException += OnUnhandledException;
         Services = ConfigureServices();
+    }
+
+    private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        // Keep process alive when possible so the user does not just see a black flash
+        System.Diagnostics.Debug.WriteLine("Unhandled: " + e.Exception);
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "PlexWindows",
+                "crash.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.AppendAllText(path,
+                DateTimeOffset.Now + Environment.NewLine + e.Exception + Environment.NewLine + Environment.NewLine);
+        }
+        catch
+        {
+            // ignore
+        }
+        e.Handled = true;
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -50,7 +72,6 @@ public partial class App : Application
         services.AddSingleton<ConnectionManager>();
         services.AddSingleton<PlaybackDecisionEngine>();
         services.AddSingleton<AppSettings>();
-        // Router: respects AppSettings.PlayerBackend (auto | mediaFoundation | libVlc)
         services.AddTransient<IPlayerEngine>(sp =>
         {
             var settings = sp.GetRequiredService<AppSettings>();

@@ -28,6 +28,15 @@ public partial class HomeViewModel : ObservableObject
         _api = api;
         _auth = auth;
         _connections = connections;
+        // If shell discovers a server after this page was constructed, reload
+        _connections.PropertyChanged += async (_, e) =>
+        {
+            if (e.PropertyName == nameof(ConnectionManager.ActiveServer) &&
+                _connections.ActiveServer is not null)
+            {
+                await LoadAsync();
+            }
+        };
     }
 
     public async Task LoadAsync()
@@ -35,7 +44,9 @@ public partial class HomeViewModel : ObservableObject
         if (_connections.ActiveBaseUrl is null || string.IsNullOrEmpty(_connections.ActiveToken) ||
             _connections.ActiveServer is null)
         {
-            StatusMessage = "No active server. Discover servers first.";
+            StatusMessage = string.IsNullOrEmpty(_auth.AuthToken)
+                ? "Not signed in."
+                : "Discovering server… (or open Servers to pick one)";
             return;
         }
 
@@ -58,7 +69,7 @@ public partial class HomeViewModel : ObservableObject
                     Poster = PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb)
                 }).ToList()
             }).ToList();
-            StatusMessage = Hubs.Count == 0 ? "No hubs returned." : "";
+            StatusMessage = Hubs.Count == 0 ? "No hubs returned from this server." : "";
         }
         catch (Exception ex)
         {

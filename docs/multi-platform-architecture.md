@@ -181,10 +181,12 @@ Reference implementation already exists on iOS:
 - PIN auth (DPAPI), server discovery/ranking, Fluent sidebar shell, Home hubs.
 - PlaybackDecisionEngine + IPlayerEngine + Media Foundation stub + URL builder.
 
-### Phase 3 — Windows full playback & libraries
-- Wire MediaPlayerElement; Direct Play / Stream / Transcode.
-- Libraries, Movie/Show detail, Search, audio/subtitle, resume, next episode.
-- Keyboard shortcuts + media keys; MSIX release path.
+### Phase 3 — Windows full playback & libraries (in progress)
+- ✅ Libraries (Movies / TV / Music), Detail, Search, Favorites
+- ✅ PlaybackDecision + URL builder + Player page + next-episode
+- ✅ Keyboard: Space / ← → / Esc / MediaPlayPause
+- 🚧 MediaPlayerElement real MediaSource attach on Windows host
+- ⏳ Audio/subtitle track UI; poster image binding polish; MSIX CI
 
 ### Phase 4 — Android TV skeleton
 - New Android TV project (Kotlin + Compose TV).

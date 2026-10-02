@@ -91,7 +91,7 @@ public sealed partial class PlayerPage : Page
         switch (e.Key)
         {
             case VirtualKey.Space:
-            case VirtualKey.MediaPlayPause:
+            case (VirtualKey)179 /* VK_MEDIA_PLAY_PAUSE */:
                 ViewModel.TogglePlayPause();
                 e.Handled = true;
                 break;
@@ -121,7 +121,7 @@ public sealed partial class PlayerPage : Page
                 if (Frame.CanGoBack) Frame.GoBack();
                 e.Handled = true;
                 break;
-            case VirtualKey.MediaStop:
+            case (VirtualKey)178 /* VK_MEDIA_STOP */:
                 await ViewModel.StopAsync();
                 e.Handled = true;
                 break;

@@ -10,11 +10,11 @@ struct ServerContext: Sendable {
 // MARK: - Library
 
 actor LibraryRepository {
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let cache: ResponseCache
     private var memoryLibraries: [String: (date: Date, libraries: [PlexLibrary])] = [:]
 
-    init(api: PlexAPIClient, cache: ResponseCache = ResponseCache(namespace: "library")) {
+    init(api: any PlexAPIProtocol, cache: ResponseCache = ResponseCache(namespace: "library")) {
         self.api = api
         self.cache = cache
     }
@@ -71,10 +71,10 @@ actor LibraryRepository {
 // MARK: - Hub / Home
 
 actor HubRepository {
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let cache: ResponseCache
 
-    init(api: PlexAPIClient, cache: ResponseCache = ResponseCache(namespace: "hubs")) {
+    init(api: any PlexAPIProtocol, cache: ResponseCache = ResponseCache(namespace: "hubs")) {
         self.api = api
         self.cache = cache
     }
@@ -98,10 +98,10 @@ actor HubRepository {
 // MARK: - Metadata
 
 actor MetadataRepository {
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let cache: ResponseCache
 
-    init(api: PlexAPIClient, cache: ResponseCache = ResponseCache(namespace: "metadata")) {
+    init(api: any PlexAPIProtocol, cache: ResponseCache = ResponseCache(namespace: "metadata")) {
         self.api = api
         self.cache = cache
     }
@@ -144,10 +144,10 @@ actor MetadataRepository {
 // MARK: - Search
 
 actor SearchRepository {
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let cache: ResponseCache
 
-    init(api: PlexAPIClient, cache: ResponseCache = ResponseCache(namespace: "search")) {
+    init(api: any PlexAPIProtocol, cache: ResponseCache = ResponseCache(namespace: "search")) {
         self.api = api
         self.cache = cache
     }
@@ -173,10 +173,10 @@ actor SearchRepository {
 // MARK: - Collections / Playlists / Favorites
 
 actor CollectionsRepository {
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let cache: ResponseCache
 
-    init(api: PlexAPIClient, cache: ResponseCache = ResponseCache(namespace: "collections")) {
+    init(api: any PlexAPIProtocol, cache: ResponseCache = ResponseCache(namespace: "collections")) {
         self.api = api
         self.cache = cache
     }
@@ -226,10 +226,10 @@ actor CollectionsRepository {
 }
 
 actor PlaylistsRepository {
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let cache: ResponseCache
 
-    init(api: PlexAPIClient, cache: ResponseCache = ResponseCache(namespace: "playlists")) {
+    init(api: any PlexAPIProtocol, cache: ResponseCache = ResponseCache(namespace: "playlists")) {
         self.api = api
         self.cache = cache
     }
@@ -250,9 +250,9 @@ actor PlaylistsRepository {
 }
 
 actor FavoritesRepository {
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
 
-    init(api: PlexAPIClient) {
+    init(api: any PlexAPIProtocol) {
         self.api = api
     }
 

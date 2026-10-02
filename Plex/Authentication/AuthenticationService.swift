@@ -16,13 +16,13 @@ final class AuthenticationService {
     private(set) var authToken: String?
     private(set) var lastError: PlexError?
 
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let keychain: KeychainStore
     private let logger: LogRouter
 
     private var pollTask: Task<Void, Never>?
 
-    init(api: PlexAPIClient, keychain: KeychainStore, logger: LogRouter) {
+    init(api: any PlexAPIProtocol, keychain: KeychainStore, logger: LogRouter) {
         self.api = api
         self.keychain = keychain
         self.logger = logger

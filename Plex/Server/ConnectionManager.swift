@@ -10,13 +10,13 @@ final class ConnectionManager {
     private(set) var isRefreshing = false
     private(set) var lastError: PlexError?
 
-    private let api: PlexAPIClient
+    private let api: any PlexAPIProtocol
     private let networkMonitor: NetworkPathMonitor
     private let logger: LogRouter
 
     private var pathObservationTask: Task<Void, Never>?
 
-    init(api: PlexAPIClient, networkMonitor: NetworkPathMonitor, logger: LogRouter) {
+    init(api: any PlexAPIProtocol, networkMonitor: NetworkPathMonitor, logger: LogRouter) {
         self.api = api
         self.networkMonitor = networkMonitor
         self.logger = logger

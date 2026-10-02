@@ -2,7 +2,8 @@ import Foundation
 
 /// Unified client for plex.tv and PMS endpoints.
 /// Injects client identity + token headers; decodes JSON; maps errors.
-actor PlexAPIClient {
+/// Conforms to `PlexAPIProtocol` so domain services depend on the contract, not the concrete actor.
+actor PlexAPIClient: PlexAPIProtocol {
     private let http: HTTPClient
     private let identity: ClientIdentity
     private let logger: LogRouter

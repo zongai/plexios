@@ -51,7 +51,7 @@ public sealed class PlexConnection
     public DateTimeOffset? LastSuccess { get; set; }
 
     public string Id => Uri;
-    public Uri? BaseUrl => Uri.TryCreate(Uri, UriKind.Absolute, out var u) ? u : null;
+    public Uri? BaseUrl => System.Uri.TryCreate(Uri, UriKind.Absolute, out var u) ? u : null;
 
     /// <summary>Lower is better. Matches iOS rankScore semantics.</summary>
     public int RankScore

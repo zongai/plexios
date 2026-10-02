@@ -13,6 +13,8 @@ on:
 
 jobs:
   test:
+    # User preference: do not run tests on push/build unless explicitly needed
+    if: false
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:

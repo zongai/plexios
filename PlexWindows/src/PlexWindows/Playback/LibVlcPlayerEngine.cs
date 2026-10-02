@@ -34,7 +34,15 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         get
         {
 #if USE_LIBVLC
-            return true;
+            try
+            {
+                Core.Initialize();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
 #else
             return false;
 #endif

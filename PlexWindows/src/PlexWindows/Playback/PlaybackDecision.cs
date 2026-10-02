@@ -62,7 +62,7 @@ public sealed class ClientCapabilities
         SupportedContainers = new(StringComparer.OrdinalIgnoreCase)
             { "mp4", "m4v", "mov", "mpegts", "mpeg", "avi", "wmv", "asf" },
         SupportedVideoCodecs = new(StringComparer.OrdinalIgnoreCase)
-            { "h264", "avc", "hevc", "h265", "mpeg2video", "mpeg4", "vc1", "wmv3", "vp9" },
+            { "h264", "avc", "hevc", "h265", "mpeg2video", "mpeg4", "vc1", "wmv3" },
         SupportedAudioCodecs = new(StringComparer.OrdinalIgnoreCase)
             { "aac", "mp3", "ac3", "eac3", "wmav2", "pcm", "flac", "opus" },
         SupportedSubtitleFormats = new(StringComparer.OrdinalIgnoreCase)

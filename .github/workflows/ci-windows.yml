@@ -40,12 +40,24 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Restore
         run: dotnet restore PlexWindows.sln
-      - name: Build Release x64
-        run: dotnet build src/PlexWindows/PlexWindows.csproj -c Release -p:Platform=x64 --no-restore
-      - name: Upload binaries
+      - name: Publish unpackaged self-contained win-x64
+        run: |
+          dotnet publish src/PlexWindows/PlexWindows.csproj `
+            -c Release `
+            -r win-x64 `
+            -p:Platform=x64 `
+            -p:WindowsPackageType=None `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:SelfContained=true `
+            -p:PublishSingleFile=false `
+            -o publish/win-x64
+      - name: Verify exe
+        run: |
+          Get-ChildItem publish/win-x64 -Filter *.exe | Format-Table Name,Length
+          if (-not (Test-Path publish/win-x64/PlexWindows.exe)) { throw "PlexWindows.exe missing" }
+      - name: Upload exe folder
         uses: actions/upload-artifact@v4
         with:
-          name: plex-windows-x64
-          path: |
-            PlexWindows/src/PlexWindows/bin/**/Release/**/*
-          if-no-files-found: warn
+          name: plex-windows-exe-x64
+          path: PlexWindows/publish/win-x64/**
+          if-no-files-found: error

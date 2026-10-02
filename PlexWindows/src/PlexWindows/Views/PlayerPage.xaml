@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PlexWindows.Views.PlayerPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:playback="using:PlexWindows.Playback"
+    xmlns:vlc="using:LibVLCSharp.WinUI"
+    Background="Black"
+    KeyDown="Page_KeyDown"
+    PointerMoved="Page_PointerMoved"
+    PointerPressed="Page_PointerPressed">
+
+    <Grid>
+        <!-- Media Foundation surface -->
+        <MediaPlayerElement x:Name="MfElement"
+                            AreTransportControlsEnabled="False"
+                            Stretch="Uniform"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            Visibility="{x:Bind ViewModel.ShowMfSurface, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- LibVLC surface (shown when Router falls back) -->
+        <vlc:VideoView x:Name="VlcView"
+                       HorizontalAlignment="Stretch"
+                       VerticalAlignment="Stretch"
+                       Visibility="{x:Bind ViewModel.ShowVlcSurface, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+
+        <ProgressRing IsActive="{x:Bind ViewModel.IsBuffering, Mode=OneWay}"
+                      Width="56" Height="56"
+                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                      Visibility="{x:Bind ViewModel.IsBuffering, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+
+        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="#FFCC66" FontSize="16" TextWrapping="Wrap"
+                   Margin="48" MaxWidth="560" />
+
+        <!-- Top chrome -->
+        <Grid VerticalAlignment="Top" Padding="24,16"
+              Visibility="{x:Bind ViewModel.ShowControls, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+            <Grid.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#CC000000" Offset="0" />
+                    <GradientStop Color="#00000000" Offset="1" />
+                </LinearGradientBrush>
+            </Grid.Background>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}"
+                           FontSize="22" FontWeight="SemiBold" Foreground="White" />
+                <TextBlock Text="{x:Bind ViewModel.Subtitle, Mode=OneWay}"
+                           FontSize="13" Foreground="#CCCCCC" />
+            </StackPanel>
+            <Border Grid.Column="1" Background="#33FFFFFF" CornerRadius="4" Padding="10,4"
+                    VerticalAlignment="Top" Margin="0,0,8,0">
+                <TextBlock Text="{x:Bind ViewModel.ModeLabel, Mode=OneWay}"
+                           FontSize="11" Foreground="#EEEEEE" />
+            </Border>
+            <Border Grid.Column="2" Background="#33FFFFFF" CornerRadius="4" Padding="10,4"
+                    VerticalAlignment="Top">
+                <TextBlock Text="{x:Bind ViewModel.BackendLabel, Mode=OneWay}"
+                           FontSize="11" Foreground="#EEEEEE" />
+            </Border>
+        </Grid>
+
+        <!-- Bottom controls -->
+        <Grid VerticalAlignment="Bottom"
+              Visibility="{x:Bind ViewModel.ShowControls, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">
+            <Grid.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#00000000" Offset="0" />
+                    <GradientStop Color="#CC000000" Offset="0.35" />
+                    <GradientStop Color="#EE000000" Offset="1" />
+                </LinearGradientBrush>
+            </Grid.Background>
+            <StackPanel Padding="28,20,28,24" Spacing="10">
+                <TextBlock Text="{x:Bind ViewModel.DecisionReason, Mode=OneWay}"
+                           FontSize="11" Foreground="#888888" />
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.PositionText, Mode=OneWay}"
+                               Foreground="White" VerticalAlignment="Center" FontSize="12" MinWidth="48" />
+                    <Slider x:Name="SeekSlider" Grid.Column="1"
+                            Minimum="0"
+                            Maximum="{x:Bind ViewModel.DurationSeconds, Mode=OneWay}"
+                            Value="{x:Bind ViewModel.PositionSeconds, Mode=OneWay}"
+                            ValueChanged="Seek_ValueChanged"
+                            PointerCaptureLost="Seek_PointerCaptureLost" />
+                    <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.DurationText, Mode=OneWay}"
+                               Foreground="White" VerticalAlignment="Center" FontSize="12"
+                               MinWidth="48" HorizontalAlignment="Right" />
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Content="{x:Bind ViewModel.MuteLabel, Mode=OneWay}"
+                                Click="Mute_Click" MinWidth="40" ToolTipService.ToolTip="Mute (M)" />
+                        <Slider Width="120" Minimum="0" Maximum="1" StepFrequency="0.05"
+                                Value="{x:Bind ViewModel.Volume, Mode=TwoWay}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                        <Button Content="−10s" Click="SkipBack_Click" ToolTipService.ToolTip="← / J" />
+                        <Button Content="{x:Bind ViewModel.PlayPauseLabel, Mode=OneWay}"
+                                Click="PlayPause_Click" MinWidth="88"
+                                Style="{StaticResource AccentButtonStyle}"
+                                ToolTipService.ToolTip="Space" />
+                        <Button Content="+10s" Click="SkipFwd_Click" ToolTipService.ToolTip="→ / L" />
+                        <Button Content="Exit" Click="Exit_Click" ToolTipService.ToolTip="Esc" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <ComboBox Header="Audio" Width="160"
+                                  Visibility="{x:Bind ViewModel.HasAudioTracks, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
+                                  ItemsSource="{x:Bind ViewModel.AudioTracks, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedAudio, Mode=OneWay}"
+                                  SelectionChanged="Audio_SelectionChanged">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="playback:TrackInfo">
+                                    <TextBlock Text="{x:Bind DisplayLabel}" TextTrimming="CharacterEllipsis" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <ComboBox Header="Subtitle" Width="160"
+                                  Visibility="{x:Bind ViewModel.HasSubtitleTracks, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
+                                  ItemsSource="{x:Bind ViewModel.SubtitleTracks, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedSubtitle, Mode=OneWay}"
+                                  SelectionChanged="Subtitle_SelectionChanged">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="playback:TrackInfo">
+                                    <TextBlock Text="{x:Bind DisplayLabel}" TextTrimming="CharacterEllipsis" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

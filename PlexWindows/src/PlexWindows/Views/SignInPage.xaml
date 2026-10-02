@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PlexWindows.Views.SignInPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{StaticResource PlexBackgroundBrush}">
+    <Grid>
+        <StackPanel MaxWidth="420" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Spacing="16" Padding="32">
+            <TextBlock Text="Sign in to Plex"
+                       Style="{StaticResource TitleTextBlockStyle}"
+                       Foreground="{StaticResource PlexPrimaryTextBrush}"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="Open plex.tv/link on any device and enter the code below."
+                       Style="{StaticResource BodySecondaryStyle}"
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center" />
+            <Border Background="{StaticResource PlexSurfaceBrush}"
+                    BorderBrush="{StaticResource PlexStrokeBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="24,20"
+                    HorizontalAlignment="Center">
+                <TextBlock Text="{x:Bind ViewModel.PinCode, Mode=OneWay}"
+                           FontSize="36" FontWeight="SemiBold"
+                           Foreground="{StaticResource PlexAccentBrush}"
+                           HorizontalAlignment="Center"
+                           CharacterSpacing="80" />
+            </Border>
+            <ProgressRing IsActive="{x:Bind ViewModel.IsSigningIn, Mode=OneWay}"
+                          Width="32" Height="32" HorizontalAlignment="Center" />
+            <TextBlock Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                       Style="{StaticResource CaptionSecondaryStyle}"
+                       HorizontalAlignment="Center" TextAlignment="Center" />
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                <Button Content="Get code" Click="Start_Click"
+                        Style="{StaticResource AccentButtonStyle}"
+                        AccessKey="G" />
+                <HyperlinkButton Content="Open plex.tv/link"
+                                 NavigateUri="https://plex.tv/link" />
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Page>

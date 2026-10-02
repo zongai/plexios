@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PlexWindows.Views.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{StaticResource PlexBackgroundBrush}">
+    <NavigationView x:Name="NavView"
+                    PaneDisplayMode="Left"
+                    IsSettingsVisible="True"
+                    IsBackButtonVisible="Collapsed"
+                    OpenPaneLength="240"
+                    CompactPaneLength="48"
+                    IsPaneToggleButtonVisible="True"
+                    PaneTitle="Plex"
+                    Background="{StaticResource PlexBackgroundBrush}"
+                    SelectionChanged="NavView_SelectionChanged">
+        <NavigationView.MenuItems>
+            <NavigationViewItem Content="Home" Tag="home" Icon="Home" AccessKey="H" />
+            <NavigationViewItem Content="Movies" Tag="movies" Icon="Video" AccessKey="M" />
+            <NavigationViewItem Content="TV Shows" Tag="shows" Icon="Library" AccessKey="T" />
+            <NavigationViewItem Content="Music" Tag="music" Icon="Audio" AccessKey="U" />
+            <NavigationViewItemSeparator />
+            <NavigationViewItem Content="Collections" Tag="collections" Icon="List" />
+            <NavigationViewItem Content="Playlists" Tag="playlists" Icon="MusicInfo" />
+            <NavigationViewItem Content="Favorites" Tag="favorites" Icon="Favorite" AccessKey="F" />
+        </NavigationView.MenuItems>
+        <NavigationView.FooterMenuItems>
+            <NavigationViewItem Content="Sign out" Tag="signout" Icon="LeaveChat" />
+        </NavigationView.FooterMenuItems>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Padding="16,12" ColumnSpacing="12"
+                  Background="{StaticResource PlexSurfaceBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="320" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{x:Bind ViewModel.ActiveServerName, Mode=OneWay}"
+                           Style="{StaticResource BodyStrongTextBlockStyle}"
+                           Foreground="{StaticResource PlexPrimaryTextBrush}"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Servers" Click="Servers_Click"
+                        ToolTipService.ToolTip="Switch server or connection" />
+                <AutoSuggestBox Grid.Column="2"
+                                PlaceholderText="Search library (Ctrl+F)"
+                                QueryIcon="Find"
+                                QuerySubmitted="Search_QuerySubmitted"
+                                AutomationProperties.Name="Search" />
+            </Grid>
+            <Frame x:Name="ContentFrame" Grid.Row="1" />
+        </Grid>
+    </NavigationView>
+</Page>

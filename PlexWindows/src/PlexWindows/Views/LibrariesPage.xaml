@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PlexWindows.Views.LibrariesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:PlexWindows.Models"
+    xmlns:helpers="using:PlexWindows.Helpers"
+    Background="{StaticResource PlexBackgroundBrush}">
+    <!-- Fluent master-detail: list + content -->
+    <Grid Padding="{StaticResource PagePadding}" ColumnSpacing="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource PlexSurfaceBrush}"
+                BorderBrush="{StaticResource PlexStrokeBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource CardCornerRadius}"
+                Padding="4">
+            <ListView ItemsSource="{x:Bind ViewModel.Libraries, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.SelectedLibrary, Mode=TwoWay}"
+                      SelectionChanged="LibraryList_SelectionChanged"
+                      SelectionMode="Single"
+                      IsItemClickEnabled="False">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:PlexLibrary">
+                        <StackPanel Padding="12,10" Spacing="2">
+                            <TextBlock Text="{x:Bind Title}"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}"
+                                       Foreground="{StaticResource PlexPrimaryTextBrush}" />
+                            <TextBlock Text="{x:Bind Type}"
+                                       Style="{StaticResource CaptionSecondaryStyle}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+
+        <Grid Grid.Column="1" RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="{x:Bind ViewModel.Title, Mode=OneWay}"
+                       Style="{StaticResource PageTitleStyle}" />
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+                <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                              Width="28" Height="28" />
+                <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                           Style="{StaticResource BodySecondaryStyle}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2">
+                <ItemsRepeater ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout MinItemWidth="148" MinItemHeight="260"
+                                           MinColumnSpacing="12" MinRowSpacing="12"
+                                           ItemsStretch="None" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="helpers:MediaCardItem">
+                            <Button Style="{StaticResource CardButtonStyle}"
+                                    Click="Item_Click" Tag="{x:Bind}"
+                                    AutomationProperties.Name="{x:Bind Title}">
+                                <Border Style="{StaticResource MediaCardBorderStyle}" Width="148">
+                                    <StackPanel>
+                                        <Border Height="210"
+                                                Background="{StaticResource PlexSurfaceElevatedBrush}"
+                                                CornerRadius="8,8,0,0">
+                                            <Image Source="{x:Bind Poster}" Stretch="UniformToFill" />
+                                        </Border>
+                                        <StackPanel Padding="10,8" Spacing="2">
+                                            <TextBlock Text="{x:Bind Title}" MaxLines="2"
+                                                       TextWrapping="WrapWholeWords"
+                                                       Foreground="{StaticResource PlexPrimaryTextBrush}" />
+                                            <TextBlock Text="{x:Bind Year}"
+                                                       Style="{StaticResource CaptionSecondaryStyle}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>

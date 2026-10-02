@@ -7,7 +7,6 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
     <Nullable>enable</Nullable>
@@ -16,12 +15,9 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <AssemblyName>PlexWindows</AssemblyName>
     <Version>0.1.0</Version>
-    <Authors>PlexClient</Authors>
-    <Product>Plex Windows Native</Product>
-    <Description>Native WinUI 3 Plex Media Server client</Description>
     <DefineConstants>$(DefineConstants);USE_LIBVLC</DefineConstants>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250401001" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7175" />
@@ -34,11 +30,9 @@
     <PackageReference Include="LibVLCSharp.WinUI" Version="3.10.0" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
   </ItemGroup>
-
   <ItemGroup>
     <Content Include="Assets\**" />
   </ItemGroup>
-
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>

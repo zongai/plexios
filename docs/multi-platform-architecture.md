@@ -196,8 +196,10 @@ Reference implementation already exists on iOS:
 - ✅ PlaybackDecisionEngine + URL builder (DP / DS / Transcode)
 - ⏳ Phase 5: Detail/Search/Collections, tracks, next-episode, timeline
 
-### Phase 5 — Android TV full playback
-- Decision integration, remote-first UI, next episode, etc.
+### Phase 5 — Android TV full playback (done)
+- ✅ Detail / Search / Collections / Playlists
+- ✅ Coil posters, next-episode, timeline report
+- ✅ Home nav chips → Libraries / Search / Collections / Playlists
 
 ### Phase 6 — Cross-platform hardening
 - Unified settings surface, CI path filters, release artifacts, capability matrix tests.

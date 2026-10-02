@@ -26,7 +26,13 @@ public sealed class PlexApiClient
         _json = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
-            NumberHandling = JsonNumberHandling.AllowReadingFromString
+            NumberHandling = JsonNumberHandling.AllowReadingFromString,
+            Converters =
+            {
+                new FlexibleNullableDoubleConverter(),
+                new FlexibleNullableIntConverter(),
+                new FlexibleNullableLongConverter()
+            }
         };
     }
 
@@ -496,13 +502,20 @@ public sealed class PlexApiClient
         public string? Type { get; set; }
         public string? Title { get; set; }
         public string? Summary { get; set; }
+        [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? Year { get; set; }
         public string? ContentRating { get; set; }
+        [JsonConverter(typeof(FlexibleNullableDoubleConverter))]
         public double? Rating { get; set; }
+        [JsonConverter(typeof(FlexibleNullableDoubleConverter))]
         public double? AudienceRating { get; set; }
+        [JsonConverter(typeof(FlexibleNullableDoubleConverter))]
         public double? UserRating { get; set; }
+        [JsonConverter(typeof(FlexibleNullableLongConverter))]
         public long? Duration { get; set; }
+        [JsonConverter(typeof(FlexibleNullableLongConverter))]
         public long? ViewOffset { get; set; }
+        [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? ViewCount { get; set; }
         public string? Thumb { get; set; }
         public string? Art { get; set; }
@@ -512,10 +525,15 @@ public sealed class PlexApiClient
         public string? GrandparentTitle { get; set; }
         public string? ParentRatingKey { get; set; }
         public string? GrandparentRatingKey { get; set; }
+        [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? Index { get; set; }
+        [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? ParentIndex { get; set; }
+        [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? LeafCount { get; set; }
+        [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? ViewedLeafCount { get; set; }
+        [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? ChildCount { get; set; }
         public string? Studio { get; set; }
         public string? Tagline { get; set; }

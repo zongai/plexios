@@ -14,7 +14,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _autoPlayNextEpisode;
     [ObservableProperty] private string _preferredAudioLanguage = "";
     [ObservableProperty] private string _preferredSubtitleLanguage = "";
-    [ObservableProperty] private int _maxRemoteBitrateMbps = 20;
+    [ObservableProperty] private double _maxRemoteBitrateMbps = 20;
     [ObservableProperty] private string _playerBackend = "auto";
     [ObservableProperty] private string _statusMessage = "";
 
@@ -32,8 +32,9 @@ public partial class SettingsViewModel : ObservableObject
         AutoPlayNextEpisode = _settings.AutoPlayNextEpisode;
         PreferredAudioLanguage = _settings.PreferredAudioLanguage ?? "";
         PreferredSubtitleLanguage = _settings.PreferredSubtitleLanguage ?? "";
-        MaxRemoteBitrateMbps = Math.Max(1, _settings.MaxRemoteBitrate / 1_000_000);
+        MaxRemoteBitrateMbps = Math.Max(1, _settings.MaxRemoteBitrate / 1_000_000.0);
         PlayerBackend = _settings.PlayerBackend;
+        StatusMessage = "";
     }
 
     [RelayCommand]
@@ -44,7 +45,7 @@ public partial class SettingsViewModel : ObservableObject
             ? null : PreferredAudioLanguage.Trim();
         _settings.PreferredSubtitleLanguage = string.IsNullOrWhiteSpace(PreferredSubtitleLanguage)
             ? null : PreferredSubtitleLanguage.Trim();
-        _settings.MaxRemoteBitrate = MaxRemoteBitrateMbps * 1_000_000;
+        _settings.MaxRemoteBitrate = (int)Math.Round(Math.Clamp(MaxRemoteBitrateMbps, 1, 100) * 1_000_000);
         _settings.PlayerBackend = PlayerBackend;
         StatusMessage = "Saved.";
     }

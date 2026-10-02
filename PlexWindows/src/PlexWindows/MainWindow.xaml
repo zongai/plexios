@@ -8,28 +8,6 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
     <Grid x:Name="RootGrid" Background="{StaticResource PlexBackgroundBrush}">
-        <Grid.RowDefinitions>
-            <!-- Reserved strip for drag + system caption buttons (min / max / close) -->
-            <RowDefinition Height="40" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- SetTitleBar target: system leaves the right side for caption buttons -->
-        <Grid x:Name="AppTitleBar"
-              Grid.Row="0"
-              Background="Transparent"
-              VerticalAlignment="Stretch">
-            <TextBlock Text="Plex"
-                       VerticalAlignment="Center"
-                       Margin="16,0,0,0"
-                       Style="{StaticResource CaptionTextBlockStyle}"
-                       Foreground="{StaticResource PlexSecondaryTextBrush}"
-                       IsHitTestVisible="False" />
-        </Grid>
-
-        <!-- App content below the title bar — no overlap with caption buttons -->
-        <Frame x:Name="RootFrame"
-               Grid.Row="1"
-               Background="{StaticResource PlexBackgroundBrush}" />
+        <Frame x:Name="RootFrame" Background="{StaticResource PlexBackgroundBrush}" />
     </Grid>
 </Window>

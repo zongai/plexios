@@ -25,7 +25,6 @@
             <NavigationViewItem Content="Favorites" Tag="favorites" Icon="Favorite" AccessKey="F" />
         </NavigationView.MenuItems>
         <NavigationView.FooterMenuItems>
-            <!-- LeaveChat is not a valid Symbol on all SDK builds and can crash XAML load -->
             <NavigationViewItem Content="Sign out" Tag="signout" Icon="Contact" />
         </NavigationView.FooterMenuItems>
 
@@ -34,7 +33,9 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Grid Grid.Row="0" Padding="16,12" ColumnSpacing="12"
+            <Grid Grid.Row="0"
+                  Padding="16,10,16,10"
+                  ColumnSpacing="12"
                   Background="{StaticResource PlexSurfaceBrush}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -45,14 +46,19 @@
                            Text="{x:Bind ViewModel.ActiveServerName, Mode=OneWay}"
                            Style="{StaticResource BodyStrongTextBlockStyle}"
                            Foreground="{StaticResource PlexPrimaryTextBrush}"
-                           VerticalAlignment="Center" />
-                <Button Grid.Column="1" Content="Servers" Click="Servers_Click"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="1"
+                        Content="Servers"
+                        Click="Servers_Click"
                         ToolTipService.ToolTip="Switch server or connection" />
                 <AutoSuggestBox Grid.Column="2"
                                 PlaceholderText="Search library (Ctrl+F)"
                                 QueryIcon="Find"
                                 QuerySubmitted="Search_QuerySubmitted"
-                                AutomationProperties.Name="Search" />
+                                AutomationProperties.Name="Search"
+                                MinWidth="180"
+                                HorizontalAlignment="Stretch" />
             </Grid>
             <Frame x:Name="ContentFrame" Grid.Row="1"
                    Background="{StaticResource PlexBackgroundBrush}" />

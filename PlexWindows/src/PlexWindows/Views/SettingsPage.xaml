@@ -5,8 +5,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="{StaticResource PlexBackgroundBrush}">
     <ScrollViewer Padding="{StaticResource PagePadding}">
-        <StackPanel MaxWidth="560" Spacing="4">
+        <StackPanel MaxWidth="560" Spacing="8">
             <TextBlock Text="Settings" Style="{StaticResource PageTitleStyle}" />
+
             <TextBlock Text="Playback" Style="{StaticResource SectionHeaderStyle}" Margin="0,12,0,4" />
             <ToggleSwitch Header="Auto-play next episode"
                           IsOn="{x:Bind ViewModel.AutoPlayNextEpisode, Mode=TwoWay}"
@@ -14,21 +15,25 @@
             <TextBox Header="Preferred audio language (ISO 639, optional)"
                      Text="{x:Bind ViewModel.PreferredAudioLanguage, Mode=TwoWay}"
                      PlaceholderText="e.g. en"
-                     Margin="0,8,0,0" />
+                     Margin="0,4,0,0" />
             <TextBox Header="Preferred subtitle language (ISO 639, optional)"
                      Text="{x:Bind ViewModel.PreferredSubtitleLanguage, Mode=TwoWay}"
                      PlaceholderText="e.g. en" />
-            <NumberBox Header="Max remote bitrate (Mbps)"
+            <!-- NumberBox.Value is double — bind to double property, not int -->
+            <NumberBox x:Name="BitrateBox"
+                       Header="Max remote bitrate (Mbps)"
                        Minimum="1" Maximum="100"
                        SpinButtonPlacementMode="Inline"
                        Value="{x:Bind ViewModel.MaxRemoteBitrateMbps, Mode=TwoWay}"
-                       Margin="0,8,0,0" />
-            <ComboBox Header="Player backend"
+                       Margin="0,4,0,0" />
+            <ComboBox x:Name="BackendBox"
+                      Header="Player backend"
                       Width="280"
                       ItemsSource="{x:Bind ViewModel.BackendOptions}"
                       SelectedItem="{x:Bind ViewModel.PlayerBackend, Mode=TwoWay}"
-                      Margin="0,8,0,0" />
-            <TextBlock Text="Storage &amp; account" Style="{StaticResource SectionHeaderStyle}" Margin="0,20,0,8" />
+                      Margin="0,4,0,0" />
+
+            <TextBlock Text="Storage &amp; account" Style="{StaticResource SectionHeaderStyle}" Margin="0,16,0,8" />
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button Content="Save" Click="Save_Click" Style="{StaticResource AccentButtonStyle}" />
                 <Button Content="Clear image cache" Click="ClearCache_Click" />
@@ -39,7 +44,7 @@
                        Margin="0,12,0,0" />
             <TextBlock Text="Auth token is never shown or exported."
                        Style="{StaticResource CaptionSecondaryStyle}"
-                       Margin="0,16,0,0" />
+                       Margin="0,8,0,0" />
         </StackPanel>
     </ScrollViewer>
 </Page>

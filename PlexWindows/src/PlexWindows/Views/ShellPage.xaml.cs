@@ -11,6 +11,7 @@ namespace PlexWindows.Views;
 public sealed partial class ShellPage : Page
 {
     public ShellViewModel ViewModel { get; }
+    private bool _dialogOpen;
 
     public ShellPage()
     {
@@ -25,14 +26,8 @@ public sealed partial class ShellPage : Page
         Loaded -= ShellPage_Loaded;
         try
         {
-            // Discover servers BEFORE first Home load so hubs have a context
             await ViewModel.InitializeAsync();
-            if (ContentFrame.Content is null)
-                ContentFrame.Navigate(typeof(HomePage));
-            else if (ContentFrame.Content is HomePage)
-                ContentFrame.Navigate(typeof(HomePage)); // refresh after discover
-            else
-                ContentFrame.Navigate(typeof(HomePage));
+            ContentFrame.Navigate(typeof(HomePage));
         }
         catch (Exception ex)
         {
@@ -48,7 +43,8 @@ public sealed partial class ShellPage : Page
         {
             if (args.IsSettingsSelected)
             {
-                ContentFrame.Navigate(typeof(SettingsPage));
+                if (ContentFrame.Content is not SettingsPage)
+                    ContentFrame.Navigate(typeof(SettingsPage));
                 return;
             }
 
@@ -90,6 +86,8 @@ public sealed partial class ShellPage : Page
 
     private async void Servers_Click(object sender, RoutedEventArgs e)
     {
+        if (_dialogOpen) return;
+
         var connections = App.Services.GetRequiredService<ConnectionManager>();
         var auth = App.Services.GetRequiredService<AuthenticationService>();
 
@@ -108,7 +106,8 @@ public sealed partial class ShellPage : Page
         {
             SelectionMode = ListViewSelectionMode.Single,
             Width = 420,
-            MaxHeight = 360
+            MaxHeight = 360,
+            DisplayMemberPath = nameof(ServerPickItem.Label)
         };
 
         foreach (var server in connections.Servers)
@@ -136,8 +135,6 @@ public sealed partial class ShellPage : Page
             }
         }
 
-        list.DisplayMemberPath = nameof(ServerPickItem.Label);
-
         var dialog = new ContentDialog
         {
             Title = "Select server / connection",
@@ -148,13 +145,26 @@ public sealed partial class ShellPage : Page
             DefaultButton = ContentDialogButton.Primary
         };
 
-        var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Primary) return;
-        if (list.SelectedItem is not ServerPickItem pick) return;
+        _dialogOpen = true;
+        try
+        {
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+            if (list.SelectedItem is not ServerPickItem pick) return;
 
-        connections.SelectConnection(pick.Server, pick.Connection);
-        ViewModel.ActiveServerName = pick.Server.Name;
-        ContentFrame.Navigate(typeof(HomePage));
+            connections.SelectConnection(pick.Server, pick.Connection);
+            ViewModel.ActiveServerName = pick.Server.Name;
+            ContentFrame.Navigate(typeof(HomePage));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine("Servers_Click dialog: " + ex);
+            ViewModel.ActiveServerName = "Dialog error: " + ex.Message;
+        }
+        finally
+        {
+            _dialogOpen = false;
+        }
     }
 
     private void Search_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)

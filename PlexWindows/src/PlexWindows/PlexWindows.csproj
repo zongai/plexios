@@ -23,16 +23,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240627000" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250401001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7175" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
     <PackageReference Include="CommunityToolkit.WinUI.UI.Controls" Version="7.1.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
-    <!-- LibVLC fallback for formats Media Foundation cannot open -->
-    <PackageReference Include="LibVLCSharp" Version="3.9.3" />
-    <PackageReference Include="LibVLCSharp.WinUI" Version="3.9.3" />
+    <PackageReference Include="LibVLCSharp" Version="3.9.4" />
+    <PackageReference Include="LibVLCSharp.WinUI" Version="3.9.4" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
   </ItemGroup>
 
@@ -44,8 +43,8 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <WindowsPackageType>MSIX</WindowsPackageType>
-    <GenerateAppxPackageOnBuild>true</GenerateAppxPackageOnBuild>
+  <!-- Keep unpackaged for publish; pack-msix.ps1 can override -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' and '$(WindowsPackageType)' == ''">
+    <WindowsPackageType>None</WindowsPackageType>
   </PropertyGroup>
 </Project>

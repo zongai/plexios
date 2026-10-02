@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>PlexWindows.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Compile decision engine sources directly (avoid WinUI app reference on CI Linux) -->
+    <Compile Include="..\..\src\PlexWindows\Playback\PlaybackDecision.cs" Link="Playback\PlaybackDecision.cs" />
+    <Compile Include="..\..\src\PlexWindows\Models\PlexModels.cs" Link="Models\PlexModels.cs" />
+  </ItemGroup>
+</Project>

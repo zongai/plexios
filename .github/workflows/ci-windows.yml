@@ -24,7 +24,9 @@ jobs:
         with:
           dotnet-version: "8.0.x"
       - name: Unit tests (decision engine)
-        run: dotnet test tests/PlexWindows.Tests/PlexWindows.Tests.csproj -c Release --verbosity minimal
+        run: |
+          dotnet restore tests/PlexWindows.Tests/PlexWindows.Tests.csproj
+          dotnet test tests/PlexWindows.Tests/PlexWindows.Tests.csproj -c Release --verbosity minimal --no-restore
 
   build:
     if: github.event_name == 'workflow_dispatch'
@@ -38,8 +40,10 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - name: Restore
-        run: dotnet restore PlexWindows.sln
+      - name: Install Windows workload
+        run: dotnet workload install maui-windows --skip-manifest-update || dotnet workload restore src/PlexWindows/PlexWindows.csproj || true
+      - name: Restore app
+        run: dotnet restore src/PlexWindows/PlexWindows.csproj
       - name: Publish unpackaged self-contained win-x64
         run: |
           dotnet publish src/PlexWindows/PlexWindows.csproj `

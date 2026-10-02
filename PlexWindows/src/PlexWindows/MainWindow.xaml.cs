@@ -11,10 +11,14 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // Content draws under the title bar chrome, but only inside AppTitleBar.
+        // SetTitleBar reserves the caption-button region so UI never overlaps min/max/close.
         ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+
         try
         {
-            // Dark content root so we never show an empty transparent hole
             if (Content is FrameworkElement root)
                 root.RequestedTheme = ElementTheme.Dark;
         }
@@ -31,7 +35,6 @@ public sealed partial class MainWindow : Window
         try
         {
             var auth = App.Services.GetRequiredService<AuthenticationService>();
-            // Critical: poll completion and State changes must marshal to this queue
             auth.AttachUiDispatcher(DispatcherQueue);
 
             await auth.RestoreSessionAsync().ConfigureAwait(true);
@@ -46,7 +49,6 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            // Last-resort: show sign-in with error instead of a black window
             System.Diagnostics.Debug.WriteLine("MainWindow.InitializeAsync failed: " + ex);
             try
             {
@@ -73,7 +75,6 @@ public sealed partial class MainWindow : Window
                 if (RootFrame.Content is SignInPage) return;
                 RootFrame.Navigate(typeof(SignInPage));
             }
-            // SigningIn: stay on current page (SignIn shows PIN)
         }
         catch (Exception ex)
         {

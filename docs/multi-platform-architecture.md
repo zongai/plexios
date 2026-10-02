@@ -169,26 +169,29 @@ Reference implementation already exists on iOS:
 | Image cache | ImagePipeline (memory+disk) | Coil / Glide equivalent | native cache |
 | Build | XcodeGen + xcodebuild → IPA | Gradle → APK/AAB (TV) | MSBuild / dotnet → MSIX |
 
-## 6. Migration Phases (approved)
+## 6. Migration Phases (approved; Windows prioritized 2026-10-02)
 
-### Phase 1 — Formalize Shared Core (current)
-- Document all contracts (this file + request/response examples).
-- Extract pure interfaces / protocols inside iOS where beneficial (`PlexAPIProtocol`, capability injection, etc.).
+### Phase 1 — Formalize Shared Core ✅
+- Document all contracts (this file + multi-platform-contracts.md).
+- Extract `PlexAPIProtocol` inside iOS; domain services depend on contract.
 - Keep every change iOS-buildable.
-- No Android/Windows code yet.
 
-### Phase 2 — Android TV skeleton
+### Phase 2 — Windows skeleton ✅ (scaffold complete)
+- WinUI 3 project at `artifacts/PlexWindows/`.
+- PIN auth (DPAPI), server discovery/ranking, Fluent sidebar shell, Home hubs.
+- PlaybackDecisionEngine + IPlayerEngine + Media Foundation stub + URL builder.
+
+### Phase 3 — Windows full playback & libraries
+- Wire MediaPlayerElement; Direct Play / Stream / Transcode.
+- Libraries, Movie/Show detail, Search, audio/subtitle, resume, next episode.
+- Keyboard shortcuts + media keys; MSIX release path.
+
+### Phase 4 — Android TV skeleton
 - New Android TV project (Kotlin + Compose TV).
-- PIN auth, server discovery, Home, Libraries, basic detail, Media3 playback shell.
+- PIN auth, server discovery, Home, Libraries, Media3 shell.
 
-### Phase 3 — Android TV full playback
-- Decision integration, Direct Play/Stream/Transcode, audio/subtitle, resume, next episode, remote commands.
-
-### Phase 4 — Windows skeleton
-- WinUI 3 app, same feature order as Phase 2.
-
-### Phase 5 — Windows advanced
-- Shortcuts, media keys, full playback parity.
+### Phase 5 — Android TV full playback
+- Decision integration, remote-first UI, next episode, etc.
 
 ### Phase 6 — Cross-platform hardening
 - Unified settings surface, CI path filters, release artifacts, capability matrix tests.
@@ -209,12 +212,12 @@ Reference implementation already exists on iOS:
 4. Playback decision remains explainable (reason string).
 5. New platform code lives in its own tree; no mixed platform conditionals in Shared.
 
-## 9. Immediate Next Actions (Phase 1)
+## 9. Immediate Next Actions
 
-1. ✅ Architecture analysis approved; branch `feature/multi-platform` created.
-2. Formalize remaining contracts (API request/response examples, ClientCapabilities interface, PlaybackEngine protocol).
-3. Light iOS-side extraction of protocols only where it improves testability and future porting.
-4. Stop and report after Phase 1 documentation + minimal interface work; await go-ahead for Phase 2.
+1. ✅ Phase 1 complete (contracts + PlexAPIProtocol).
+2. ✅ Windows skeleton scaffolded under `artifacts/PlexWindows/`.
+3. Next: Phase 3 — wire real MediaPlayerElement, library browsing, detail pages, search.
+4. Then Android TV (Phase 4).
 
 ---
 

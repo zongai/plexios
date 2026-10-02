@@ -207,6 +207,13 @@ Reference implementation already exists on iOS:
 - ✅ Path-filtered CI: `ci-windows.yml`, `ci-android.yml`, `release.yml`
 - ✅ Quality gates documented in `docs/phase6-hardening.md`
 
+### Phase 7 — Release packaging & player parity (done)
+- ✅ Android Media3 audio/subtitle track panel
+- ✅ Android release APK (arm64-v8a, minify) + CI release job
+- ✅ Windows `scripts/pack-msix.ps1` + CI artifact upload
+- ✅ Tag/`release.yml` multi-platform release notes + Android artifact
+- 📄 `docs/phase7-release-parity.md`
+
 ## 7. Build & CI Rules
 
 - iOS: continue `xcodegen generate` + unsigned IPA workflow. Never break existing path.

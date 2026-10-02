@@ -26,7 +26,6 @@ jobs:
       - name: Unit tests (decision engine)
         run: dotnet test tests/PlexWindows.Tests/PlexWindows.Tests.csproj -c Release --verbosity minimal
 
-  # Full WinUI build requires Windows App SDK workload; keep optional on dispatch
   build:
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
@@ -41,5 +40,12 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Restore
         run: dotnet restore PlexWindows.sln
-      - name: Build
+      - name: Build Release x64
         run: dotnet build src/PlexWindows/PlexWindows.csproj -c Release -p:Platform=x64 --no-restore
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: plex-windows-x64
+          path: |
+            PlexWindows/src/PlexWindows/bin/**/Release/**/*
+          if-no-files-found: warn

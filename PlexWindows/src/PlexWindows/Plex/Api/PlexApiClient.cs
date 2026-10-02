@@ -98,11 +98,8 @@ public sealed class PlexApiClient
         using var req = MakePmsRequest(baseUrl, "hubs", token);
         using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
-        var container = await resp.Content.ReadFromJsonAsync<MediaContainerDto<HubContainerDto>>(_json, ct)
-            .ConfigureAwait(false);
-        return (container?.MediaContainer?.Hub ?? [])
-            .Select(MapHub)
-            .ToList();
+        var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        return ParseHubsResilient(json);
     }
 
     public async Task<IReadOnlyList<PlexMetadata>> FetchLibraryAllAsync(
@@ -135,11 +132,8 @@ public sealed class PlexApiClient
         using var req = MakePmsRequest(baseUrl, $"hubs/search?query={Uri.EscapeDataString(query)}", token);
         using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
-        var container = await resp.Content.ReadFromJsonAsync<MediaContainerDto<HubContainerDto>>(_json, ct)
-            .ConfigureAwait(false);
-        return (container?.MediaContainer?.Hub ?? [])
-            .Select(MapHub)
-            .ToList();
+        var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        return ParseHubsResilient(json);
     }
 
     public async Task<IReadOnlyList<PlexMetadata>> FetchChildrenAsync(
@@ -338,6 +332,84 @@ public sealed class PlexApiClient
             _ => PlexLibraryType.Unknown
         };
         return new PlexLibrary(d.Key ?? "", d.Uuid, d.Title ?? "", type, d.Agent, d.Scanner, d.Thumb, d.Art, d.Count, null);
+    }
+
+    
+    /// <summary>
+    /// Parse hubs without failing the entire payload when one Metadata.Rating is malformed.
+    /// </summary>
+    private IReadOnlyList<PlexHub> ParseHubsResilient(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("MediaContainer", out var mc))
+                return Array.Empty<PlexHub>();
+            if (!mc.TryGetProperty("Hub", out var hubArr) || hubArr.ValueKind != JsonValueKind.Array)
+                return Array.Empty<PlexHub>();
+
+            var hubs = new List<PlexHub>();
+            foreach (var hubEl in hubArr.EnumerateArray())
+            {
+                try
+                {
+                    var items = new List<PlexMetadata>();
+                    if (hubEl.TryGetProperty("Metadata", out var metaArr) && metaArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var metaEl in metaArr.EnumerateArray())
+                        {
+                            try
+                            {
+                                var dto = JsonSerializer.Deserialize<MetadataDto>(metaEl.GetRawText(), _json);
+                                if (dto is not null)
+                                    items.Add(MapMetadata(dto));
+                            }
+                            catch
+                            {
+                                // skip one bad card
+                            }
+                        }
+                    }
+
+                    hubs.Add(new PlexHub
+                    {
+                        Key = hubEl.TryGetProperty("key", out var k) ? k.GetString() ?? "" :
+                              hubEl.TryGetProperty("Key", out var k2) ? k2.GetString() ?? "" : "",
+                        HubIdentifier = hubEl.TryGetProperty("hubIdentifier", out var hi) ? hi.GetString() :
+                                        hubEl.TryGetProperty("HubIdentifier", out var hi2) ? hi2.GetString() : null,
+                        Title = hubEl.TryGetProperty("title", out var ti) ? ti.GetString() ?? "" :
+                                hubEl.TryGetProperty("Title", out var ti2) ? ti2.GetString() ?? "" : "",
+                        Type = hubEl.TryGetProperty("type", out var ty) ? ty.GetString() :
+                               hubEl.TryGetProperty("Type", out var ty2) ? ty2.GetString() : null,
+                        Style = hubEl.TryGetProperty("style", out var st) ? st.GetString() :
+                                hubEl.TryGetProperty("Style", out var st2) ? st2.GetString() : null,
+                        Size = hubEl.TryGetProperty("size", out var sz) && sz.TryGetInt32(out var szi) ? szi :
+                               hubEl.TryGetProperty("Size", out var sz2) && sz2.TryGetInt32(out var szi2) ? szi2 : null,
+                        More = (hubEl.TryGetProperty("more", out var mo) && mo.ValueKind == JsonValueKind.True) ||
+                               (hubEl.TryGetProperty("More", out var mo2) && mo2.ValueKind == JsonValueKind.True),
+                        Items = items
+                    });
+                }
+                catch
+                {
+                    // skip bad hub
+                }
+            }
+            return hubs;
+        }
+        catch
+        {
+            // last resort: try original typed path
+            try
+            {
+                var container = JsonSerializer.Deserialize<MediaContainerDto<HubContainerDto>>(json, _json);
+                return (container?.MediaContainer?.Hub ?? []).Select(MapHub).ToList();
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to parse home hubs: " + ex.Message, ex);
+            }
+        }
     }
 
     private static PlexHub MapHub(HubDto h) => new()

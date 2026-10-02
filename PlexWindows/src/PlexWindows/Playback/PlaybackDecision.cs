@@ -112,19 +112,19 @@ public sealed class PlaybackDecisionEngine
     {
         var netBitrate = BitrateForNetwork(network);
 
-        if (metadata.Media.Count == 0)
+        if (metadata.Media is null || metadata.Media.Count == 0)
         {
             return Transcode("No media versions available", 0, 0, null, null, false, netBitrate);
         }
 
-        var mi = Math.Min(mediaIndex, metadata.Media.Count - 1);
+        var mi = Math.Clamp(mediaIndex, 0, metadata.Media.Count - 1);
         var media = metadata.Media[mi];
-        if (media.Parts.Count == 0)
+        if (media.Parts is null || media.Parts.Count == 0)
         {
             return Transcode("Media has no parts", mi, 0, null, null, false, netBitrate);
         }
 
-        var pi = Math.Min(partIndex, media.Parts.Count - 1);
+        var pi = Math.Clamp(partIndex, 0, media.Parts.Count - 1);
         var part = media.Parts[pi];
         var streams = part.Streams;
 

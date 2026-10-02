@@ -117,8 +117,18 @@ public partial class DetailViewModel : ObservableObject
         }
 
         var network = _connections.ActiveNetworkClass;
-        var decision = _decisionEngine.Decide(meta, network);
-        var url = _urlBuilder.Build(ctx, meta, decision);
+        PlaybackDecision decision;
+        Uri url;
+        try
+        {
+            decision = _decisionEngine.Decide(meta, network);
+            url = _urlBuilder.Build(ctx, meta, decision);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Cannot start playback: " + ex.Message;
+            return null;
+        }
         var start = meta.ViewOffset ?? 0;
         if (meta.Duration is long d && start > d * 0.95)
             start = 0;

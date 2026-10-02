@@ -298,6 +298,34 @@ public sealed class PlexApiClient
         };
     }
 
+    private static double? CoerceDouble(object? value)
+    {
+        if (value is null) return null;
+        switch (value)
+        {
+            case double d: return d;
+            case float f: return f;
+            case int i: return i;
+            case long l: return l;
+            case decimal m: return (double)m;
+            case JsonElement el:
+                return el.ValueKind switch
+                {
+                    JsonValueKind.Number when el.TryGetDouble(out var d) => d,
+                    JsonValueKind.String => double.TryParse(el.GetString(),
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var ds) ? ds : null,
+                    _ => null
+                };
+            case string s when double.TryParse(s,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed):
+                return parsed;
+            default:
+                return null;
+        }
+    }
+
     private static PlexLibrary MapLibrary(DirectoryDto d)
     {
         var type = d.Type?.ToLowerInvariant() switch
@@ -337,9 +365,9 @@ public sealed class PlexApiClient
             Summary = m.Summary,
             Year = m.Year,
             ContentRating = m.ContentRating,
-            Rating = m.Rating,
-            AudienceRating = m.AudienceRating,
-            UserRating = m.UserRating,
+            Rating = CoerceDouble(m.Rating),
+            AudienceRating = CoerceDouble(m.AudienceRating),
+            UserRating = CoerceDouble(m.UserRating),
             Duration = m.Duration,
             ViewOffset = m.ViewOffset,
             ViewCount = m.ViewCount,
@@ -505,12 +533,10 @@ public sealed class PlexApiClient
         [JsonConverter(typeof(FlexibleNullableIntConverter))]
         public int? Year { get; set; }
         public string? ContentRating { get; set; }
-        [JsonConverter(typeof(FlexibleNullableDoubleConverter))]
-        public double? Rating { get; set; }
-        [JsonConverter(typeof(FlexibleNullableDoubleConverter))]
-        public double? AudienceRating { get; set; }
-        [JsonConverter(typeof(FlexibleNullableDoubleConverter))]
-        public double? UserRating { get; set; }
+        // Plex may emit number, string, empty, or odd tokens — keep as string and parse later
+        public object? Rating { get; set; }
+        public object? AudienceRating { get; set; }
+        public object? UserRating { get; set; }
         [JsonConverter(typeof(FlexibleNullableLongConverter))]
         public long? Duration { get; set; }
         [JsonConverter(typeof(FlexibleNullableLongConverter))]

@@ -88,18 +88,38 @@ public partial class DetailViewModel : ObservableObject
 
     /// <summary>
     /// Builds a PlaybackRequest for the current item (or a child episode).
+    /// Fetches full metadata when Media parts are missing (hub/list items often omit them).
     /// </summary>
-    public PlaybackRequest? BuildPlaybackRequest(PlexMetadata? target = null)
+    public async Task<PlaybackRequest?> BuildPlaybackRequestAsync(PlexMetadata? target = null)
     {
         var meta = target ?? Item;
         var ctx = CurrentContext;
         if (meta is null || ctx is null) return null;
 
+        // Hub cards rarely include Media/Part — pull full metadata before deciding
+        if (meta.Media is null || meta.Media.Count == 0)
+        {
+            try
+            {
+                meta = await _api.FetchMetadataAsync(meta.RatingKey, ctx.BaseUrl, ctx.Token);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Failed to load media: " + ex.Message;
+                return null;
+            }
+        }
+
+        if (meta.Media is null || meta.Media.Count == 0)
+        {
+            StatusMessage = "No playable media on this item.";
+            return null;
+        }
+
         var network = _connections.ActiveNetworkClass;
         var decision = _decisionEngine.Decide(meta, network);
         var url = _urlBuilder.Build(ctx, meta, decision);
         var start = meta.ViewOffset ?? 0;
-        // Don't resume if almost finished
         if (meta.Duration is long d && start > d * 0.95)
             start = 0;
 
@@ -113,6 +133,10 @@ public partial class DetailViewModel : ObservableObject
             StartPositionMs = start
         };
     }
+
+    /// <summary>Sync wrapper for call sites that cannot await (prefer async).</summary>
+    public PlaybackRequest? BuildPlaybackRequest(PlexMetadata? target = null)
+        => BuildPlaybackRequestAsync(target).GetAwaiter().GetResult();
 
     [RelayCommand]
     public async Task ToggleFavoriteAsync()

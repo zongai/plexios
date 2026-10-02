@@ -18,15 +18,38 @@ public sealed class PlaybackUrlBuilder
 
     public Uri Build(ServerContext context, PlexMetadata metadata, PlaybackDecision decision)
     {
-        var media = metadata.Media[decision.MediaIndex];
-        var part = media.Parts[decision.PartIndex];
-
-        return decision.Mode switch
+        // Prefer Direct Play only when media/part indices are valid
+        if (decision.Mode == PlaybackMode.DirectPlay &&
+            TryGetPart(metadata, decision.MediaIndex, decision.PartIndex, out var part) &&
+            !string.IsNullOrEmpty(part.Key))
         {
-            PlaybackMode.DirectPlay => BuildDirectPlay(context, part),
-            PlaybackMode.DirectStream => BuildTranscode(context, metadata, decision, directStream: true),
-            _ => BuildTranscode(context, metadata, decision, directStream: false)
-        };
+            return BuildDirectPlay(context, part);
+        }
+
+        // DirectStream / Transcode (or DirectPlay fallback when no part key)
+        return BuildTranscode(
+            context,
+            metadata,
+            decision,
+            directStream: decision.Mode == PlaybackMode.DirectStream);
+    }
+
+    private static bool TryGetPart(
+        PlexMetadata metadata,
+        int mediaIndex,
+        int partIndex,
+        out PlexPart part)
+    {
+        part = null!;
+        if (metadata.Media is null || metadata.Media.Count == 0)
+            return false;
+        var mi = Math.Clamp(mediaIndex, 0, metadata.Media.Count - 1);
+        var media = metadata.Media[mi];
+        if (media.Parts is null || media.Parts.Count == 0)
+            return false;
+        var pi = Math.Clamp(partIndex, 0, media.Parts.Count - 1);
+        part = media.Parts[pi];
+        return true;
     }
 
     private Uri BuildDirectPlay(ServerContext context, PlexPart part)
@@ -48,9 +71,13 @@ public sealed class PlaybackUrlBuilder
     {
         var path = "video/:/transcode/universal/start.m3u8";
         var baseUri = new Uri(context.BaseUrl, path);
+        // metadata.Key is like /library/metadata/123 — required by universal transcoder
+        var mediaPath = string.IsNullOrEmpty(metadata.Key)
+            ? $"/library/metadata/{metadata.RatingKey}"
+            : metadata.Key;
         var q = new Dictionary<string, string>
         {
-            ["path"] = metadata.Key,
+            ["path"] = mediaPath,
             ["mediaIndex"] = decision.MediaIndex.ToString(),
             ["partIndex"] = decision.PartIndex.ToString(),
             ["protocol"] = "hls",
@@ -81,4 +108,3 @@ public sealed class PlaybackUrlBuilder
         return ub.Uri;
     }
 }
-

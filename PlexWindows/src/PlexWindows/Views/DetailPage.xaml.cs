@@ -28,9 +28,9 @@ public sealed partial class DetailPage : Page
         }
     }
 
-    private void Play_Click(object sender, RoutedEventArgs e)
+    private async void Play_Click(object sender, RoutedEventArgs e)
     {
-        var req = ViewModel.BuildPlaybackRequest();
+        var req = await ViewModel.BuildPlaybackRequestAsync();
         if (req is null) return;
         Frame.Navigate(typeof(PlayerPage), req);
     }
@@ -45,14 +45,13 @@ public sealed partial class DetailPage : Page
         if (Frame.CanGoBack) Frame.GoBack();
     }
 
-    private void Child_Click(object sender, RoutedEventArgs e)
+    private async void Child_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: PlexMetadata child }) return;
 
-        // Episodes / tracks → play directly; seasons / albums → drill in
         if (child.Type is PlexMetadataType.Episode or PlexMetadataType.Track or PlexMetadataType.Movie)
         {
-            var req = ViewModel.BuildPlaybackRequest(child);
+            var req = await ViewModel.BuildPlaybackRequestAsync(child);
             if (req is not null)
                 Frame.Navigate(typeof(PlayerPage), req);
         }

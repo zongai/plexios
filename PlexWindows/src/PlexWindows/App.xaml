@@ -30,7 +30,7 @@
             <SolidColorBrush x:Key="PlexStrokeBrush" Color="{StaticResource PlexStrokeColor}" />
 
             <!-- Fluent spacing / radius -->
-            <x:Double x:Key="PagePadding">24</x:Double>
+            <Thickness x:Key="PagePadding">24</Thickness>
             <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
             <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
 

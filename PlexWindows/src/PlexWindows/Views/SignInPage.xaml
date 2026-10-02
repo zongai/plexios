@@ -34,7 +34,7 @@
                        Style="{StaticResource CaptionSecondaryStyle}"
                        HorizontalAlignment="Center" TextAlignment="Center" />
             <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                <Button Content="Get code" Click="Start_Click"
+                <Button Content="Get code" Click="SignIn_Click"
                         Style="{StaticResource AccentButtonStyle}"
                         AccessKey="G" />
                 <HyperlinkButton Content="Open plex.tv/link"

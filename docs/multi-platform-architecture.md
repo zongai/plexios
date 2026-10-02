@@ -189,9 +189,12 @@ Reference implementation already exists on iOS:
 - ✅ Keyboard: Space / J L / ↑↓ / M / Esc / Media keys
 - ⏳ Poster image binding polish; LibVLC fallback; MSIX CI
 
-### Phase 4 — Android TV skeleton
-- New Android TV project (Kotlin + Compose TV).
-- PIN auth, server discovery, Home, Libraries, Media3 shell.
+### Phase 4 — Android TV skeleton (done)
+- ✅ `artifacts/AndroidTV/` — Kotlin + Compose for TV, Leanback launcher
+- ✅ PIN auth (EncryptedSharedPreferences), server discover/rank/probe
+- ✅ Home hubs, Libraries grid, Media3/ExoPlayer shell
+- ✅ PlaybackDecisionEngine + URL builder (DP / DS / Transcode)
+- ⏳ Phase 5: Detail/Search/Collections, tracks, next-episode, timeline
 
 ### Phase 5 — Android TV full playback
 - Decision integration, remote-first UI, next episode, etc.

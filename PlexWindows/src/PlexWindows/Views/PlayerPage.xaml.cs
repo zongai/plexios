@@ -65,12 +65,15 @@ public sealed partial class PlayerPage : Page
 
     private async void Audio_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // Ignore programmatic refresh of ItemsSource/SelectedItem
+        if (e.AddedItems.Count == 0) return;
         if (e.AddedItems.FirstOrDefault() is TrackInfo track)
             await ViewModel.SelectAudioAsync(track);
     }
 
     private async void Subtitle_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (e.AddedItems.Count == 0) return;
         if (e.AddedItems.FirstOrDefault() is TrackInfo track)
             await ViewModel.SelectSubtitleAsync(track);
     }

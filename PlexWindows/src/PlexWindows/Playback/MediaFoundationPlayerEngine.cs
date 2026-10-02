@@ -428,7 +428,7 @@ public sealed class MediaFoundationPlayerEngine : IPlayerEngine
 }
 
 /// <summary>UI-friendly track descriptor sourced from Plex streams.</summary>
-public sealed class TrackInfo
+public sealed class TrackInfo : IEquatable<TrackInfo>
 {
     public int Id { get; init; }
     public string Title { get; init; } = "";
@@ -447,4 +447,8 @@ public sealed class TrackInfo
             return string.Join(" · ", parts);
         }
     }
+
+    public bool Equals(TrackInfo? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => obj is TrackInfo t && Equals(t);
+    public override int GetHashCode() => Id;
 }

@@ -18,6 +18,8 @@ public partial class PlayerViewModel : ObservableObject
     private PlaybackPreferences _prefs = PlaybackPreferences.Default;
     private CancellationTokenSource? _controlsCts;
     private bool _seeking;
+    private bool _updatingTracks;
+    private bool _reloadingTracks;
 
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private string _subtitle = "";
@@ -217,25 +219,106 @@ public partial class PlayerViewModel : ObservableObject
 
     public async Task SelectAudioAsync(TrackInfo? track)
     {
-        if (track is null) return;
+        if (track is null || _updatingTracks || _reloadingTracks) return;
+        if (SelectedAudio?.Id == track.Id) return;
         SelectedAudio = track;
+        // Try in-player switch first (LibVLC / some MF cases)
         await _player.SelectAudioTrackAsync(track.Id);
+        // Plex-correct path: rebuild URL with forced audio stream and resume
+        await ReloadWithTracksAsync(forcedAudioId: track.Id, forcedSubtitleId: CurrentForcedSubtitleId());
         BumpControls();
     }
 
     public async Task SelectSubtitleAsync(TrackInfo? track)
     {
-        if (track is null || track.Id < 0)
-        {
-            SelectedSubtitle = SubtitleOff;
-            await _player.SelectSubtitleAsync(null);
-        }
-        else
-        {
-            SelectedSubtitle = track;
-            await _player.SelectSubtitleAsync(track.Id);
-        }
+        if (_updatingTracks || _reloadingTracks) return;
+        var wantOff = track is null || track.Id < 0;
+        var newId = wantOff ? -1 : track!.Id;
+        if (wantOff && (SelectedSubtitle is null || SelectedSubtitle.Id < 0)) return;
+        if (!wantOff && SelectedSubtitle?.Id == newId) return;
+
+        SelectedSubtitle = wantOff ? SubtitleOff : track;
+        // In-player attempt (embedded soft subs on some backends)
+        await _player.SelectSubtitleAsync(wantOff ? null : newId);
+        // Always rebuild stream so transcode/burn-in and external subs actually apply
+        await ReloadWithTracksAsync(
+            forcedAudioId: SelectedAudio?.Id,
+            forcedSubtitleId: newId);
         BumpControls();
+    }
+
+    private int CurrentForcedSubtitleId()
+    {
+        if (SelectedSubtitle is null || SelectedSubtitle.Id < 0) return -1;
+        return SelectedSubtitle.Id;
+    }
+
+    /// <summary>
+    /// Rebuild decision + media URL with forced audio/subtitle and resume at current position.
+    /// Required for Plex: subtitleStreamID / audioStreamID are part of the play session URL.
+    /// </summary>
+    private async Task ReloadWithTracksAsync(int? forcedAudioId, int? forcedSubtitleId)
+    {
+        if (Request is null || _reloadingTracks) return;
+        _reloadingTracks = true;
+        StatusMessage = "Switching tracks…";
+        try
+        {
+            var pos = Math.Max(0, _player.PositionMs);
+            var meta = Request.Metadata;
+            var decision = _decisionEngine.Decide(
+                meta,
+                Request.Network,
+                Request.Decision.MediaIndex,
+                Request.Decision.PartIndex,
+                forcedAudioId: forcedAudioId,
+                forcedSubtitleId: forcedSubtitleId);
+            // Direct Play cannot carry a chosen subtitle stream ID in the URL.
+            // Promote to Transcode so PMS burns/serves the selected sub.
+            if (forcedSubtitleId is int sid && sid > 0 && decision.Mode == PlaybackMode.DirectPlay)
+            {
+                decision = decision with
+                {
+                    Mode = PlaybackMode.Transcode,
+                    SelectedSubtitleStreamId = sid,
+                    BurnInSubtitles = true,
+                    Reason = "Subtitle selected — transcode for reliable subtitle delivery"
+                };
+            }
+            var url = _urlBuilder.Build(Request.Context, meta, decision);
+            var newReq = new PlaybackRequest
+            {
+                Metadata = meta,
+                Context = Request.Context,
+                Network = Request.Network,
+                Decision = decision,
+                MediaUrl = url,
+                StartPositionMs = pos,
+                Preferences = _prefs
+            };
+            Request = newReq;
+            DecisionReason = decision.Reason;
+            ModeLabel = decision.Mode switch
+            {
+                PlaybackMode.DirectPlay => "Direct Play",
+                PlaybackMode.DirectStream => "Direct Stream",
+                _ => "Transcode"
+            };
+            await _player.PrepareAsync(newReq);
+            _player.Play();
+            IsPlaying = true;
+            PlayPauseLabel = "Pause";
+            StatusMessage = "";
+            RefreshTracks();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Track switch failed: " + ex.Message;
+        }
+        finally
+        {
+            _reloadingTracks = false;
+        }
     }
 
     public void BumpControls()
@@ -277,18 +360,72 @@ public partial class PlayerViewModel : ObservableObject
 
     private void RefreshTracks()
     {
-        AudioTracks = _player.AudioTracks.ToList();
-        var subs = _player.SubtitleTracks.ToList();
-        // Prepend Off
-        var withOff = new List<TrackInfo> { SubtitleOff };
-        withOff.AddRange(subs);
-        SubtitleTracks = withOff;
+        _updatingTracks = true;
+        try
+        {
+            var audio = _player.AudioTracks.ToList();
+            var subs = _player.SubtitleTracks.ToList();
 
-        HasAudioTracks = AudioTracks.Count > 0;
-        HasSubtitleTracks = SubtitleTracks.Count > 1; // more than just Off
+            // Fallback: populate from Plex metadata when engine has not exposed tracks yet
+            if ((audio.Count == 0 || subs.Count == 0) && Request is not null)
+            {
+                var part = Request.Metadata.Media
+                    .ElementAtOrDefault(Request.Decision.MediaIndex)?.Parts
+                    .ElementAtOrDefault(Request.Decision.PartIndex);
+                if (part is not null)
+                {
+                    if (audio.Count == 0)
+                    {
+                        audio = part.Streams
+                            .Where(s => s.Type == PlexStream.StreamType.Audio)
+                            .Select(s => new TrackInfo
+                            {
+                                Id = s.Id,
+                                Title = s.ExtendedDisplayTitle ?? s.DisplayTitle ?? s.Title
+                                        ?? s.Language ?? $"Audio {s.Id}",
+                                Language = s.LanguageCode ?? s.Language,
+                                Codec = s.Codec,
+                                Channels = s.Channels,
+                                IsSelected = Request.Decision.SelectedAudioStreamId == s.Id
+                            }).ToList();
+                    }
+                    if (subs.Count == 0)
+                    {
+                        subs = part.Streams
+                            .Where(s => s.Type == PlexStream.StreamType.Subtitle)
+                            .Select(s => new TrackInfo
+                            {
+                                Id = s.Id,
+                                Title = s.ExtendedDisplayTitle ?? s.DisplayTitle ?? s.Title
+                                        ?? s.Language ?? $"Subtitle {s.Id}",
+                                Language = s.LanguageCode ?? s.Language,
+                                Codec = s.Codec ?? s.Format,
+                                IsSelected = Request.Decision.SelectedSubtitleStreamId == s.Id
+                            }).ToList();
+                    }
+                }
+            }
 
-        SelectedAudio = AudioTracks.FirstOrDefault(t => t.IsSelected) ?? AudioTracks.FirstOrDefault();
-        SelectedSubtitle = subs.FirstOrDefault(t => t.IsSelected) ?? SubtitleOff;
+            AudioTracks = audio;
+            var withOff = new List<TrackInfo> { SubtitleOff };
+            withOff.AddRange(subs);
+            SubtitleTracks = withOff;
+
+            HasAudioTracks = AudioTracks.Count > 0;
+            HasSubtitleTracks = SubtitleTracks.Count > 1;
+
+            var dec = Request?.Decision;
+            SelectedAudio = AudioTracks.FirstOrDefault(t => t.IsSelected)
+                            ?? AudioTracks.FirstOrDefault(t => t.Id == dec?.SelectedAudioStreamId)
+                            ?? AudioTracks.FirstOrDefault();
+            SelectedSubtitle = subs.FirstOrDefault(t => t.IsSelected)
+                               ?? subs.FirstOrDefault(t => t.Id == dec?.SelectedSubtitleStreamId)
+                               ?? SubtitleOff;
+        }
+        finally
+        {
+            _updatingTracks = false;
+        }
     }
 
     private void UpdateTimeLabels()

@@ -302,11 +302,14 @@ public partial class PlayerViewModel : ObservableObject
             listIndex = AudioTracks.ToList().FindIndex(t => t.Id == track.Id);
 
         var mode = Request?.Decision.Mode ?? PlaybackMode.DirectPlay;
-        var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
+        // Prefer in-player whenever LibVLC is the active engine (or available and DirectPlay file)
+        var usingVlc = _player.Backend == PlayerBackendKind.LibVlc
+                       || (_player.Backend != PlayerBackendKind.MediaFoundation
+                           && LibVlcPlayerEngine.IsAvailable);
 
         // LibVLC + Direct Play: switch embedded audio in the open container.
-        // Avoid Direct Stream HLS — VLC often fails plex.direct HTTPS (HTTP connection failure).
-        if (usingVlc && mode == PlaybackMode.DirectPlay)
+        // Avoid Direct Stream HLS — PMS returns HTTP 400 on LibVLC's ranged GET of start.m3u8.
+        if (_player.Backend == PlayerBackendKind.LibVlc && mode == PlaybackMode.DirectPlay)
         {
             AppDebugLog.Info("TrackSwitch", $"audio in-player only id={track.Id} index={listIndex}");
             await _player.SelectAudioTrackAsync(track.Id, listIndex);
@@ -336,10 +339,10 @@ public partial class PlayerViewModel : ObservableObject
         SelectedSubtitle = wantOff ? SubtitleOff : track;
 
         var mode = Request?.Decision.Mode ?? PlaybackMode.DirectPlay;
-        var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
 
         // LibVLC + Direct Play: SetSpu / AddSlave on current file — no HLS remux.
-        if (usingVlc && mode == PlaybackMode.DirectPlay)
+        // PMS returns HTTP 400 when LibVLC GETs start.m3u8 with Range: bytes=0-.
+        if (_player.Backend == PlayerBackendKind.LibVlc && mode == PlaybackMode.DirectPlay)
         {
             AppDebugLog.Info("TrackSwitch", $"subtitle in-player only id={newId}");
             try { await _player.SelectSubtitleAsync(wantOff ? null : newId); } catch { /* non-fatal */ }

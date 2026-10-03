@@ -106,12 +106,12 @@ public sealed class PlayerEngineRouter : IPlayerEngine
             return;
         }
 
-        // Auto: prefer LibVLC for Direct Stream / Transcode (PMS network URLs).
-        // MF is unreliable for container-remux and many HLS edge cases.
+        // Auto: prefer LibVLC whenever available (DirectPlay MKV/HEVC + in-player
+        // audio/sub switch). MF cannot switch tracks mid-stream and often fails HEVC.
+        // iOS uses a single native player path; we mirror that with LibVLC on Windows.
         var preferVlc =
             _preferredBackend == "auto"
-            && _vlc is not null
-            && request.Decision.Mode is PlaybackMode.DirectStream or PlaybackMode.Transcode;
+            && _vlc is not null;
 
         if (preferVlc)
         {
@@ -130,7 +130,7 @@ public sealed class PlayerEngineRouter : IPlayerEngine
             }
         }
 
-        // MF path (forced mediaFoundation, or auto DirectPlay, or VLC failed)
+        // MF path (forced mediaFoundation, or VLC unavailable/failed)
         var allowFallback = _preferredBackend == "auto" && _vlc is not null;
 
         SetActive(_mf);

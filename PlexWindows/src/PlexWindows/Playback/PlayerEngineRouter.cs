@@ -1,3 +1,4 @@
+using PlexWindows.Helpers;
 namespace PlexWindows.Playback;
 
 /// <summary>
@@ -17,7 +18,16 @@ public sealed class PlayerEngineRouter : IPlayerEngine
     {
         _preferredBackend = Normalize(preferredBackend);
         _mf = new MediaFoundationPlayerEngine();
-        _vlc = LibVlcPlayerEngine.IsAvailable ? new LibVlcPlayerEngine() : null;
+        try
+        {
+            _vlc = LibVlcPlayerEngine.IsAvailable ? new LibVlcPlayerEngine() : null;
+        }
+        catch (Exception ex)
+        {
+            AppDebugLog.Error("PlayerRouter", ex, "LibVlcPlayerEngine ctor failed");
+            _vlc = null;
+        }
+        AppDebugLog.Info("PlayerRouter", _vlc is null ? "LibVLC unavailable — MF only" : "LibVLC available");
         _active = _mf;
         Wire(_mf);
         if (_vlc is not null) Wire(_vlc);

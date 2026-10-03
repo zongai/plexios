@@ -57,10 +57,31 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     private static void EnsureCoreInitialized()
     {
         var dir = ResolveLibVlcDirectory();
+        AppDebugLog.Info("LibVLC.Core",
+            dir is null
+                ? "libvlc.dll not found under BaseDirectory=" + AppContext.BaseDirectory
+                : "using native dir=" + dir);
+
         if (dir is not null)
+        {
+            // Ensure plugin loader can resolve sibling DLLs
+            try
+            {
+                var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+                if (!path.Split(Path.PathSeparator).Any(p =>
+                        string.Equals(p, dir, StringComparison.OrdinalIgnoreCase)))
+                {
+                    Environment.SetEnvironmentVariable("PATH", dir + Path.PathSeparator + path);
+                }
+            }
+            catch { /* non-fatal */ }
+
             Core.Initialize(dir);
+        }
         else
-            Core.Initialize(); // last resort
+        {
+            Core.Initialize();
+        }
     }
 #endif
 
@@ -71,12 +92,15 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 #if USE_LIBVLC
             try
             {
-                // Loads native libvlc from VideoLAN.LibVLC.Windows package output
                 EnsureCoreInitialized();
+                // Probe real native instanciation (Core.Initialize alone is not enough)
+                using var probe = new LibVLC("--no-video-title-show");
+                AppDebugLog.Info("LibVLC", "IsAvailable probe OK");
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                AppDebugLog.Error("LibVLC", ex, "IsAvailable probe failed");
                 return false;
             }
 #else
@@ -223,17 +247,11 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 
             _media = new Media(_libVlc, url, FromType.FromLocation);
             _media.AddOption(":network-caching=3000");
-            _media.AddOption(":http-reconnect=true");
-            _media.AddOption(":http-continuous=true");
-            _media.AddOption(":http-user-agent=PlexWindows/0.1");
-            // Critical for plex.direct HTTPS / LAN certs
-            _media.AddOption(":http-tls-verify=0");
-            _media.AddOption(":avcodec-hw=any");
-            // HLS
-            // Prefer adaptive/HLS-friendly demux without hard-failing
-            _media.AddOption(":hls-segment-threads=2");
             _media.AddOption(":file-caching=3000");
             _media.AddOption(":live-caching=3000");
+            _media.AddOption(":http-reconnect=true");
+            _media.AddOption(":http-user-agent=PlexWindows/0.1");
+            _media.AddOption(":avcodec-hw=any");
 
             _mediaPlayer.Media = _media;
             _mediaPlayer.Volume = (int)(_volume * 100);
@@ -518,11 +536,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 _mediaPlayer?.Dispose();
                 _mediaPlayer = null;
                 _libVlc?.Dispose();
-                if (!opts.Any(o => o.Contains("http-tls-verify", StringComparison.OrdinalIgnoreCase)))
-                {
-                    opts.Add("--http-tls-verify=0");
-                    opts.Add("--no-gnutls-system-trust");
-                }
+                // Only pass options that LibVLCWinUI sample uses (swapchain + quiet UI)
                 _libVlc = new LibVLC(enableDebugLogs: true, opts.ToArray());
                 _libVlc.Log += (_, e) =>
                 {
@@ -552,15 +566,20 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     {
         if (_libVlc is null)
         {
-            // Fallback without swapchain (may still work for audio / some builds)
-            _libVlc = new LibVLC(
-                enableDebugLogs: true,
-                "--no-video-title-show",
-                "--network-caching=2000",
-                "--avcodec-hw=any",
-                // plex.direct / LAN HTTPS often fails strict cert verify in LibVLC
-                "--http-tls-verify=0",
-                "--no-gnutls-system-trust");
+            // Minimal, known-good options only. Unknown switches crash native init.
+            AppDebugLog.Info("LibVLC", "Creating LibVLC instance…");
+            try
+            {
+                _libVlc = new LibVLC(
+                    enableDebugLogs: true,
+                    "--no-video-title-show",
+                    "--network-caching=3000");
+            }
+            catch (Exception ex)
+            {
+                AppDebugLog.Error("LibVLC", ex, "new LibVLC() failed");
+                throw;
+            }
             _libVlc.Log += (_, e) =>
             {
                 if (e.Level is LogLevel.Error or LogLevel.Warning)
@@ -568,11 +587,8 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                     _lastLibVlcLog = $"[{e.Level}] {e.Module}: {e.Message}";
                     AppDebugLog.Warn("LibVLC", $"{e.Module}: {e.Message}");
                 }
-                else if (e.Level == LogLevel.Debug)
-                {
-                    AppDebugLog.Info("LibVLC", $"{e.Module}: {e.Message}");
-                }
             };
+            AppDebugLog.Info("LibVLC", "LibVLC instance OK");
         }
 
         if (_mediaPlayer is null)

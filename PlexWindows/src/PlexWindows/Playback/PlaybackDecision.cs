@@ -97,9 +97,9 @@ public sealed class ClientCapabilities
         SupportedAudioCodecs = new(StringComparer.OrdinalIgnoreCase)
             { "aac", "mp3", "ac3", "eac3", "wmav2", "pcm", "flac", "opus", "dts", "truehd" },
         SupportedSubtitleFormats = new(StringComparer.OrdinalIgnoreCase)
-            { "srt", "vtt", "ttml", "dfxp", "ass", "ssa" },
-        RequiresBurnInFor = new(StringComparer.OrdinalIgnoreCase)
-            { "pgs", "vobsub", "dvd", "idx" },
+            { "srt", "vtt", "ttml", "dfxp", "ass", "ssa", "pgs", "vobsub", "dvd", "idx" },
+        // LibVLC renders image + text subs natively — never force PMS burn-in
+        RequiresBurnInFor = new(StringComparer.OrdinalIgnoreCase),
         SupportsHdr10 = true,
         SupportsDolbyVision = false,
         MaxAudioChannels = 16,
@@ -121,9 +121,8 @@ public sealed class ClientCapabilities
         SupportedAudioCodecs = new(StringComparer.OrdinalIgnoreCase)
             { "aac", "mp3", "ac3", "eac3", "wmav2", "pcm", "flac", "opus" },
         SupportedSubtitleFormats = new(StringComparer.OrdinalIgnoreCase)
-            { "srt", "vtt", "ttml", "dfxp", "ass", "ssa" },
-        RequiresBurnInFor = new(StringComparer.OrdinalIgnoreCase)
-            { "pgs", "vobsub", "dvd", "idx" },
+            { "srt", "vtt", "ttml", "dfxp", "ass", "ssa", "pgs", "vobsub" },
+        RequiresBurnInFor = new(StringComparer.OrdinalIgnoreCase),
         SupportsHdr10 = true,
         SupportsDolbyVision = false,
         MaxAudioChannels = 8,
@@ -162,7 +161,7 @@ public sealed class PlaybackDecisionEngine
         PlaybackPreferences? prefs = null)
     {
         _settings = settings;
-        _caps = caps ?? ClientCapabilities.MediaFoundationDefault;
+        _caps = caps ?? ClientCapabilities.LibVlcDefault;
         _prefs = prefs ?? PlaybackPreferences.Default;
     }
 

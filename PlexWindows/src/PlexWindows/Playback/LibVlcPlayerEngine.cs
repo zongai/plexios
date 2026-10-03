@@ -207,7 +207,6 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 #if !USE_LIBVLC
         State = PlayerState.Error;
         ErrorOccurred?.Invoke(this, "LibVLC was not compiled in (USE_LIBVLC undefined).");
-        await Task.CompletedTask;
         return;
 #else
         if (!_coreReady)
@@ -247,7 +246,27 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             AppDebugLog.Info("LibVLC.Prepare",
                 $"mode={request.Decision.Mode} reason={request.Decision.Reason} url={AppDebugLog.RedactUrl(url)}");
 
-            _media = new Media(_libVlc, url, FromType.FromLocation);
+            // PMS returns HTTP 400 when LibVLC GETs start.m3u8 with Range: bytes=0-.
+            // Prefetch playlist with HttpClient (no Range) and play from a local temp file.
+            if (url.Contains("start.m3u8", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var local = await PrefetchHlsPlaylistAsync(request.MediaUrl, ct).ConfigureAwait(true);
+                    AppDebugLog.Info("LibVLC.Prepare", "playing prefetched HLS " + local);
+                    _media = new Media(_libVlc, local, FromType.FromPath);
+                }
+                catch (Exception ex)
+                {
+                    AppDebugLog.Error("LibVLC.Prepare", ex, "HLS prefetch failed — trying direct URL");
+                    _media = new Media(_libVlc, url, FromType.FromLocation);
+                }
+            }
+            else
+            {
+                _media = new Media(_libVlc, url, FromType.FromLocation);
+            }
+
             _media.AddOption(":network-caching=3000");
             _media.AddOption(":file-caching=3000");
             _media.AddOption(":live-caching=3000");

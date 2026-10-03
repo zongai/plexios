@@ -69,7 +69,8 @@ public partial class App : Application
 
         services.AddSingleton<AuthenticationService>();
         services.AddSingleton<ConnectionManager>();
-        services.AddSingleton<PlaybackDecisionEngine>();
+        services.AddSingleton<PlaybackDecisionEngine>(sp =>
+            new PlaybackDecisionEngine(sp.GetRequiredService<AppSettings>(), ClientCapabilities.LibVlcDefault));
         services.AddSingleton<AppSettings>();
         services.AddTransient<IPlayerEngine>(sp =>
         {

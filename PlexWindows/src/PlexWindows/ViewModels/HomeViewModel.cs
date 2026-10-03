@@ -83,4 +83,34 @@ public partial class HomeViewModel : ObservableObject
             IsLoading = false;
         }
     }
+
+    public void ApplyHomeFilter(ServerContext? ctx = null, IReadOnlyList<PlexLibrary>? libraries = null)
+    {
+        ctx ??= _connections.ActiveBaseUrl is not null
+                && !string.IsNullOrEmpty(_connections.ActiveToken)
+                && _connections.ActiveServer is not null
+            ? new ServerContext(_connections.ActiveBaseUrl, _connections.ActiveToken,
+                _connections.ActiveServer.MachineIdentifier)
+            : null;
+
+        var prefs = _settings.HomeDisplay;
+        var filtered = prefs.Filter(_rawHubs.ToList(), libraries);
+        Hubs = filtered.Select(h => new HubCards
+        {
+            Title = h.Title,
+            Items = h.Items.Select(m => new MediaCardItem
+            {
+                Metadata = m,
+                Poster = ctx is null
+                    ? null
+                    : PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb)
+            }).ToList()
+        }).ToList();
+    }
+
+    public void ReapplyPreferences()
+    {
+        if (_rawHubs.Count == 0) return;
+        ApplyHomeFilter();
+    }
 }

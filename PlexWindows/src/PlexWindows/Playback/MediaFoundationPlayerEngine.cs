@@ -150,7 +150,7 @@ public sealed class MediaFoundationPlayerEngine : IPlayerEngine
 
             // Apply decision-selected tracks when possible
             if (request.Decision.SelectedAudioStreamId is int audioId)
-                await SelectAudioTrackAsync(audioId, ct).ConfigureAwait(true);
+                await SelectAudioTrackAsync(audioId, -1, ct).ConfigureAwait(true);
             if (request.Decision.SelectedSubtitleStreamId is int subId)
                 await SelectSubtitleAsync(subId, ct).ConfigureAwait(true);
             else

@@ -346,8 +346,6 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 
         if (target is int vlcId)
         {
-            // Prefer property setter + SetAudioTrack (LibVLCSharp versions differ)
-            try { _mediaPlayer.AudioTrack = vlcId; } catch { /* older bindings */ }
             var ok = _mediaPlayer.SetAudioTrack(vlcId);
             var current = _mediaPlayer.AudioTrack;
             if (!ok && current != vlcId)

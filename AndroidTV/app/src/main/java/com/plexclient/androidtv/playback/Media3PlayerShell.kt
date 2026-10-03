@@ -43,32 +43,32 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
     private val player: ExoPlayer = ExoPlayer.Builder(context).build()
 
     private val _state = MutableStateFlow(PlayerState.Idle)
-    val state: StateFlow<PlayerState> = _state.asStateFlow()
+    override val state: StateFlow<PlayerState> = _state.asStateFlow()
 
     private val _audioTracks = MutableStateFlow<List<PlayerTrack>>(emptyList())
-    val audioTracks: StateFlow<List<PlayerTrack>> = _audioTracks.asStateFlow()
+    override val audioTracks: StateFlow<List<PlayerTrack>> = _audioTracks.asStateFlow()
 
     private val _subtitleTracks = MutableStateFlow<List<PlayerTrack>>(emptyList())
-    val subtitleTracks: StateFlow<List<PlayerTrack>> = _subtitleTracks.asStateFlow()
+    override val subtitleTracks: StateFlow<List<PlayerTrack>> = _subtitleTracks.asStateFlow()
+
+    // PlayerState lives in MediaPlayerContract.kt (contract-aligned).
 
     /**
-     * Contract-aligned states (docs/cross-platform-playback-contract.md §4):
-     * idle | loading | ready | buffering | playing | paused | ended | stopped | error
-     *
-     * ExoPlayer mapping:
-     * - STATE_IDLE -> Idle (or Stopped after stop())
-     * - STATE_BUFFERING -> Buffering (play intent unchanged; NOT paused)
-     * - STATE_READY + isPlaying -> Playing
-     * - STATE_READY + !playWhenReady -> Paused
-     * - STATE_READY + playWhenReady && !isPlaying -> Ready
-     * - STATE_ENDED -> Ended
-     * - onPlayerError -> Error
-     * - prepare/load -> Loading
-     * - explicit stop() -> Stopped
+     * Media3 surface binding only (PlayerView). Business logic must use [MediaPlayerContract].
      */
-    enum class PlayerState { Idle, Loading, Ready, Buffering, Playing, Paused, Stopped, Ended, Error }
-
     val exoPlayer: ExoPlayer get() = player
+
+    override val positionMs: Long
+        get() = player.currentPosition.coerceAtLeast(0L)
+
+    override val durationMs: Long
+        get() = player.duration.takeIf { it > 0 } ?: 0L
+
+    override val isPlaying: Boolean
+        get() = player.isPlaying
+
+    override val isBuffering: Boolean
+        get() = player.playbackState == Player.STATE_BUFFERING
 
     init {
         player.addListener(object : Player.Listener {
@@ -109,14 +109,14 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
         })
     }
 
-    fun prepare(url: URI, startPositionMs: Long = 0) {
+    override fun prepare(url: URI, startPositionMs: Long = 0) {
         val item = MediaItem.fromUri(url.toString())
         _state.value = PlayerState.Loading
         player.setMediaItem(item, startPositionMs)
         player.prepare()
     }
 
-    fun play() {
+    override fun play() {
         // play intent; buffering is not paused
         _state.value = if (player.playbackState == Player.STATE_BUFFERING) {
             PlayerState.Buffering
@@ -126,31 +126,31 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
         player.play()
     }
 
-    fun pause() {
+    override fun pause() {
         player.pause()
         if (player.playbackState != Player.STATE_ENDED) {
             _state.value = PlayerState.Paused
         }
     }
 
-    fun stop() {
+    override fun stop() {
         player.stop()
         _state.value = PlayerState.Stopped
     }
 
-    fun seekTo(ms: Long) = player.seekTo(ms)
+    override fun seekTo(ms: Long) = player.seekTo(ms)
 
     /** Playback rate (1.0 = normal). */
-    fun setRate(rate: Float) {
+    override fun setRate(rate: Float) {
         player.setPlaybackSpeed(rate)
     }
 
     /** Linear volume 0…1 (player volume, not system stream volume). */
-    fun setVolume(volume: Float) {
+    override fun setVolume(volume: Float) {
         player.volume = volume.coerceIn(0f, 1f)
     }
 
-    fun selectAudio(track: PlayerTrack) {
+    override fun selectAudio(track: PlayerTrack) {
         val groups = player.currentTracks.groups
         if (track.groupIndex !in groups.indices) return
         val group = groups[track.groupIndex]
@@ -163,7 +163,7 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
             .build()
     }
 
-    fun selectSubtitle(track: PlayerTrack?) {
+    override fun selectSubtitle(track: PlayerTrack?) {
         if (track == null) {
             // Disable text tracks
             player.trackSelectionParameters = player.trackSelectionParameters
@@ -185,7 +185,7 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
             .build()
     }
 
-    fun release() = player.release()
+    override fun release() = player.release()
 
     private fun refreshTracks(tracks: Tracks) {
         val audio = mutableListOf<PlayerTrack>()

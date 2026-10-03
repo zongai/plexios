@@ -59,7 +59,7 @@ fun PlayerScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
                     useController = true
-                    player = viewModel.shell.exoPlayer
+                    player = viewModel.playerForView()
                 }
             },
             modifier = Modifier.fillMaxSize()

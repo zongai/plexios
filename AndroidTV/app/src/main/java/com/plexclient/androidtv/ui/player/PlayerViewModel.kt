@@ -46,6 +46,9 @@ class PlayerViewModel(
     private val timeline: TimelineReporter,
     private val appSettings: AppSettings
 ) : AndroidViewModel(app) {
+    /** Media3 surface only — prefer contract methods for control/progress. */
+    fun playerForView(): androidx.media3.exoplayer.ExoPlayer = shell.exoPlayer
+
     val shell = Media3PlayerShell(app.applicationContext)
 
     private val prefs: PlaybackPreferences
@@ -118,14 +121,14 @@ class PlayerViewModel(
 
     fun togglePlayPause() {
         val req = current
-        if (shell.exoPlayer.isPlaying) {
+        if (shell.isPlaying) {
             shell.pause()
             if (req != null) {
                 timeline.report(
                     req.context,
                     req.metadata.ratingKey,
-                    shell.exoPlayer.currentPosition,
-                    shell.exoPlayer.duration.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
+                    shell.positionMs,
+                    shell.durationMs.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
                     "paused"
                 )
             }
@@ -136,8 +139,8 @@ class PlayerViewModel(
                 timeline.report(
                     req.context,
                     req.metadata.ratingKey,
-                    shell.exoPlayer.currentPosition,
-                    shell.exoPlayer.duration.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
+                    shell.positionMs,
+                    shell.durationMs.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
                     "playing"
                 )
             }
@@ -151,8 +154,8 @@ class PlayerViewModel(
             timeline.report(
                 req.context,
                 req.metadata.ratingKey,
-                shell.exoPlayer.currentPosition,
-                shell.exoPlayer.duration.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
+                shell.positionMs,
+                shell.durationMs.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
                 "stopped"
             )
         }
@@ -190,7 +193,7 @@ class PlayerViewModel(
     }
 
     private fun updateSkipMarker() {
-        val pos = shell.exoPlayer.currentPosition
+        val pos = shell.positionMs
         val active = markers.firstOrNull {
             it.type == com.plexclient.androidtv.plex.model.PlexMarkerType.Intro ||
                 it.type == com.plexclient.androidtv.plex.model.PlexMarkerType.Credits
@@ -221,12 +224,11 @@ class PlayerViewModel(
             while (isActive) {
                 delay(15_000)
                 val req = current ?: continue
-                val pos = shell.exoPlayer.currentPosition
-                val dur = shell.exoPlayer.duration.takeIf { it > 0 }
-                    ?: (req.metadata.duration ?: 0)
+                val pos = shell.positionMs
+                val dur = shell.durationMs.takeIf { it > 0 } ?: (req.metadata.duration ?: 0)
                 val st = when {
-                    shell.exoPlayer.isPlaying -> "playing"
-                    shell.exoPlayer.playbackState == Player.STATE_BUFFERING -> "buffering"
+                    shell.isPlaying -> "playing"
+                    shell.isBuffering -> "buffering"
                     else -> "paused"
                 }
                 timeline.report(req.context, req.metadata.ratingKey, pos, dur, st)
@@ -278,8 +280,8 @@ class PlayerViewModel(
             timeline.report(
                 req.context,
                 req.metadata.ratingKey,
-                shell.exoPlayer.currentPosition,
-                shell.exoPlayer.duration.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
+                shell.positionMs,
+                shell.durationMs.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
                 "stopped"
             )
         }

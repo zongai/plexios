@@ -477,6 +477,20 @@ public partial class PlayerViewModel : ObservableObject
 
             // Keep the same player backend across track reload to avoid mid-session engine swap.
             decision = decision with { Backend = Request.Decision.Backend };
+
+            // Light capability guard: System (MF) cannot soft-render subs on DP/DS after rewrite.
+            if (decision.Backend == PlaybackBackend.System
+                && decision.SelectedSubtitleStreamId is int keepSub && keepSub > 0
+                && !decision.BurnInSubtitles
+                && decision.Mode is PlaybackMode.DirectPlay or PlaybackMode.DirectStream)
+            {
+                decision = decision with
+                {
+                    Mode = PlaybackMode.Transcode,
+                    BurnInSubtitles = true,
+                    Reason = decision.Reason + " · capability guard: MF subtitle burn-in"
+                };
+            }
             var ctx = RewriteContextBase(Request.Context);
             var url = _urlBuilder.Build(ctx, meta, decision, Request.Network, pos);
             AppDebugLog.Info("TrackSwitch",

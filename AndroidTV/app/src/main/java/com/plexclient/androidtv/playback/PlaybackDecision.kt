@@ -29,8 +29,11 @@ data class ClientCapabilities(
     val requiresBurnInFor: Set<String>
 ) {
     companion object {
-        /** Conservative Media3 / ExoPlayer capability matrix for Android TV. */
-        val AndroidTVDefault = ClientCapabilities(
+        /**
+         * System backend (ExoPlayer / Media3) capability matrix.
+         * Primary path for Android TV.
+         */
+        val SystemProfile = ClientCapabilities(
             supportedContainers = setOf("mp4", "mkv", "mov", "m4v", "webm", "mpegts", "avi"),
             supportedVideoCodecs = setOf("h264", "hevc", "vp9", "av1", "mpeg4", "mpeg2video"),
             supportedAudioCodecs = setOf("aac", "ac3", "eac3", "mp3", "flac", "opus", "vorbis", "dts"),
@@ -48,6 +51,33 @@ data class ClientCapabilities(
             canRenderBitmapSubtitles = false,
             requiresBurnInFor = setOf("pgs", "vobsub", "dvd")
         )
+
+        /**
+         * VLC fallback matrix (broader containers/codecs).
+         * Not wired as a backend yet — reserved for Decision when LibVLC is added.
+         */
+        val VlcProfile = SystemProfile.copy(
+            supportedContainers = SystemProfile.supportedContainers + setOf(
+                "flv", "wmv", "asf", "ogm", "ogg", "m2ts", "ts"
+            ),
+            supportedVideoCodecs = SystemProfile.supportedVideoCodecs + setOf(
+                "vc1", "wmv3", "msmpeg4"
+            ),
+            supportedAudioCodecs = SystemProfile.supportedAudioCodecs + setOf(
+                "truehd", "mlp", "wmav2", "dca"
+            ),
+            canRenderBitmapSubtitles = true,
+            requiresBurnInFor = emptySet()
+        )
+
+        /** @deprecated Use [SystemProfile]. */
+        val AndroidTVDefault = SystemProfile
+
+        fun forBackend(backend: PlaybackBackend): ClientCapabilities =
+            when (backend) {
+                PlaybackBackend.System -> SystemProfile
+                PlaybackBackend.Vlc -> VlcProfile
+            }
     }
 }
 

@@ -65,7 +65,51 @@ public sealed class ClientCapabilities
     public bool SupportsBackgroundPlayback { get; init; } = true;
     public bool SupportsRemoteCommandCenter { get; init; } = true;
 
-    /// <summary>Conservative Windows defaults (Media Foundation + common codecs).</summary>
+    /// <summary>Media Foundation primary matrix (stricter containers).</summary>
+    public static ClientCapabilities MediaFoundationDefault { get; } = new()
+    {
+        SupportedContainers = new(StringComparer.OrdinalIgnoreCase)
+            { "mp4", "m4v", "mov", "mpegts", "mpeg", "avi", "wmv", "asf" },
+        SupportedVideoCodecs = new(StringComparer.OrdinalIgnoreCase)
+            { "h264", "avc", "hevc", "h265", "mpeg2video", "mpeg4", "vc1", "wmv3", "vp9" },
+        SupportedAudioCodecs = new(StringComparer.OrdinalIgnoreCase)
+            { "aac", "mp3", "ac3", "eac3", "wmav2", "pcm", "flac", "opus" },
+        SupportedSubtitleFormats = new(StringComparer.OrdinalIgnoreCase)
+            { "srt", "vtt", "ttml", "dfxp" },
+        RequiresBurnInFor = new(StringComparer.OrdinalIgnoreCase)
+            { "pgs", "vobsub", "dvd", "idx", "ass", "ssa" },
+        SupportsHdr10 = true,
+        SupportsDolbyVision = false,
+        MaxAudioChannels = 8,
+        SupportsPiP = false,
+        SupportsAirPlay = false,
+        SupportsBackgroundPlayback = true,
+        SupportsRemoteCommandCenter = true
+    };
+
+    /// <summary>LibVLC fallback matrix (broad Direct Play).</summary>
+    public static ClientCapabilities LibVlcDefault { get; } = new()
+    {
+        SupportedContainers = new(StringComparer.OrdinalIgnoreCase)
+            { "mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "asf", "mpegts", "mpeg", "m2ts", "ts", "flv", "ogg" },
+        SupportedVideoCodecs = new(StringComparer.OrdinalIgnoreCase)
+            { "h264", "avc", "hevc", "h265", "mpeg2video", "mpeg4", "vc1", "wmv3", "vp8", "vp9", "av1" },
+        SupportedAudioCodecs = new(StringComparer.OrdinalIgnoreCase)
+            { "aac", "mp3", "ac3", "eac3", "wmav2", "pcm", "flac", "opus", "dts", "truehd" },
+        SupportedSubtitleFormats = new(StringComparer.OrdinalIgnoreCase)
+            { "srt", "vtt", "ttml", "dfxp", "ass", "ssa" },
+        RequiresBurnInFor = new(StringComparer.OrdinalIgnoreCase)
+            { "pgs", "vobsub", "dvd", "idx" },
+        SupportsHdr10 = true,
+        SupportsDolbyVision = false,
+        MaxAudioChannels = 16,
+        SupportsPiP = false,
+        SupportsAirPlay = false,
+        SupportsBackgroundPlayback = true,
+        SupportsRemoteCommandCenter = true
+    };
+
+    /// <summary>Union used when Decision does not yet pick a backend matrix (compat).</summary>
     public static ClientCapabilities WindowsDefault { get; } = new()
     {
         // Broad set: LibVLC path can Direct Play nearly anything; MF path still

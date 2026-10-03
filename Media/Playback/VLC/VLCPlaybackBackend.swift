@@ -21,6 +21,7 @@ final class VLCPlaybackBackend: NSObject {
     private(set) var positionMs: Int64 = 0
     private(set) var durationMs: Int64 = 0
     private(set) var rate: Float = 1.0
+    private(set) var volume: Float = 1.0
 
     private(set) var drawableView: UIView = {
         let v = UIView()
@@ -268,9 +269,12 @@ final class VLCPlaybackBackend: NSObject {
         // VLC audio volume is 0…200 (100 = normal, 200 = +6dB-ish boost).
         // App linear scale: 0…2 → map to 0…200.
         let clamped = min(2, max(0, linear))
+        volume = clamped
         let v = Int((clamped * 100).rounded())
         mediaPlayer?.audio?.volume = Int32(min(200, max(0, v)))
     }
+
+    var isPlaying: Bool { state == .playing }
 
     func setRate(_ rate: Float) {
         self.rate = rate
@@ -724,3 +728,5 @@ extension VLCPlaybackBackend: VLCMediaPlayerDelegate {
     }
 }
 #endif
+
+extension VLCPlaybackBackend: MediaPlayerProtocol {}

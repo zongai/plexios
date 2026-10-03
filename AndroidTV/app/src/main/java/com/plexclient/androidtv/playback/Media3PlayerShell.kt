@@ -39,7 +39,7 @@ data class PlayerTrack(
 /**
  * Media3 / ExoPlayer shell with track enumeration and selection.
  */
-class Media3PlayerShell(context: Context) {
+class Media3PlayerShell(context: Context) : MediaPlayerContract {
     private val player: ExoPlayer = ExoPlayer.Builder(context).build()
 
     private val _state = MutableStateFlow(PlayerState.Idle)

@@ -116,6 +116,52 @@ class PlayerViewModel(
         }
     }
 
+    fun togglePlayPause() {
+        val req = current
+        if (shell.exoPlayer.isPlaying) {
+            shell.pause()
+            if (req != null) {
+                timeline.report(
+                    req.context,
+                    req.metadata.ratingKey,
+                    shell.exoPlayer.currentPosition,
+                    shell.exoPlayer.duration.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
+                    "paused"
+                )
+            }
+            _state.update { it.copy(status = "Paused") }
+        } else {
+            shell.play()
+            if (req != null) {
+                timeline.report(
+                    req.context,
+                    req.metadata.ratingKey,
+                    shell.exoPlayer.currentPosition,
+                    shell.exoPlayer.duration.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
+                    "playing"
+                )
+            }
+            _state.update { it.copy(status = "Playing") }
+        }
+    }
+
+    fun stopPlayback() {
+        val req = current
+        if (req != null) {
+            timeline.report(
+                req.context,
+                req.metadata.ratingKey,
+                shell.exoPlayer.currentPosition,
+                shell.exoPlayer.duration.takeIf { it > 0 } ?: (req.metadata.duration ?: 0),
+                "stopped"
+            )
+        }
+        shell.stop()
+        reportJob?.cancel()
+        positionJob?.cancel()
+        _state.update { it.copy(status = "Stopped") }
+    }
+
     fun toggleTrackPanel() {
         _state.update { it.copy(showTrackPanel = !it.showTrackPanel) }
     }

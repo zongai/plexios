@@ -90,6 +90,8 @@ public sealed class PlayerEngineRouter : IPlayerEngine
 
     public async Task PrepareAsync(PlaybackRequest request, CancellationToken ct = default)
     {
+        AppDebugLog.Info("PlayerRouter",
+            $"Prepare preferred={_preferredBackend} decision.Backend={request.Decision.Backend} mode={request.Decision.Mode} url={AppDebugLog.RedactUrl(request.MediaUrl.AbsoluteUri)}");
         // Forced LibVLC (settings)
         if (_preferredBackend == "libvlc")
         {

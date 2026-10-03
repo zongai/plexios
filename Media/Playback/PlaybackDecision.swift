@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 enum PlaybackMode: String, Sendable, Equatable {
     case directPlay
@@ -29,6 +30,8 @@ struct PlaybackDecision: Sendable, Equatable {
 }
 
 struct PlaybackDecisionEngine: Sendable {
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.plexios.app", category: "decision")
+
     let capabilities: IOSCapabilities
     let preferences: PlaybackPreferences
 
@@ -75,16 +78,22 @@ struct PlaybackDecisionEngine: Sendable {
             backend: .system
         )
         if preferences.preferSystemPlayer {
+            Self.log.info("decide system-forced mode=\(system.mode.rawValue) reason=\(system.reason, privacy: .public)")
             return system
         }
         // Bitrate-limited transcode cannot be fixed by switching backend
         if system.mode == .transcode, system.reason.hasPrefix("Quality limited") {
+            Self.log.info("decide bitrate-cap mode=transcode reason=\(system.reason, privacy: .public)")
             return system
         }
         if system.mode != .transcode {
+            Self.log.info("decide system-ok mode=\(system.mode.rawValue) backend=system reason=\(system.reason, privacy: .public)")
             return system
         }
-        guard vlcFallbackAvailable else { return system }
+        guard vlcFallbackAvailable else {
+            Self.log.info("decide system-transcode no-vlc reason=\(system.reason, privacy: .public)")
+            return system
+        }
 
         let vlc = evaluate(
             metadata: metadata,
@@ -97,9 +106,10 @@ struct PlaybackDecisionEngine: Sendable {
             backend: .vlc
         )
         if vlc.mode == .directPlay || vlc.mode == .directStream {
+            Self.log.info("decide vlc-fallback mode=\(vlc.mode.rawValue) reason=\(vlc.reason, privacy: .public)")
             return vlc
         }
-        // Keep system transcode decision (server-side) when VLC also cannot DP/DS
+        Self.log.info("decide keep-system-transcode system=\(system.reason, privacy: .public) vlc=\(vlc.reason, privacy: .public)")
         return system
     }
 

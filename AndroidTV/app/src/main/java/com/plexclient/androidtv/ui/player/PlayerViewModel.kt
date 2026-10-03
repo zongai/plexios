@@ -1,5 +1,6 @@
 package com.plexclient.androidtv.ui.player
 
+import com.plexclient.androidtv.util.AppLog
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -91,6 +92,10 @@ class PlayerViewModel(
 
     fun play(request: PlaybackRequest) {
         current = request
+        AppLog.i(
+            "Player",
+            "play rk=${request.metadata.ratingKey} mode=${request.decision.mode} backend=${request.decision.backend} reason=${request.decision.reason} url=${AppLog.redact(request.mediaUrl.toString())} startMs=${request.startPositionMs}"
+        )
         markers = request.metadata.markers
         viewModelScope.launch {
             _state.update {
@@ -114,6 +119,7 @@ class PlayerViewModel(
                     "playing"
                 )
             } catch (e: Exception) {
+                AppLog.e("Player", "play failed", e)
                 _state.update { it.copy(status = e.message ?: "Playback error") }
             }
         }
@@ -170,11 +176,13 @@ class PlayerViewModel(
     }
 
     fun selectAudio(track: PlayerTrack) {
+        AppLog.i("Track", "audio id=${track.id} label=${track.label} lang=${track.language}")
         shell.selectAudio(track)
         _state.update { it.copy(status = "Audio: ${track.label}") }
     }
 
     fun selectSubtitle(track: PlayerTrack?) {
+        AppLog.i("Track", "subtitle id=${track?.id} label=${track?.label}")
         shell.selectSubtitle(track)
         _state.update {
             it.copy(status = if (track == null) "Subtitles off" else "Sub: ${track.label}")

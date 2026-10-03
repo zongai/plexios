@@ -289,6 +289,10 @@ final class PlaybackEngine {
             && !useSwiftVLC
             && VLCPlaybackBackend.isLinked
 
+        logger.playback.info(
+            "open decision.backend=\(decision.backend.rawValue) mode=\(decision.mode.rawValue) wantVLC=\(wantVLCDirect) useVLC=\(useVLC) useSwiftVLC=\(useSwiftVLC) reason=\(decision.reason)"
+        )
+
         if useSwiftVLC {
             do {
                 let svlc = swiftVLCBackend ?? SwiftVLCPlaybackBackend()

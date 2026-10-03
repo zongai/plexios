@@ -33,6 +33,7 @@ public static class AppDebugLog
         }
     }
 
+    public static void Debug(string area, string message) => Write("DEBUG", area, message);
     public static void Info(string area, string message) => Write("INFO", area, message);
     public static void Warn(string area, string message) => Write("WARN", area, message);
     public static void Error(string area, string message) => Write("ERROR", area, message);

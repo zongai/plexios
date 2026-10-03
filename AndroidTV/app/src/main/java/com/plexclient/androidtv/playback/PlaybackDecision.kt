@@ -1,5 +1,6 @@
 package com.plexclient.androidtv.playback
 
+import com.plexclient.androidtv.util.AppLog
 import com.plexclient.androidtv.plex.model.PlexMetadata
 import com.plexclient.androidtv.plex.model.PlexStream
 
@@ -119,16 +120,26 @@ class PlaybackDecisionEngine(
         // System matrix first; VLC profile only if system would transcode and VLC is "available"
         // (LibVLC backend not shipped yet — structure is ready; vlcAvailable stays false).
         val system = evaluate(metadata, network, ClientCapabilities.SystemProfile, PlaybackBackend.System)
-        if (system.mode != PlaybackMode.Transcode) return system
-        if (system.reason.startsWith("Quality limited")) return system
+        AppLog.d("Decision", "system mode=${system.mode} backend=${system.backend} reason=${system.reason} rk=${metadata.ratingKey}")
+        if (system.mode != PlaybackMode.Transcode) {
+            AppLog.i("Decision", "use system mode=${system.mode} reason=${system.reason}")
+            return system
+        }
+        if (system.reason.startsWith("Quality limited")) {
+            AppLog.i("Decision", "bitrate-cap keep system transcode")
+            return system
+        }
 
         val vlcAvailable = false // set true when LibVLC adapter ships
         if (vlcAvailable) {
             val vlc = evaluate(metadata, network, ClientCapabilities.VlcProfile, PlaybackBackend.Vlc)
+            AppLog.d("Decision", "vlc mode=${vlc.mode} reason=${vlc.reason}")
             if (vlc.mode == PlaybackMode.DirectPlay || vlc.mode == PlaybackMode.DirectStream) {
+                AppLog.i("Decision", "vlc-fallback mode=${vlc.mode}")
                 return vlc
             }
         }
+        AppLog.i("Decision", "keep system transcode reason=${system.reason}")
         return system
     }
 

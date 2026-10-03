@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.net.URI
+import com.plexclient.androidtv.util.AppLog
 
 /**
  * Contract-aligned track descriptor (docs/cross-platform-playback-contract.md §6).
@@ -104,7 +105,9 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 _state.value = PlayerState.Error
-                _lastError.value = PlaybackError.fromThrowable(error, PlaybackErrorCode.Decode)
+                val pe = PlaybackError.fromThrowable(error, PlaybackErrorCode.Decode)
+                _lastError.value = pe
+                AppLog.e("Exo", "playerError code=${pe.code.wire} msg=${pe.message}", error)
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -114,8 +117,10 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
     }
 
     override fun prepare(url: URI, startPositionMs: Long = 0) {
+        AppLog.i("Exo", "prepare startMs=$startPositionMs url=${AppLog.redact(url.toString())}")
         val item = MediaItem.fromUri(url.toString())
         _state.value = PlayerState.Loading
+        _lastError.value = null
         player.setMediaItem(item, startPositionMs)
         player.prepare()
     }

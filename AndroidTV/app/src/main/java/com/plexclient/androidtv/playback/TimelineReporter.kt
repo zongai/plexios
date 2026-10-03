@@ -1,5 +1,6 @@
 package com.plexclient.androidtv.playback
 
+import com.plexclient.androidtv.util.AppLog
 import com.plexclient.androidtv.plex.identity.ClientIdentity
 import com.plexclient.androidtv.plex.model.ServerContext
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,7 @@ class TimelineReporter(
             if (now - lastReportMs.get() < minIntervalMs) return
         }
         lastReportMs.set(now)
+        AppLog.d("Timeline", "report state=$state pos=$positionMs dur=$durationMs rk=$ratingKey")
         scope.launch {
             try {
                 val path = buildString {
@@ -58,8 +60,8 @@ class TimelineReporter(
                     .also { identity.applyTo(it, context.token) }
                     .build()
                 http.newCall(req).execute().close()
-            } catch (_: Exception) {
-                // swallow
+            } catch (e: Exception) {
+                AppLog.w("Timeline", "report failed: ${e.message}")
             }
         }
     }

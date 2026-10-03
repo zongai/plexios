@@ -193,20 +193,37 @@ public sealed class PlaybackDecisionEngine
         var system = Evaluate(
             metadata, network, mediaIndex, partIndex, forcedAudioId, forcedSubtitleId,
             ClientCapabilities.MediaFoundationDefault, PlaybackBackend.System);
+        AppDebugLog.Debug("Decision",
+            $"system mode={system.Mode} backend={system.Backend} reason={system.Reason} rk={metadata.RatingKey}");
         if (system.Mode != PlaybackMode.Transcode)
+        {
+            AppDebugLog.Info("Decision", $"use system mode={system.Mode} reason={system.Reason}");
             return system;
+        }
         if (system.Reason.Contains("bitrate", StringComparison.OrdinalIgnoreCase) ||
             system.Reason.Contains("exceeds preference", StringComparison.OrdinalIgnoreCase))
+        {
+            AppDebugLog.Info("Decision", "bitrate-cap keep system transcode");
             return system;
+        }
 
         if (LibVlcPlayerEngine.IsAvailable)
         {
             var vlc = Evaluate(
                 metadata, network, mediaIndex, partIndex, forcedAudioId, forcedSubtitleId,
                 ClientCapabilities.LibVlcDefault, PlaybackBackend.Vlc);
+            AppDebugLog.Debug("Decision", $"vlc mode={vlc.Mode} reason={vlc.Reason}");
             if (vlc.Mode is PlaybackMode.DirectPlay or PlaybackMode.DirectStream)
+            {
+                AppDebugLog.Info("Decision", $"vlc-fallback mode={vlc.Mode} reason={vlc.Reason}");
                 return vlc;
+            }
         }
+        else
+        {
+            AppDebugLog.Debug("Decision", "LibVLC unavailable — cannot fallback");
+        }
+        AppDebugLog.Info("Decision", $"keep system transcode reason={system.Reason}");
         return system;
     }
 

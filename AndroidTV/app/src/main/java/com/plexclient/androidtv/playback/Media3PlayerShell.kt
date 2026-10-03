@@ -39,7 +39,22 @@ class Media3PlayerShell(context: Context) {
     private val _subtitleTracks = MutableStateFlow<List<PlayerTrack>>(emptyList())
     val subtitleTracks: StateFlow<List<PlayerTrack>> = _subtitleTracks.asStateFlow()
 
-    enum class PlayerState { Idle, Buffering, Ready, Playing, Ended, Error }
+    /**
+     * Contract-aligned states (docs/cross-platform-playback-contract.md §4):
+     * idle | loading | ready | buffering | playing | paused | ended | stopped | error
+     *
+     * ExoPlayer mapping:
+     * - STATE_IDLE -> Idle (or Stopped after stop())
+     * - STATE_BUFFERING -> Buffering (play intent unchanged; NOT paused)
+     * - STATE_READY + isPlaying -> Playing
+     * - STATE_READY + !playWhenReady -> Paused
+     * - STATE_READY + playWhenReady && !isPlaying -> Ready
+     * - STATE_ENDED -> Ended
+     * - onPlayerError -> Error
+     * - prepare/load -> Loading
+     * - explicit stop() -> Stopped
+     */
+    enum class PlayerState { Idle, Loading, Ready, Buffering, Playing, Paused, Stopped, Ended, Error }
 
     val exoPlayer: ExoPlayer get() = player
 
@@ -47,16 +62,29 @@ class Media3PlayerShell(context: Context) {
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 _state.value = when (playbackState) {
+                    Player.STATE_IDLE ->
+                        if (_state.value == PlayerState.Stopped) PlayerState.Stopped else PlayerState.Idle
                     Player.STATE_BUFFERING -> PlayerState.Buffering
-                    Player.STATE_READY -> if (player.isPlaying) PlayerState.Playing else PlayerState.Ready
+                    Player.STATE_READY -> when {
+                        player.playWhenReady && player.isPlaying -> PlayerState.Playing
+                        !player.playWhenReady -> PlayerState.Paused
+                        else -> PlayerState.Ready
+                    }
                     Player.STATE_ENDED -> PlayerState.Ended
                     else -> PlayerState.Idle
                 }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) _state.value = PlayerState.Playing
-                else if (player.playbackState == Player.STATE_READY) _state.value = PlayerState.Ready
+                when {
+                    isPlaying -> _state.value = PlayerState.Playing
+                    player.playbackState == Player.STATE_READY && !player.playWhenReady ->
+                        _state.value = PlayerState.Paused
+                    player.playbackState == Player.STATE_READY ->
+                        _state.value = PlayerState.Ready
+                    player.playbackState == Player.STATE_ENDED ->
+                        _state.value = PlayerState.Ended
+                }
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -71,13 +99,44 @@ class Media3PlayerShell(context: Context) {
 
     fun prepare(url: URI, startPositionMs: Long = 0) {
         val item = MediaItem.fromUri(url.toString())
+        _state.value = PlayerState.Loading
         player.setMediaItem(item, startPositionMs)
         player.prepare()
     }
 
-    fun play() = player.play()
-    fun pause() = player.pause()
+    fun play() {
+        // play intent; buffering is not paused
+        _state.value = if (player.playbackState == Player.STATE_BUFFERING) {
+            PlayerState.Buffering
+        } else {
+            PlayerState.Playing
+        }
+        player.play()
+    }
+
+    fun pause() {
+        player.pause()
+        if (player.playbackState != Player.STATE_ENDED) {
+            _state.value = PlayerState.Paused
+        }
+    }
+
+    fun stop() {
+        player.stop()
+        _state.value = PlayerState.Stopped
+    }
+
     fun seekTo(ms: Long) = player.seekTo(ms)
+
+    /** Playback rate (1.0 = normal). */
+    fun setRate(rate: Float) {
+        player.setPlaybackSpeed(rate)
+    }
+
+    /** Linear volume 0…1 (player volume, not system stream volume). */
+    fun setVolume(volume: Float) {
+        player.volume = volume.coerceIn(0f, 1f)
+    }
 
     fun selectAudio(track: PlayerTrack) {
         val groups = player.currentTracks.groups

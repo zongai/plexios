@@ -190,3 +190,13 @@ UI layers map these to localized recovery actions; core must not depend on UI st
 
 These contracts are intentionally language-neutral.  
 iOS already implements them. Android TV and Windows must match behavior, not source code.
+
+
+---
+
+## Playback contract (detailed)
+
+See:
+
+- `cross-platform-playback-contract.md` — adopted playback semantics, state, tracks, decision, backend policy
+- `cross-platform-playback-gap-analysis.md` — iOS / Android TV / Windows gap list vs that contract

@@ -1,9 +1,14 @@
 namespace PlexWindows.Playback;
 
+/// <summary>
+/// Contract-aligned states (docs/cross-platform-playback-contract.md §4).
+/// Mapping: Opening → loading; other names match the contract 1:1.
+/// Buffering is NOT paused — UI play/pause follows play intent.
+/// </summary>
 public enum PlayerState
 {
     Idle,
-    Opening,
+    Opening,   // contract: loading
     Buffering,
     Playing,
     Paused,

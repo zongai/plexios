@@ -1,5 +1,20 @@
 import Foundation
 
+/// Contract-aligned states (see docs/cross-platform-playback-contract.md §4):
+/// idle | loading | ready | buffering | playing | paused | ended | stopped | error
+///
+/// Mapping notes:
+/// - `loading`  == contract loading (prepare / open)
+/// - `buffering` is NOT paused — UI play/pause follows `PlaybackEngine.isPlaying`
+/// - no separate `ready` / `ended` here; ended is handled via player callbacks + stop
+/// Contract-aligned states (docs/cross-platform-playback-contract.md §4):
+/// idle | loading | ready | buffering | playing | paused | ended | stopped | error
+///
+/// Mapping notes:
+/// - `loading` == contract loading (prepare / open)
+/// - `buffering` is NOT paused — UI play/pause follows `PlaybackEngine.isPlaying`
+/// - no separate `ready` here; prepared-but-not-playing is represented as paused/idle at session level
+/// - natural end is handled via player callbacks then stop/ended transition
 enum PlaybackSessionState: String, Sendable {
     case idle
     case loading

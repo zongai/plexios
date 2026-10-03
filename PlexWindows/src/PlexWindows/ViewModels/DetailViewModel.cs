@@ -96,6 +96,20 @@ public partial class DetailViewModel : ObservableObject
         var ctx = CurrentContext;
         if (meta is null || ctx is null) return null;
 
+        // Show / Season have no Media — resolve a playable episode first (iOS playShow semantics)
+        if (meta.Type is PlexMetadataType.Show or PlexMetadataType.Season)
+        {
+            var episode = await ResolvePlayableEpisodeAsync(meta, ctx);
+            if (episode is null)
+            {
+                StatusMessage = string.IsNullOrEmpty(StatusMessage)
+                    ? "No playable episode found."
+                    : StatusMessage;
+                return null;
+            }
+            meta = episode;
+        }
+
         // Hub cards rarely include Media/Part — pull full metadata before deciding
         if (meta.Media is null || meta.Media.Count == 0)
         {

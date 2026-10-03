@@ -44,15 +44,38 @@ public sealed class AppSettings
 
     public string? PreferredAudioLanguage
     {
-        get => _data.PreferredAudioLanguage;
-        set { _data.PreferredAudioLanguage = value; Save(); }
+        get => PreferredAudioLanguages.FirstOrDefault();
+        set
+        {
+            PreferredAudioLanguages = string.IsNullOrWhiteSpace(value)
+                ? Array.Empty<string>()
+                : new[] { value.Trim() };
+        }
     }
 
     public string? PreferredSubtitleLanguage
     {
-        get => _data.PreferredSubtitleLanguage;
-        set { _data.PreferredSubtitleLanguage = value; Save(); }
+        get => PreferredSubtitleLanguages.FirstOrDefault();
+        set
+        {
+            PreferredSubtitleLanguages = string.IsNullOrWhiteSpace(value)
+                ? Array.Empty<string>()
+                : new[] { value.Trim() };
+        }
     }
+
+    public IReadOnlyList<string> PreferredAudioLanguages
+    {
+        get => _data.PreferredAudioLanguages ?? Array.Empty<string>();
+        set { _data.PreferredAudioLanguages = value?.ToArray() ?? Array.Empty<string>(); Save(); }
+    }
+
+    public IReadOnlyList<string> PreferredSubtitleLanguages
+    {
+        get => _data.PreferredSubtitleLanguages ?? Array.Empty<string>();
+        set { _data.PreferredSubtitleLanguages = value?.ToArray() ?? Array.Empty<string>(); Save(); }
+    }
+
 
     public int MaxRemoteBitrate
     {
@@ -156,6 +179,8 @@ public sealed class AppSettings
         public HashSet<string> DisabledLibraryKeys { get; set; } = new();
         public string? PreferredAudioLanguage { get; set; }
         public string? PreferredSubtitleLanguage { get; set; }
+        public string[]? PreferredAudioLanguages { get; set; }
+        public string[]? PreferredSubtitleLanguages { get; set; }
         public int MaxRemoteBitrate { get; set; } = 20_000_000;
         public string? PlayerBackend { get; set; } = "auto";
 

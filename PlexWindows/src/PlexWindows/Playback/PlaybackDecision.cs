@@ -1,3 +1,4 @@
+using PlexWindows.Services;
 namespace PlexWindows.Playback;
 
 public enum PlaybackMode
@@ -84,6 +85,10 @@ public sealed class PlaybackPreferences
     public int? MaxVideoBitrateKbps { get; set; }
     public bool PreferDirectPlay { get; set; } = true;
     public bool AutoPlayNextEpisode { get; set; } = true;
+    public bool SubtitlesEnabled { get; set; } = true;
+    /// <summary>Priority list of ISO language codes (empty = Auto).</summary>
+    public IReadOnlyList<string> PreferredAudioLanguages { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> PreferredSubtitleLanguages { get; set; } = Array.Empty<string>();
 
     public static PlaybackPreferences Default { get; } = new();
 }
@@ -94,12 +99,32 @@ public sealed class PlaybackPreferences
 public sealed class PlaybackDecisionEngine
 {
     private readonly ClientCapabilities _caps;
-    private readonly PlaybackPreferences _prefs;
+    private PlaybackPreferences _prefs;
+    private readonly AppSettings? _settings;
 
-    public PlaybackDecisionEngine(ClientCapabilities? caps = null, PlaybackPreferences? prefs = null)
+    public PlaybackDecisionEngine(
+        AppSettings? settings = null,
+        ClientCapabilities? caps = null,
+        PlaybackPreferences? prefs = null)
     {
+        _settings = settings;
         _caps = caps ?? ClientCapabilities.WindowsDefault;
         _prefs = prefs ?? PlaybackPreferences.Default;
+    }
+
+    private void RefreshPrefs()
+    {
+        if (_settings is null) return;
+        _prefs = new PlaybackPreferences
+        {
+            AutoPlayNextEpisode = _settings.AutoPlayNextEpisode,
+            SubtitlesEnabled = _settings.SubtitlesEnabled,
+            MaxVideoBitrateKbps = _settings.MaxRemoteBitrate > 0
+                ? Math.Max(1000, _settings.MaxRemoteBitrate / 1000)
+                : null,
+            PreferredAudioLanguages = _settings.PreferredAudioLanguages,
+            PreferredSubtitleLanguages = _settings.PreferredSubtitleLanguages,
+        };
     }
 
     public PlaybackDecision Decide(
@@ -110,6 +135,7 @@ public sealed class PlaybackDecisionEngine
         int? forcedAudioId = null,
         int? forcedSubtitleId = null)
     {
+        RefreshPrefs();
         var netBitrate = BitrateForNetwork(network);
 
         if (metadata.Media is null || metadata.Media.Count == 0)
@@ -206,24 +232,65 @@ public sealed class PlaybackDecisionEngine
             mi, pi, audioId, subtitleId, burnIn, netBitrate);
     }
 
-    private static int? SelectAudio(List<Models.PlexStream> streams, int? forced)
+    private int? SelectAudio(List<Models.PlexStream> streams, int? forced)
     {
         if (forced is int id && streams.Any(s => s.Id == id)) return id;
-        var def = streams.FirstOrDefault(s => s.IsDefault) ?? streams.FirstOrDefault();
+        foreach (var pref in _prefs.PreferredAudioLanguages.Where(s => !string.IsNullOrWhiteSpace(s)))
+        {
+            var match = streams.FirstOrDefault(s => MatchesLanguage(s, pref));
+            if (match is not null) return match.Id;
+        }
+        var def = streams.FirstOrDefault(s => s.IsDefault) ?? streams.FirstOrDefault(s => s.IsSelected)
+                  ?? streams.FirstOrDefault();
         return def?.Id;
     }
 
-    private static (int? id, bool burnIn) SelectSubtitle(List<Models.PlexStream> streams, int? forced)
+    private (int? id, bool burnIn) SelectSubtitle(List<Models.PlexStream> streams, int? forced)
     {
         if (forced is int id)
         {
             if (id < 0) return (null, false); // explicit off
-            if (streams.Any(s => s.Id == id)) return (id, false);
+            if (streams.Any(s => s.Id == id))
+            {
+                var s = streams.First(x => x.Id == id);
+                return (id, RequiresBurnIn(s));
+            }
         }
-        var forcedSub = streams.FirstOrDefault(s => s.IsForced);
-        if (forcedSub is not null) return (forcedSub.Id, false);
-        var def = streams.FirstOrDefault(s => s.IsDefault);
-        return (def?.Id, false);
+        if (!_prefs.SubtitlesEnabled)
+            return (null, false);
+
+        foreach (var pref in _prefs.PreferredSubtitleLanguages.Where(s => !string.IsNullOrWhiteSpace(s)))
+        {
+            var match = streams.FirstOrDefault(s => MatchesLanguage(s, pref));
+            if (match is not null) return (match.Id, RequiresBurnIn(match));
+        }
+        var selected = streams.FirstOrDefault(s => s.IsSelected) ?? streams.FirstOrDefault(s => s.IsDefault);
+        if (selected is not null) return (selected.Id, RequiresBurnIn(selected));
+        if (_prefs.PreferredSubtitleLanguages.Count == 0)
+        {
+            var forcedSub = streams.FirstOrDefault(s => s.IsForced);
+            if (forcedSub is not null) return (forcedSub.Id, RequiresBurnIn(forcedSub));
+        }
+        return (null, false);
+    }
+
+    private static bool MatchesLanguage(Models.PlexStream stream, string pref)
+    {
+        var p = pref.Trim().ToLowerInvariant();
+        if (p.Length == 0) return false;
+        var code = (stream.LanguageCode ?? "").ToLowerInvariant();
+        var lang = (stream.Language ?? "").ToLowerInvariant();
+        if (code == p || code.StartsWith(p + "-") || p.StartsWith(code + "-")) return true;
+        if (lang.StartsWith(p)) return true;
+        // zh matches zh-CN / zh-TW
+        if (p == "zh" && (code.StartsWith("zh") || lang.Contains("chinese") || lang.Contains("中文"))) return true;
+        return false;
+    }
+
+    private bool RequiresBurnIn(Models.PlexStream s)
+    {
+        var fmt = (s.Codec ?? s.Format ?? "").ToLowerInvariant();
+        return _caps.RequiresBurnInFor.Contains(fmt);
     }
 
     private int? BitrateForNetwork(NetworkClass network)

@@ -23,8 +23,8 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private bool _autoPlayNextEpisode;
     [ObservableProperty] private bool _subtitlesEnabled = true;
-    [ObservableProperty] private string _preferredAudioLanguage = "";
-    [ObservableProperty] private string _preferredSubtitleLanguage = "";
+    [ObservableProperty] private LanguageCatalog.Option? _selectedAudioLanguage;
+    [ObservableProperty] private LanguageCatalog.Option? _selectedSubtitleLanguage;
     [ObservableProperty] private double _maxRemoteBitrateMbps = 20;
     [ObservableProperty] private string _playerBackend = "auto";
     [ObservableProperty] private string _statusMessage = "";
@@ -38,6 +38,8 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<PlexServer> Servers { get; } = new();
 
     public IReadOnlyList<int> MaxItemsOptions { get; } = [10, 15, 20, 30, 50];
+    public IReadOnlyList<LanguageCatalog.Option> LanguageOptions { get; } = LanguageCatalog.All;
+
 
     public IReadOnlyList<string> BackendOptions { get; } =
         ["auto", "mediaFoundation", "libVlc"];
@@ -72,8 +74,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         AutoPlayNextEpisode = _settings.AutoPlayNextEpisode;
         SubtitlesEnabled = _settings.SubtitlesEnabled;
-        PreferredAudioLanguage = _settings.PreferredAudioLanguage ?? "";
-        PreferredSubtitleLanguage = _settings.PreferredSubtitleLanguage ?? "";
+        SelectedAudioLanguage = LanguageCatalog.Find(_settings.PreferredAudioLanguage);
+        SelectedSubtitleLanguage = LanguageCatalog.Find(_settings.PreferredSubtitleLanguage);
         MaxRemoteBitrateMbps = Math.Max(0, _settings.MaxRemoteBitrate / 1_000_000.0);
         PlayerBackend = _settings.PlayerBackend;
         SelectedQuality = QualityOptions.FirstOrDefault(q =>
@@ -108,10 +110,10 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settings.AutoPlayNextEpisode = AutoPlayNextEpisode;
         _settings.SubtitlesEnabled = SubtitlesEnabled;
-        _settings.PreferredAudioLanguage = string.IsNullOrWhiteSpace(PreferredAudioLanguage)
-            ? null : PreferredAudioLanguage.Trim();
-        _settings.PreferredSubtitleLanguage = string.IsNullOrWhiteSpace(PreferredSubtitleLanguage)
-            ? null : PreferredSubtitleLanguage.Trim();
+        _settings.PreferredAudioLanguage = string.IsNullOrEmpty(SelectedAudioLanguage?.Code)
+            ? null : SelectedAudioLanguage!.Code;
+        _settings.PreferredSubtitleLanguage = string.IsNullOrEmpty(SelectedSubtitleLanguage?.Code)
+            ? null : SelectedSubtitleLanguage!.Code;
         // 0 / Original → keep a high remote cap; else selected Mbps
         var mbps = SelectedQuality?.Mbps ?? MaxRemoteBitrateMbps;
         _settings.MaxRemoteBitrate = mbps <= 0

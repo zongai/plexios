@@ -99,12 +99,14 @@
                               Width="280"
                               ItemsSource="{x:Bind ViewModel.QualityOptions}"
                               SelectedItem="{x:Bind ViewModel.SelectedQuality, Mode=TwoWay}" />
-                    <TextBox Header="Preferred audio language (ISO 639)"
-                             Text="{x:Bind ViewModel.PreferredAudioLanguage, Mode=TwoWay}"
-                             PlaceholderText="e.g. en · empty = auto" />
-                    <TextBox Header="Preferred subtitle language (ISO 639)"
-                             Text="{x:Bind ViewModel.PreferredSubtitleLanguage, Mode=TwoWay}"
-                             PlaceholderText="e.g. zh · empty = off preference" />
+                    <ComboBox Header="Preferred audio language"
+                              Width="280"
+                              ItemsSource="{x:Bind ViewModel.LanguageOptions}"
+                              SelectedItem="{x:Bind ViewModel.SelectedAudioLanguage, Mode=TwoWay}" />
+                    <ComboBox Header="Preferred subtitle language"
+                              Width="280"
+                              ItemsSource="{x:Bind ViewModel.LanguageOptions}"
+                              SelectedItem="{x:Bind ViewModel.SelectedSubtitleLanguage, Mode=TwoWay}" />
                 </StackPanel>
             </Border>
 

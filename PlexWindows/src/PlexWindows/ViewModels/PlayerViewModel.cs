@@ -86,8 +86,14 @@ public partial class PlayerViewModel : ObservableObject
         _prefs = new PlaybackPreferences
         {
             AutoPlayNextEpisode = _settings.AutoPlayNextEpisode,
-            MaxVideoBitrateKbps = Math.Max(1000, _settings.MaxRemoteBitrate / 1000)
+            SubtitlesEnabled = _settings.SubtitlesEnabled,
+            MaxVideoBitrateKbps = _settings.MaxRemoteBitrate > 0
+                ? _settings.MaxRemoteBitrate / 1000
+                : null,
+            PreferredAudioLanguages = _settings.PreferredAudioLanguages,
+            PreferredSubtitleLanguages = _settings.PreferredSubtitleLanguages,
         };
+    };
         if (_player is PlayerEngineRouter router)
             router.SetPreferredBackend(_settings.PlayerBackend);
     }

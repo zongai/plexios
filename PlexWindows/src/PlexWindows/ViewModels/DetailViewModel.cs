@@ -122,7 +122,10 @@ public partial class DetailViewModel : ObservableObject
         try
         {
             decision = _decisionEngine.Decide(meta, network);
-            url = _urlBuilder.Build(ctx, meta, decision);
+            var startOffset = meta.ViewOffset ?? 0;
+            if (meta.Duration is long d0 && startOffset > d0 * 0.95)
+                startOffset = 0;
+            url = _urlBuilder.Build(ctx, meta, decision, network, startOffset);
         }
         catch (Exception ex)
         {

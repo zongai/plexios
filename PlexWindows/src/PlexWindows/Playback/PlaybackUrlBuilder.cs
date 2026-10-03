@@ -5,7 +5,7 @@ namespace PlexWindows.Playback;
 
 /// <summary>
 /// Builds Direct Play / Direct Stream / Transcode URLs against PMS.
-/// Semantics aligned with iOS PlaybackURLBuilder.
+/// Query parameters aligned with iOS PlaybackURLBuilder.
 /// </summary>
 public sealed class PlaybackUrlBuilder
 {
@@ -16,9 +16,14 @@ public sealed class PlaybackUrlBuilder
         _identity = identity;
     }
 
-    public Uri Build(ServerContext context, PlexMetadata metadata, PlaybackDecision decision)
+    public Uri Build(
+        ServerContext context,
+        PlexMetadata metadata,
+        PlaybackDecision decision,
+        NetworkClass network = NetworkClass.Unknown,
+        long offsetMs = 0,
+        string? sessionId = null)
     {
-        // Prefer Direct Play only when media/part indices are valid
         if (decision.Mode == PlaybackMode.DirectPlay &&
             TryGetPart(metadata, decision.MediaIndex, decision.PartIndex, out var part) &&
             !string.IsNullOrEmpty(part.Key))
@@ -26,12 +31,14 @@ public sealed class PlaybackUrlBuilder
             return BuildDirectPlay(context, part);
         }
 
-        // DirectStream / Transcode (or DirectPlay fallback when no part key)
         return BuildTranscode(
             context,
             metadata,
             decision,
-            directStream: decision.Mode == PlaybackMode.DirectStream);
+            directStream: decision.Mode == PlaybackMode.DirectStream,
+            network,
+            offsetMs,
+            sessionId ?? Guid.NewGuid().ToString("N"));
     }
 
     private static bool TryGetPart(
@@ -67,14 +74,27 @@ public sealed class PlaybackUrlBuilder
         ServerContext context,
         PlexMetadata metadata,
         PlaybackDecision decision,
-        bool directStream)
+        bool directStream,
+        NetworkClass network,
+        long offsetMs,
+        string sessionId)
     {
         var path = "video/:/transcode/universal/start.m3u8";
         var baseUri = new Uri(context.BaseUrl, path);
-        // metadata.Key is like /library/metadata/123 — required by universal transcoder
         var mediaPath = string.IsNullOrEmpty(metadata.Key)
             ? $"/library/metadata/{metadata.RatingKey}"
             : metadata.Key;
+
+        // Advertise codecs LibVLC can handle so PMS remuxes/transcodes appropriately.
+        // Prefer H.264 in HLS for maximum compatibility when full transcode is requested.
+        var videoCodecs = directStream
+            ? "h264,hevc,mpeg4,mpeg2video,vp8,vp9"
+            : "h264";
+        var audioCodecs = directStream
+            ? "aac,mp3,ac3,eac3,flac,opus,pcm"
+            : "aac,mp3";
+        var subtitleCodecs = "srt,vtt,ass,ssa";
+
         var q = new Dictionary<string, string>
         {
             ["path"] = mediaPath,
@@ -84,18 +104,49 @@ public sealed class PlaybackUrlBuilder
             ["fastSeek"] = "1",
             ["directPlay"] = "0",
             ["directStream"] = directStream ? "1" : "0",
-            ["subtitleSize"] = "100",
+            ["directStreamAudio"] = directStream ? "1" : "0",
+            ["videoCodecs"] = videoCodecs,
+            ["audioCodecs"] = audioCodecs,
+            ["subtitleCodecs"] = subtitleCodecs,
+            ["session"] = sessionId,
+            ["offset"] = Math.Max(0, offsetMs).ToString(),
+            ["copyts"] = "1",
+            ["location"] = network == NetworkClass.Local ? "lan" : "wan",
             ["X-Plex-Token"] = context.Token,
             ["X-Plex-Client-Identifier"] = _identity.ClientIdentifier,
             ["X-Plex-Product"] = _identity.Product,
             ["X-Plex-Platform"] = _identity.Platform,
-            ["subtitles"] = decision.BurnInSubtitles ? "burn" : "auto",
-            ["subtitleStreamID"] = decision.SelectedSubtitleStreamId?.ToString() ?? "0"
+            ["X-Plex-Platform-Version"] = _identity.PlatformVersion,
+            ["X-Plex-Device"] = _identity.Device,
+            ["X-Plex-Device-Name"] = _identity.DeviceName,
+            ["X-Plex-Version"] = _identity.Version,
         };
+
+        if (decision.BurnInSubtitles)
+        {
+            q["subtitles"] = "burn";
+            q["advancedSubtitles"] = "burn";
+        }
+        else if (decision.SelectedSubtitleStreamId is not null)
+        {
+            q["subtitles"] = "segmented";
+            q["advancedSubtitles"] = "text";
+        }
+        else
+        {
+            q["subtitles"] = "none";
+        }
+
         if (decision.SelectedAudioStreamId is int audioId)
             q["audioStreamID"] = audioId.ToString();
+        if (decision.SelectedSubtitleStreamId is int subId)
+            q["subtitleStreamID"] = subId.ToString();
         if (decision.MaxBitrateKbps is int br)
+        {
             q["maxVideoBitrate"] = br.ToString();
+            q["videoQuality"] = "100";
+        }
+
         return AppendQuery(baseUri, q);
     }
 

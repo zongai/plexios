@@ -343,7 +343,7 @@ public partial class PlayerViewModel : ObservableObject
                     Reason = "Subtitle selected — transcode for reliable subtitle delivery"
                 };
             }
-            var url = _urlBuilder.Build(Request.Context, meta, decision);
+            var url = _urlBuilder.Build(Request.Context, meta, decision, Request.Network, pos);
             var newReq = new PlaybackRequest
             {
                 Metadata = meta,
@@ -546,7 +546,7 @@ public partial class PlayerViewModel : ObservableObject
             }
 
             var decision = _decisionEngine.Decide(next, Request.Network);
-            var url = _urlBuilder.Build(Request.Context, next, decision);
+            var url = _urlBuilder.Build(Request.Context, next, decision, Request.Network, 0);
             var nextReq = new PlaybackRequest
             {
                 Metadata = next,

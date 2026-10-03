@@ -213,18 +213,22 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             _media?.Dispose();
 
             // Network / PMS URLs must use FromLocation
-            _media = new Media(_libVlc, request.MediaUrl.AbsoluteUri, FromType.FromLocation);
-            _media.AddOption(":network-caching=1500");
+            var url = request.MediaUrl.AbsoluteUri;
+            _media = new Media(_libVlc, url, FromType.FromLocation);
+            _media.AddOption(":network-caching=2000");
             _media.AddOption(":http-reconnect=true");
+            _media.AddOption(":http-continuous=true");
+            // Self-signed / local PMS certs
+            _media.AddOption(":http-user-agent=PlexWindows/0.1");
             // Prefer hardware decode when available
             _media.AddOption(":avcodec-hw=any");
+            // Live / HLS resilience
 
             _mediaPlayer.Media = _media;
             _mediaPlayer.Volume = (int)(_volume * 100);
             _mediaPlayer.Mute = _isMuted;
             _pendingSeekMs = request.StartPositionMs > 0 ? request.StartPositionMs : null;
 
-            // Apply subtitle/audio preference via LibVLC when possible after start
             State = PlayerState.Paused;
             RaiseOnUi(() =>
             {
@@ -394,7 +398,12 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 _mediaPlayer?.Dispose();
                 _mediaPlayer = null;
                 _libVlc?.Dispose();
-                _libVlc = new LibVLC(opts.ToArray());
+                _libVlc = new LibVLC(enableDebugLogs: false, opts.ToArray());
+                _libVlc.Log += (_, e) =>
+                {
+                    if (e.Level is LogLevel.Error or LogLevel.Warning)
+                        _lastLibVlcLog = $"[{e.Level}] {e.Module}: {e.Message}";
+                };
             }
             EnsurePlayer();
             if (_videoView is not null && _mediaPlayer is not null)
@@ -413,8 +422,15 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         {
             // Fallback without swapchain (may still work for audio / some builds)
             _libVlc = new LibVLC(
+                enableDebugLogs: false,
                 "--no-video-title-show",
-                "--network-caching=1500");
+                "--network-caching=2000",
+                "--avcodec-hw=any");
+            _libVlc.Log += (_, e) =>
+            {
+                if (e.Level is LogLevel.Error or LogLevel.Warning)
+                    _lastLibVlcLog = $"[{e.Level}] {e.Module}: {e.Message}";
+            };
         }
 
         if (_mediaPlayer is null)
@@ -444,7 +460,8 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             _mediaPlayer.EncounteredError += (_, _) =>
             {
                 State = PlayerState.Error;
-                RaiseOnUi(() => ErrorOccurred?.Invoke(this, "LibVLC encountered a playback error."));
+                var detail = _lastLibVlcLog ?? "unknown";
+                RaiseOnUi(() => ErrorOccurred?.Invoke(this, "LibVLC playback error: " + detail));
             };
             _mediaPlayer.Buffering += (_, e) =>
             {

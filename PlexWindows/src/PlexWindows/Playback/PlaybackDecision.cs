@@ -60,10 +60,12 @@ public sealed class ClientCapabilities
     /// <summary>Conservative Windows defaults (Media Foundation + common codecs).</summary>
     public static ClientCapabilities WindowsDefault { get; } = new()
     {
+        // Broad set: LibVLC path can Direct Play nearly anything; MF path still
+        // fails over when container/codec truly unsupported by MF.
         SupportedContainers = new(StringComparer.OrdinalIgnoreCase)
-            { "mp4", "m4v", "mov", "mpegts", "mpeg", "avi", "wmv", "asf" },
+            { "mp4", "m4v", "mov", "mkv", "webm", "avi", "wmv", "asf", "mpegts", "mpeg", "m2ts", "ts" },
         SupportedVideoCodecs = new(StringComparer.OrdinalIgnoreCase)
-            { "h264", "avc", "hevc", "h265", "mpeg2video", "mpeg4", "vc1", "wmv3" },
+            { "h264", "avc", "hevc", "h265", "mpeg2video", "mpeg4", "vc1", "wmv3", "vp8", "vp9", "av1" },
         SupportedAudioCodecs = new(StringComparer.OrdinalIgnoreCase)
             { "aac", "mp3", "ac3", "eac3", "wmav2", "pcm", "flac", "opus" },
         SupportedSubtitleFormats = new(StringComparer.OrdinalIgnoreCase)

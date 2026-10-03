@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PlexWindows.Helpers;
 using PlexWindows.Models;
+using PlexWindows.Plex.Api;
 using PlexWindows.Plex.Auth;
 using PlexWindows.Plex.Server;
 using PlexWindows.Services;
@@ -18,6 +19,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly AppSettings _settings;
     private readonly AuthenticationService _auth;
     private readonly ConnectionManager _connections;
+    private readonly PlexApiClient _api;
 
     [ObservableProperty] private bool _autoPlayNextEpisode;
     [ObservableProperty] private bool _subtitlesEnabled = true;
@@ -28,8 +30,14 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private string _accountStatus = "Signed in";
     [ObservableProperty] private string _activeServerSummary = "";
+    [ObservableProperty] private bool _showContinueWatching = true;
+    [ObservableProperty] private bool _showRecentlyPlayed = true;
+    [ObservableProperty] private int _maxItemsPerHub = 20;
+    public ObservableCollection<LibraryToggleItem> Libraries { get; } = new();
 
     public ObservableCollection<PlexServer> Servers { get; } = new();
+
+    public IReadOnlyList<int> MaxItemsOptions { get; } = [10, 15, 20, 30, 50];
 
     public IReadOnlyList<string> BackendOptions { get; } =
         ["auto", "mediaFoundation", "libVlc"];
@@ -50,11 +58,13 @@ public partial class SettingsViewModel : ObservableObject
     public SettingsViewModel(
         AppSettings settings,
         AuthenticationService auth,
-        ConnectionManager connections)
+        ConnectionManager connections,
+        PlexApiClient api)
     {
         _settings = settings;
         _auth = auth;
         _connections = connections;
+        _api = api;
         Load();
     }
 
@@ -69,6 +79,11 @@ public partial class SettingsViewModel : ObservableObject
         SelectedQuality = QualityOptions.FirstOrDefault(q =>
             Math.Abs(q.Mbps - MaxRemoteBitrateMbps) < 0.5)
             ?? QualityOptions[0];
+
+        ShowContinueWatching = _settings.ShowContinueWatching;
+        ShowRecentlyPlayed = _settings.ShowRecentlyPlayed;
+        MaxItemsPerHub = _settings.MaxItemsPerHub;
+        _ = LoadLibrariesAsync();
 
         AccountStatus = _auth.State is AuthState.SignedIn ? "Signed in" : "Signed out";
         ActiveServerSummary = _connections.ActiveServer is { } s
@@ -103,6 +118,15 @@ public partial class SettingsViewModel : ObservableObject
             ? 100_000_000
             : (int)Math.Round(Math.Clamp(mbps, 1, 100) * 1_000_000);
         _settings.PlayerBackend = PlayerBackend;
+        _settings.ShowContinueWatching = ShowContinueWatching;
+        _settings.ShowRecentlyPlayed = ShowRecentlyPlayed;
+        _settings.MaxItemsPerHub = MaxItemsPerHub;
+        var disabled = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var lib in Libraries)
+        {
+            if (!lib.IsEnabled) disabled.Add(lib.Key);
+        }
+        _settings.DisabledLibraryKeys = disabled;
         StatusMessage = "Saved.";
     }
 
@@ -145,6 +169,28 @@ public partial class SettingsViewModel : ObservableObject
         StatusMessage = "Signed out.";
     }
 
+    private async Task LoadLibrariesAsync()
+    {
+        Libraries.Clear();
+        try
+        {
+            if (_connections.ActiveBaseUrl is null || string.IsNullOrEmpty(_connections.ActiveToken))
+                return;
+            var libs = await _api.FetchLibrarySectionsAsync(_connections.ActiveBaseUrl, _connections.ActiveToken);
+            var disabled = _settings.DisabledLibraryKeys;
+            foreach (var lib in libs)
+            {
+                Libraries.Add(new LibraryToggleItem
+                {
+                    Key = lib.Key,
+                    Title = lib.Title,
+                    IsEnabled = !disabled.Contains(lib.Key)
+                });
+            }
+        }
+        catch { /* ignore */ }
+    }
+
     public string AppVersion =>
         typeof(SettingsViewModel).Assembly.GetName().Version?.ToString() ?? "1.0";
 
@@ -152,4 +198,11 @@ public partial class SettingsViewModel : ObservableObject
     {
         public override string ToString() => Label;
     }
+}
+
+public partial class LibraryToggleItem : ObservableObject
+{
+    public string Key { get; set; } = "";
+    public string Title { get; set; } = "";
+    [ObservableProperty] private bool _isEnabled = true;
 }

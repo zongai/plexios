@@ -4,6 +4,7 @@ using PlexWindows.Models;
 using PlexWindows.Plex.Api;
 using PlexWindows.Plex.Auth;
 using PlexWindows.Plex.Server;
+using PlexWindows.Services;
 
 namespace PlexWindows.ViewModels;
 
@@ -18,16 +19,19 @@ public partial class HomeViewModel : ObservableObject
     private readonly PlexApiClient _api;
     private readonly AuthenticationService _auth;
     private readonly ConnectionManager _connections;
+    private readonly AppSettings _settings;
+    private IReadOnlyList<PlexHub> _rawHubs = Array.Empty<PlexHub>();
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private IReadOnlyList<HubCards> _hubs = Array.Empty<HubCards>();
 
-    public HomeViewModel(PlexApiClient api, AuthenticationService auth, ConnectionManager connections)
+    public HomeViewModel(PlexApiClient api, AuthenticationService auth, ConnectionManager connections, AppSettings settings)
     {
         _api = api;
         _auth = auth;
         _connections = connections;
+        _settings = settings;
         // If shell discovers a server after this page was constructed, reload
         _connections.PropertyChanged += async (_, e) =>
         {
@@ -60,15 +64,14 @@ public partial class HomeViewModel : ObservableObject
                 _connections.ActiveServer.MachineIdentifier);
 
             var hubs = await _api.FetchHomeHubsAsync(ctx.BaseUrl, ctx.Token);
-            Hubs = hubs.Select(h => new HubCards
+            _rawHubs = hubs;
+            IReadOnlyList<PlexLibrary> libraries = Array.Empty<PlexLibrary>();
+            try
             {
-                Title = h.Title,
-                Items = h.Items.Select(m => new MediaCardItem
-                {
-                    Metadata = m,
-                    Poster = PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb)
-                }).ToList()
-            }).ToList();
+                libraries = await _api.FetchLibrarySectionsAsync(ctx.BaseUrl, ctx.Token);
+            }
+            catch { /* optional for filter */ }
+            ApplyHomeFilter(ctx, libraries);
             StatusMessage = Hubs.Count == 0 ? "No hubs returned from this server." : "";
         }
         catch (Exception ex)

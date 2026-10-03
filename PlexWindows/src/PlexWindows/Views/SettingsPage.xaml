@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:PlexWindows.Models"
+    xmlns:vm="using:PlexWindows.ViewModels"
     Background="{StaticResource PlexBackgroundBrush}">
     <!--
       Structure mirrors iOS SettingsTabView:
@@ -48,6 +49,37 @@
                         <Button Content="Sign out" Click="SignOut_Click"
                                 Foreground="#FFFF6B6B" />
                     </StackPanel>
+                </StackPanel>
+            </Border>
+
+
+            <!-- Home display (iOS HomeDisplaySettingsView) -->
+            <TextBlock Text="Home" Style="{StaticResource SectionHeaderStyle}" Margin="0,16,0,6" />
+            <Border Background="{StaticResource PlexSurfaceBrush}"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    Padding="16,12" Margin="0,0,0,4">
+                <StackPanel Spacing="12">
+                    <ToggleSwitch Header="Continue Watching"
+                                  IsOn="{x:Bind ViewModel.ShowContinueWatching, Mode=TwoWay}"
+                                  OnContent="On" OffContent="Off" />
+                    <ToggleSwitch Header="Recently Played"
+                                  IsOn="{x:Bind ViewModel.ShowRecentlyPlayed, Mode=TwoWay}"
+                                  OnContent="On" OffContent="Off" />
+                    <ComboBox Header="Max items per row"
+                              Width="160"
+                              ItemsSource="{x:Bind ViewModel.MaxItemsOptions}"
+                              SelectedItem="{x:Bind ViewModel.MaxItemsPerHub, Mode=TwoWay}" />
+                    <TextBlock Text="Libraries on Home" Style="{StaticResource CaptionSecondaryStyle}" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Libraries, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LibraryToggleItem">
+                                <ToggleSwitch Header="{x:Bind Title}"
+                                              IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
+                                              OnContent="On" OffContent="Off"
+                                              Margin="0,2" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 

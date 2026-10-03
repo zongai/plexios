@@ -60,6 +60,49 @@ public sealed class AppSettings
         set { _data.MaxRemoteBitrate = value; Save(); }
     }
 
+
+    public bool ShowContinueWatching
+    {
+        get => _data.ShowContinueWatching;
+        set { _data.ShowContinueWatching = value; Save(); }
+    }
+
+    public bool ShowRecentlyPlayed
+    {
+        get => _data.ShowRecentlyPlayed;
+        set { _data.ShowRecentlyPlayed = value; Save(); }
+    }
+
+    public int MaxItemsPerHub
+    {
+        get => _data.MaxItemsPerHub <= 0 ? 20 : _data.MaxItemsPerHub;
+        set { _data.MaxItemsPerHub = value; Save(); }
+    }
+
+    public HashSet<string> DisabledLibraryKeys
+    {
+        get => _data.DisabledLibraryKeys ?? new HashSet<string>();
+        set { _data.DisabledLibraryKeys = value; Save(); }
+    }
+
+    public HomeDisplayPreferences HomeDisplay
+    {
+        get => new()
+        {
+            ShowContinueWatching = ShowContinueWatching,
+            ShowRecentlyPlayed = ShowRecentlyPlayed,
+            MaxItemsPerHub = MaxItemsPerHub,
+            DisabledLibraryKeys = new HashSet<string>(DisabledLibraryKeys, StringComparer.Ordinal)
+        };
+        set
+        {
+            ShowContinueWatching = value.ShowContinueWatching;
+            ShowRecentlyPlayed = value.ShowRecentlyPlayed;
+            MaxItemsPerHub = value.MaxItemsPerHub;
+            DisabledLibraryKeys = value.DisabledLibraryKeys;
+        }
+    }
+
     /// <summary>auto | mediaFoundation | libVlc</summary>
     public string PlayerBackend
     {
@@ -107,6 +150,10 @@ public sealed class AppSettings
     {
         public bool AutoPlayNextEpisode { get; set; } = true;
         public bool SubtitlesEnabled { get; set; } = true;
+        public bool ShowContinueWatching { get; set; } = true;
+        public bool ShowRecentlyPlayed { get; set; } = true;
+        public int MaxItemsPerHub { get; set; } = 20;
+        public HashSet<string> DisabledLibraryKeys { get; set; } = new();
         public string? PreferredAudioLanguage { get; set; }
         public string? PreferredSubtitleLanguage { get; set; }
         public int MaxRemoteBitrate { get; set; } = 20_000_000;

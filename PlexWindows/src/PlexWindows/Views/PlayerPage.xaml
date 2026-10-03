@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:playback="using:PlexWindows.Playback"
-    xmlns:vlc="using:LibVLCSharp.WinUI"
+    xmlns:vlc="using:LibVLCSharp.Platforms.Windows"
     Background="Black"
     KeyDown="Page_KeyDown"
     PointerMoved="Page_PointerMoved"
@@ -23,6 +23,7 @@
         <vlc:VideoView x:Name="VlcView"
                        HorizontalAlignment="Stretch"
                        VerticalAlignment="Stretch"
+                       Initialized="VlcView_Initialized"
                        Visibility="{x:Bind ViewModel.ShowVlcSurface, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
 
         <ProgressRing IsActive="{x:Bind ViewModel.IsBuffering, Mode=OneWay}"

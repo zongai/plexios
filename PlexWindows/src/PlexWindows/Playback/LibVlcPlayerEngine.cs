@@ -26,7 +26,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     private LibVLC? _libVlc;
     private MediaPlayer? _mediaPlayer;
     private Media? _media;
-    private LibVLCSharp.WinUI.VideoView? _videoView;
+    private LibVLCSharp.Platforms.Windows.VideoView? _videoView;
     private long? _pendingSeekMs;
     private bool _coreReady;
 #endif
@@ -124,7 +124,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     public void AttachSurfaces(object? mediaPlayerElement, object? libVlcVideoView)
     {
 #if USE_LIBVLC
-        if (libVlcVideoView is LibVLCSharp.WinUI.VideoView vv)
+        if (libVlcVideoView is LibVLCSharp.Platforms.Windows.VideoView vv)
         {
             _videoView = vv;
             EnsurePlayer();
@@ -339,11 +339,49 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     }
 
 #if USE_LIBVLC
+    /// <summary>
+    /// WinUI VideoView provides SwapChainOptions on Initialized — pass them when available.
+    /// </summary>
+    public void OnVideoViewInitialized(string[]? swapChainOptions)
+    {
+#if USE_LIBVLC
+        try
+        {
+            if (!_coreReady)
+            {
+                Core.Initialize();
+                _coreReady = true;
+            }
+            // Recreate LibVLC with swap chain options when the view becomes ready
+            if (swapChainOptions is { Length: > 0 })
+            {
+                var opts = new List<string>(swapChainOptions)
+                {
+                    "--no-video-title-show",
+                    "--network-caching=1500"
+                };
+                _mediaPlayer?.Stop();
+                _mediaPlayer?.Dispose();
+                _mediaPlayer = null;
+                _libVlc?.Dispose();
+                _libVlc = new LibVLC(opts.ToArray());
+            }
+            EnsurePlayer();
+            if (_videoView is not null && _mediaPlayer is not null)
+                _videoView.MediaPlayer = _mediaPlayer;
+        }
+        catch (Exception ex)
+        {
+            ErrorOccurred?.Invoke(this, "LibVLC VideoView init failed: " + ex.Message);
+        }
+#endif
+    }
+
     private void EnsurePlayer()
     {
         if (_libVlc is null)
         {
-            // Desktop WinUI: classic LibVLC constructor (Windows package, not UWP swapchain)
+            // Fallback without swapchain (may still work for audio / some builds)
             _libVlc = new LibVLC(
                 "--no-video-title-show",
                 "--network-caching=1500");

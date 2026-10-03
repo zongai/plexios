@@ -63,6 +63,11 @@ public sealed class PlayerEngineRouter : IPlayerEngine
     public event EventHandler? TracksChanged;
     public event EventHandler<PlayerBackendKind>? BackendChanged;
 
+    public void NotifyVlcViewInitialized(string[]? swapChainOptions)
+    {
+        _vlc?.OnVideoViewInitialized(swapChainOptions);
+    }
+
     public void AttachSurfaces(object? mediaPlayerElement, object? libVlcVideoView)
     {
         _mfSurface = mediaPlayerElement;

@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
 using PlexWindows.Playback;
+using LibVLCSharp.Platforms.Windows;
 using PlexWindows.ViewModels;
 using Windows.System;
 
@@ -36,6 +37,15 @@ public sealed partial class PlayerPage : Page
     {
         base.OnNavigatedFrom(e);
         await ViewModel.StopAsync();
+    }
+
+
+    private void VlcView_Initialized(object sender, InitializedEventArgs e)
+    {
+        if (ViewModel.Player is PlayerEngineRouter router)
+            router.NotifyVlcViewInitialized(e.SwapChainOptions);
+        else if (ViewModel.Player is LibVlcPlayerEngine vlc)
+            vlc.OnVideoViewInitialized(e.SwapChainOptions);
     }
 
     private void PlayPause_Click(object sender, RoutedEventArgs e) => ViewModel.TogglePlayPause();

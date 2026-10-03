@@ -45,7 +45,6 @@ fun PlexTvTheme(content: @Composable () -> Unit) {
             surfaceVariant = PlexSurfaceVariant,
             onSurfaceVariant = PlexOnSurfaceVariant,
             border = Color(0x33FFFFFF),
-            focusedBorder = PlexAccent,
             errorContainer = Color(0xFF3D1A1A)
         ),
         content = content

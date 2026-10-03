@@ -121,7 +121,7 @@ fun TvSideNav(
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.04f),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = Border(
-                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.focusedBorder),
+                            border = BorderStroke(2.dp, com.plexclient.androidtv.ui.theme.PlexColors.accent),
                             shape = RoundedCornerShape(8.dp)
                         )
                     ),
@@ -168,7 +168,7 @@ fun TvNavChip(label: String, onClick: () -> Unit) {
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),
         border = ClickableSurfaceDefaults.border(
             focusedBorder = Border(
-                border = BorderStroke(2.dp, MaterialTheme.colorScheme.focusedBorder),
+                border = BorderStroke(2.dp, com.plexclient.androidtv.ui.theme.PlexColors.accent),
                 shape = RoundedCornerShape(24.dp)
             )
         ),

@@ -169,8 +169,7 @@ class PlayerViewModel(
         _state.update { it.copy(showSkipMarker = false) }
     }
 
-    private fun startTimelineLoop()
-                startPositionWatch() {
+    private fun startTimelineLoop() {
         reportJob?.cancel()
         reportJob = viewModelScope.launch {
             while (isActive) {

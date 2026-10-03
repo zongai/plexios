@@ -23,21 +23,23 @@ class PlexApiClient(
     }
 
     suspend fun createPin(): PlexPin = getJson("https://clients.plex.tv/api/v2/pins?strong=false") { root ->
+        val o = root.jsonObject
         PlexPin(
-            id = root.int("id"),
-            code = root.str("code") ?: "",
-            expiresIn = root.int("expiresIn"),
-            authToken = root.str("authToken")
+            id = o.int("id"),
+            code = o.str("code") ?: "",
+            expiresIn = o.int("expiresIn"),
+            authToken = o.str("authToken")
         )
     }
 
     suspend fun checkPin(id: Int, code: String): PlexPin =
         getJson("https://clients.plex.tv/api/v2/pins/$id?code=${enc(code)}") { root ->
+            val o = root.jsonObject
             PlexPin(
-                id = root.int("id"),
-                code = root.str("code") ?: code,
-                expiresIn = root.int("expiresIn"),
-                authToken = root.str("authToken")
+                id = o.int("id"),
+                code = o.str("code") ?: code,
+                expiresIn = o.int("expiresIn"),
+                authToken = o.str("authToken")
             )
         }
 

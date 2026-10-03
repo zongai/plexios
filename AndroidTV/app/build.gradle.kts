@@ -24,8 +24,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -42,6 +42,10 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.tv.material3.ExperimentalTvMaterial3Api",
+            "-opt-in=kotlin.RequiresOptIn"
+        )
     }
     buildFeatures {
         compose = true
@@ -66,8 +70,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
 
     // Compose for TV (Leanback-style focus / D-pad)
-    implementation("androidx.tv:tv-foundation:1.0.0-alpha10")
-    implementation("androidx.tv:tv-material:1.0.0-alpha10")
+    implementation("androidx.tv:tv-foundation:1.0.0-alpha07")
+    implementation("androidx.tv:tv-material:1.0.0-alpha07")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")

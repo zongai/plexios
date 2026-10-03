@@ -305,7 +305,49 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private suspend fun buildPlayback(meta: PlexMetadata): PlaybackRequest? {
+    
+    private fun buildIptvPlayback(ch: com.plexclient.androidtv.iptv.IptvChannel): PlaybackRequest? {
+        return try {
+            val url = java.net.URI(ch.streamUrl)
+            val meta = PlexMetadata(
+                ratingKey = "iptv-${ch.id}",
+                key = "/iptv/${ch.id}",
+                type = PlexMetadataType.Unknown,
+                title = ch.name,
+                summary = null,
+                year = null,
+                thumb = ch.logoUrl,
+                art = null,
+                parentThumb = null,
+                grandparentThumb = null,
+                parentTitle = null,
+                grandparentTitle = null,
+                parentRatingKey = null,
+                grandparentRatingKey = null,
+                index = null,
+                parentIndex = null,
+                duration = null,
+                viewOffset = null,
+                contentRating = null,
+                studio = null,
+                tagline = null,
+                media = emptyList()
+            )
+            val ctx = ServerContext(java.net.URI("http://localhost/"), "", "iptv")
+            PlaybackRequest(
+                metadata = meta,
+                context = ctx,
+                network = NetworkClass.Local,
+                decision = PlaybackDecision(PlaybackMode.DirectPlay, "IPTV direct"),
+                mediaUrl = url,
+                startPositionMs = 0
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+private suspend fun buildPlayback(meta: PlexMetadata): PlaybackRequest? {
         val app = application as PlexApp
         val c = app.container
         val ctx = c.connections.context ?: return null

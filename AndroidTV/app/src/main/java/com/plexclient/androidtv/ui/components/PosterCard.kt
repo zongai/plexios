@@ -42,7 +42,7 @@ fun PosterCard(
             focusedBorder = Border(
                 border = BorderStroke(
                     TvLayout.FocusBorderWidth.dp,
-                    MaterialTheme.colorScheme.focusedBorder
+                    com.plexclient.androidtv.ui.theme.PlexColors.accent
                 ),
                 shape = RoundedCornerShape(6.dp)
             )

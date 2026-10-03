@@ -33,6 +33,8 @@
             <NavigationViewItem Content="Collections" Tag="collections" Icon="List" />
             <NavigationViewItem Content="Playlists" Tag="playlists" Icon="Bullets" />
             <NavigationViewItem Content="Favorites" Tag="favorites" Icon="Favorite" AccessKey="F" />
+            <NavigationViewItemSeparator />
+            <NavigationViewItem Content="IPTV" Tag="iptv" Icon="Video" AccessKey="I" />
         </NavigationView.MenuItems>
         <NavigationView.FooterMenuItems>
             <NavigationViewItem Content="Sign out" Tag="signout" Icon="Contact" />

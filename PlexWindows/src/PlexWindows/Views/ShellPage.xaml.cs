@@ -73,6 +73,9 @@ public sealed partial class ShellPage : Page
                 case "favorites":
                     ContentFrame.Navigate(typeof(FavoritesPage));
                     break;
+                case "iptv":
+                    ContentFrame.Navigate(typeof(IptvPage));
+                    break;
                 case "signout":
                     App.Services.GetRequiredService<AuthenticationService>().SignOut();
                     break;

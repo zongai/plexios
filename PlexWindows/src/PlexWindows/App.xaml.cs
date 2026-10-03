@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using PlexWindows.Helpers;
 using PlexWindows.Plex.Api;
+using PlexWindows.Iptv;
 using PlexWindows.Plex.Auth;
 using PlexWindows.Plex.Server;
 using PlexWindows.Playback;
@@ -89,6 +90,8 @@ public partial class App : Application
         services.AddTransient<PlaylistsViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<FavoritesViewModel>();
+        services.AddSingleton<IptvRepository>();
+        services.AddTransient<IptvViewModel>();
 
         return services.BuildServiceProvider();
     }

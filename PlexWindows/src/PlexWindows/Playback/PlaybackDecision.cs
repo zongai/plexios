@@ -198,6 +198,22 @@ public sealed class PlaybackDecisionEngine
             $"system mode={system.Mode} backend={system.Backend} reason={system.Reason} rk={metadata.RatingKey}");
         if (system.Mode != PlaybackMode.Transcode)
         {
+            // Container-only Direct Stream: LibVLC can often Direct Play the same file
+            // (HEVC/MKV, VP9, etc.) and avoids PMS HLS start.m3u8 (Range → HTTP 400).
+            if (system.Mode == PlaybackMode.DirectStream && LibVlcPlayerEngine.IsAvailable)
+            {
+                var vlcDp = Evaluate(
+                    metadata, network, mediaIndex, partIndex, forcedAudioId, forcedSubtitleId,
+                    ClientCapabilities.LibVlcDefault, PlaybackBackend.Vlc);
+                if (vlcDp.Mode == PlaybackMode.DirectPlay)
+                {
+                    AppDebugLog.Info("Decision",
+                        $"vlc-directplay over system DS reason={vlcDp.Reason}");
+                    return vlcDp;
+                }
+                AppDebugLog.Debug("Decision",
+                    $"vlc could not DP (mode={vlcDp.Mode}); keep system {system.Mode}");
+            }
             AppDebugLog.Info("Decision", $"use system mode={system.Mode} reason={system.Reason}");
             return system;
         }

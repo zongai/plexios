@@ -133,6 +133,10 @@ public sealed class PlayerEngineRouter : IPlayerEngine
         }
 
         // MF path (system decision, forced mediaFoundation, or VLC-first failed)
+        AppDebugLog.Info("PlayerRouter",
+            tryVlcFirst
+                ? "VLC-first failed or errored — trying Media Foundation"
+                : "MF path first (decision.Backend=System or forced)");
         SetActive(_mf);
         _mf.AttachSurfaces(_mfSurface, null);
 

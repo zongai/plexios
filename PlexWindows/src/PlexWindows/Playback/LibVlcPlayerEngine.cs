@@ -45,10 +45,22 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
         };
         using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
-        http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "PlexWindows/0.1");
-        http.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/x-mpegURL, */*");
 
-        var text = await http.GetStringAsync(playlistUrl, ct).ConfigureAwait(false);
+        // Do NOT send Range — PMS universal start.m3u8 returns HTTP 400 on Range: bytes=0-.
+        using var req = new HttpRequestMessage(HttpMethod.Get, playlistUrl);
+        req.Headers.TryAddWithoutValidation("User-Agent", "PlexWindows/0.1");
+        req.Headers.TryAddWithoutValidation("Accept", "application/x-mpegURL,application/vnd.apple.mpegurl,*/*");
+        req.Headers.TryAddWithoutValidation("Accept-Encoding", "identity");
+
+        using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseContentRead, ct)
+            .ConfigureAwait(false);
+        var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            AppDebugLog.Error("LibVLC.HLS",
+                $"prefetch HTTP {(int)resp.StatusCode}: {(text.Length > 200 ? text[..200] : text)} url={AppDebugLog.RedactUrl(playlistUrl.AbsoluteUri)}");
+            resp.EnsureSuccessStatusCode();
+        }
         AppDebugLog.Info("LibVLC.HLS",
             $"prefetched {text.Length} chars from {AppDebugLog.RedactUrl(playlistUrl.AbsoluteUri)}");
 
@@ -312,6 +324,8 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             _media.AddOption(":file-caching=3000");
             _media.AddOption(":live-caching=3000");
             _media.AddOption(":http-reconnect=true");
+            // Avoid Range probes that PMS rejects on transcoder endpoints
+            _media.AddOption(":http-continuous");
             _media.AddOption(":http-user-agent=PlexWindows/0.1");
             _media.AddOption(":avcodec-hw=any");
 

@@ -36,6 +36,47 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 
 
 #if USE_LIBVLC
+
+    private static async Task<string> PrefetchHlsPlaylistAsync(Uri playlistUrl, CancellationToken ct)
+    {
+        using var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+        using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
+        http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "PlexWindows/0.1");
+        http.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/x-mpegURL, */*");
+
+        var text = await http.GetStringAsync(playlistUrl, ct).ConfigureAwait(false);
+        AppDebugLog.Info("LibVLC.HLS",
+            $"prefetched {text.Length} chars from {AppDebugLog.RedactUrl(playlistUrl.AbsoluteUri)}");
+
+        var sb = new System.Text.StringBuilder();
+        using (var reader = new StringReader(text))
+        {
+            string? line;
+            while ((line = reader.ReadLine()) is not null)
+            {
+                if (line.Length == 0 || line.StartsWith('#'))
+                {
+                    sb.AppendLine(line);
+                    continue;
+                }
+                if (Uri.TryCreate(playlistUrl, line, out var abs))
+                    sb.AppendLine(abs.AbsoluteUri);
+                else
+                    sb.AppendLine(line);
+            }
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "PlexWindowsHls");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, Guid.NewGuid().ToString("N") + ".m3u8");
+        await File.WriteAllTextAsync(path, sb.ToString(), ct).ConfigureAwait(false);
+        return path;
+    }
+
     private static string? ResolveLibVlcDirectory()
     {
         var baseDir = AppContext.BaseDirectory;

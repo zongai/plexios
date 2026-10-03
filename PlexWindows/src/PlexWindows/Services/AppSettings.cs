@@ -35,6 +35,13 @@ public sealed class AppSettings
         set { _data.AutoPlayNextEpisode = value; Save(); }
     }
 
+    /// <summary>Prefer enabling subtitles when tracks are available (iOS parity).</summary>
+    public bool SubtitlesEnabled
+    {
+        get => _data.SubtitlesEnabled;
+        set { _data.SubtitlesEnabled = value; Save(); }
+    }
+
     public string? PreferredAudioLanguage
     {
         get => _data.PreferredAudioLanguage;
@@ -99,6 +106,7 @@ public sealed class AppSettings
     private sealed class SettingsData
     {
         public bool AutoPlayNextEpisode { get; set; } = true;
+        public bool SubtitlesEnabled { get; set; } = true;
         public string? PreferredAudioLanguage { get; set; }
         public string? PreferredSubtitleLanguage { get; set; }
         public int MaxRemoteBitrate { get; set; } = 20_000_000;

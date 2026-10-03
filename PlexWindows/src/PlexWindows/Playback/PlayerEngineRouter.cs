@@ -74,8 +74,14 @@ public sealed class PlayerEngineRouter : IPlayerEngine
     public async Task PrepareAsync(PlaybackRequest request, CancellationToken ct = default)
     {
         // Forced LibVLC
-        if (_preferredBackend == "libvlc" && _vlc is not null)
+        if (_preferredBackend == "libvlc")
         {
+            if (_vlc is null)
+            {
+                ErrorOccurred?.Invoke(this,
+                    "LibVLC is not available. Ensure VideoLAN.LibVLC.Windows native libraries are next to the exe.");
+                return;
+            }
             await _mf.StopAsync().ConfigureAwait(true);
             SetActive(_vlc);
             _vlc.AttachSurfaces(null, _vlcSurface);
@@ -83,7 +89,31 @@ public sealed class PlayerEngineRouter : IPlayerEngine
             return;
         }
 
-        // Forced MF (no fallback) or auto with MF first
+        // Auto: prefer LibVLC for Direct Stream / Transcode (PMS network URLs).
+        // MF is unreliable for container-remux and many HLS edge cases.
+        var preferVlc =
+            _preferredBackend == "auto"
+            && _vlc is not null
+            && request.Decision.Mode is PlaybackMode.DirectStream or PlaybackMode.Transcode;
+
+        if (preferVlc)
+        {
+            await _mf.StopAsync().ConfigureAwait(true);
+            SetActive(_vlc!);
+            _vlc!.AttachSurfaces(null, _vlcSurface);
+            try
+            {
+                await _vlc.PrepareAsync(request, ct).ConfigureAwait(true);
+                if (_vlc.State is not PlayerState.Error)
+                    return;
+            }
+            catch
+            {
+                // fall through to MF
+            }
+        }
+
+        // MF path (forced mediaFoundation, or auto DirectPlay, or VLC failed)
         var allowFallback = _preferredBackend == "auto" && _vlc is not null;
 
         SetActive(_mf);
@@ -104,7 +134,7 @@ public sealed class PlayerEngineRouter : IPlayerEngine
         try
         {
             await _mf.PrepareAsync(request, ct).ConfigureAwait(true);
-            var finished = await Task.WhenAny(tcs.Task, Task.Delay(16000, ct)).ConfigureAwait(true);
+            var finished = await Task.WhenAny(tcs.Task, Task.Delay(12000, ct)).ConfigureAwait(true);
             var ok = finished == tcs.Task && await tcs.Task.ConfigureAwait(true);
 
             if (ok && _mf.State is not PlayerState.Error)
@@ -127,8 +157,8 @@ public sealed class PlayerEngineRouter : IPlayerEngine
         {
             ErrorOccurred?.Invoke(this,
                 _vlc is null
-                    ? "Media Foundation failed and LibVLC is not available."
-                    : "Media Foundation failed (fallback disabled by settings).");
+                    ? "Media Foundation failed and LibVLC is not available (native libs missing or USE_LIBVLC off)."
+                    : "Media Foundation failed (LibVLC fallback disabled by settings).");
             return;
         }
 

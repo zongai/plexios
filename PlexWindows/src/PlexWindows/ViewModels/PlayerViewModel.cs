@@ -328,9 +328,12 @@ public partial class PlayerViewModel : ObservableObject
                 Request.Decision.PartIndex,
                 forcedAudioId: forcedAudioId,
                 forcedSubtitleId: forcedSubtitleId);
-            // Direct Play cannot carry a chosen subtitle stream ID in the URL.
-            // Promote to Transcode so PMS burns/serves the selected sub.
-            if (forcedSubtitleId is int sid && sid > 0 && decision.Mode == PlaybackMode.DirectPlay)
+            // When LibVLC is active it can render soft subs; only force PMS transcode
+            // for Media Foundation (which cannot apply external SRT mid-stream reliably).
+            var usingVlc = _player.Backend == PlayerBackendKind.LibVlc
+                           || LibVlcPlayerEngine.IsAvailable;
+            if (!usingVlc && forcedSubtitleId is int sid && sid > 0
+                && decision.Mode is PlaybackMode.DirectPlay or PlaybackMode.DirectStream)
             {
                 decision = decision with
                 {

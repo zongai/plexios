@@ -26,7 +26,7 @@ public sealed partial class PlayerPage : Page
     {
         base.OnNavigatedTo(e);
         // Dual surfaces: MF → MediaPlayerElement, LibVLC → VideoView
-        ViewModel.Player.AttachSurfaces(MfElement, VlcHost);
+        ViewModel.Player.AttachSurfaces(MfElement, VlcView);
         if (e.Parameter is PlaybackRequest req)
             _ = ViewModel.LoadAsync(req);
         Focus(FocusState.Programmatic);
@@ -82,7 +82,7 @@ public sealed partial class PlayerPage : Page
 
     private void Page_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (e.OriginalSource == MfElement || e.OriginalSource == VlcHost)
+        if (e.OriginalSource == MfElement || e.OriginalSource == VlcView)
             ViewModel.ToggleControlsVisible();
         else
             ViewModel.BumpControls();

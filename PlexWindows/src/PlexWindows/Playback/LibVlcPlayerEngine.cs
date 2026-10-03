@@ -7,8 +7,9 @@ using LibVLCSharp.Shared;
 namespace PlexWindows.Playback;
 
 /// <summary>
-/// LibVLC backend for formats Media Foundation cannot open.
-/// Requires: LibVLCSharp, LibVLCSharp.WinUI, VideoLAN.LibVLC.Windows
+/// LibVLCSharp backend (https://github.com/videolan/libvlcsharp).
+/// Primary fallback when Media Foundation cannot open the stream.
+/// Requires: LibVLCSharp, LibVLCSharp.WinUI, VideoLAN.LibVLC.Windows.
 /// </summary>
 public sealed class LibVlcPlayerEngine : IPlayerEngine
 {
@@ -27,6 +28,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     private Media? _media;
     private LibVLCSharp.WinUI.VideoView? _videoView;
     private long? _pendingSeekMs;
+    private bool _coreReady;
 #endif
 
     public static bool IsAvailable
@@ -36,6 +38,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 #if USE_LIBVLC
             try
             {
+                // Loads native libvlc from VideoLAN.LibVLC.Windows package output
                 Core.Initialize();
                 return true;
             }
@@ -54,7 +57,15 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         _dispatcher = DispatcherQueue.GetForCurrentThread()
                       ?? throw new InvalidOperationException("LibVlcPlayerEngine requires a UI DispatcherQueue.");
 #if USE_LIBVLC
-        Core.Initialize();
+        try
+        {
+            Core.Initialize();
+            _coreReady = true;
+        }
+        catch
+        {
+            _coreReady = false;
+        }
 #endif
     }
 
@@ -139,6 +150,21 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         await Task.CompletedTask;
         return;
 #else
+        if (!_coreReady)
+        {
+            try
+            {
+                Core.Initialize();
+                _coreReady = true;
+            }
+            catch (Exception ex)
+            {
+                State = PlayerState.Error;
+                ErrorOccurred?.Invoke(this, "LibVLC native libraries failed to load: " + ex.Message);
+                return;
+            }
+        }
+
         try
         {
             EnsurePlayer();
@@ -149,29 +175,26 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 return;
             }
 
+            // Bind surface before play (required for video output)
+            if (_videoView is not null)
+                _videoView.MediaPlayer = _mediaPlayer;
+
             _mediaPlayer.Stop();
             _media?.Dispose();
 
-            _media = new Media(_libVlc, request.MediaUrl);
+            // Network / PMS URLs must use FromLocation
+            _media = new Media(_libVlc, request.MediaUrl.AbsoluteUri, FromType.FromLocation);
             _media.AddOption(":network-caching=1500");
-            _media.AddOption(":file-caching=1500");
+            _media.AddOption(":http-reconnect=true");
+            // Prefer hardware decode when available
+            _media.AddOption(":avcodec-hw=any");
+
             _mediaPlayer.Media = _media;
-
-            try
-            {
-                await _media.Parse(MediaParseOptions.ParseNetwork, timeout: 5000).ConfigureAwait(true);
-                if (_media.Duration > 0)
-                    _durationMs = _media.Duration;
-            }
-            catch
-            {
-                // LengthChanged may provide duration later
-            }
-
             _mediaPlayer.Volume = (int)(_volume * 100);
             _mediaPlayer.Mute = _isMuted;
             _pendingSeekMs = request.StartPositionMs > 0 ? request.StartPositionMs : null;
 
+            // Apply subtitle/audio preference via LibVLC when possible after start
             State = PlayerState.Paused;
             RaiseOnUi(() =>
             {
@@ -182,7 +205,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         catch (Exception ex)
         {
             State = PlayerState.Error;
-            ErrorOccurred?.Invoke(this, $"LibVLC prepare failed: {ex.Message}");
+            ErrorOccurred?.Invoke(this, "LibVLC prepare failed: " + ex.Message);
         }
 
         await Task.CompletedTask;
@@ -192,7 +215,15 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     public void Play()
     {
 #if USE_LIBVLC
-        _mediaPlayer?.Play();
+        if (_mediaPlayer is null)
+        {
+            State = PlayerState.Error;
+            ErrorOccurred?.Invoke(this, "LibVLC player not ready.");
+            return;
+        }
+        if (_videoView is not null && _videoView.MediaPlayer != _mediaPlayer)
+            _videoView.MediaPlayer = _mediaPlayer;
+        _mediaPlayer.Play();
 #endif
         State = PlayerState.Playing;
     }
@@ -229,6 +260,8 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 #if USE_LIBVLC
         if (_mediaPlayer is not null && _mediaPlayer.IsSeekable)
             _mediaPlayer.Time = _positionMs;
+        else
+            _pendingSeekMs = _positionMs;
 #endif
         RaiseOnUi(() => PositionChanged?.Invoke(this, EventArgs.Empty));
         return Task.CompletedTask;
@@ -240,10 +273,17 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 #if USE_LIBVLC
         if (_mediaPlayer is not null)
         {
+            // Prefer matching by description index from Plex-ordered tracks
             var tracks = _mediaPlayer.AudioTrackDescription;
             var idx = _audioTracks.FindIndex(a => a.Id == streamId);
-            if (idx >= 0 && idx < tracks.Length)
-                _mediaPlayer.SetAudioTrack(tracks[idx].Id);
+            // LibVLC track list often has a leading "Disable" entry
+            if (tracks is { Length: > 0 })
+            {
+                // Try by index into non-disable tracks
+                var mediaTracks = tracks.Where(t => t.Id >= 0).ToArray();
+                if (idx >= 0 && idx < mediaTracks.Length)
+                    _mediaPlayer.SetAudioTrack(mediaTracks[idx].Id);
+            }
         }
 #endif
         RaiseOnUi(() => TracksChanged?.Invoke(this, EventArgs.Empty));
@@ -265,8 +305,14 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             {
                 var tracks = _mediaPlayer.SpuDescription;
                 var idx = _subtitleTracks.FindIndex(s => s.Id == streamId);
-                if (idx >= 0 && idx < tracks.Length)
-                    _mediaPlayer.SetSpu(tracks[idx].Id);
+                if (tracks is { Length: > 0 })
+                {
+                    var mediaTracks = tracks.Where(t => t.Id >= 0).ToArray();
+                    if (idx >= 0 && idx < mediaTracks.Length)
+                        _mediaPlayer.SetSpu(mediaTracks[idx].Id);
+                    else if (mediaTracks.Length > 0)
+                        _mediaPlayer.SetSpu(mediaTracks[0].Id);
+                }
             }
         }
 #endif
@@ -278,44 +324,54 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     {
         await StopAsync();
 #if USE_LIBVLC
-        if (_mediaPlayer is not null)
+        try
         {
-            _mediaPlayer.Dispose();
+            if (_videoView is not null)
+                _videoView.MediaPlayer = null;
+            _mediaPlayer?.Dispose();
             _mediaPlayer = null;
+            _libVlc?.Dispose();
+            _libVlc = null;
         }
-        _libVlc?.Dispose();
-        _libVlc = null;
-        if (_videoView is not null)
-        {
-            _videoView.MediaPlayer = null;
-            _videoView = null;
-        }
+        catch { /* ignore */ }
 #endif
+        await Task.CompletedTask;
     }
 
 #if USE_LIBVLC
     private void EnsurePlayer()
     {
-        _libVlc ??= new LibVLC("--no-osd", "--avcodec-hw=any", "--network-caching=1500");
+        if (_libVlc is null)
+        {
+            // Desktop WinUI: classic LibVLC constructor (Windows package, not UWP swapchain)
+            _libVlc = new LibVLC(
+                "--no-video-title-show",
+                "--network-caching=1500");
+        }
 
         if (_mediaPlayer is null)
         {
             _mediaPlayer = new MediaPlayer(_libVlc);
+            _mediaPlayer.TimeChanged += (_, e) =>
+            {
+                _positionMs = e.Time;
+                RaiseOnUi(() => PositionChanged?.Invoke(this, EventArgs.Empty));
+            };
+            _mediaPlayer.LengthChanged += (_, e) =>
+            {
+                if (e.Length > 0) _durationMs = e.Length;
+            };
             _mediaPlayer.Playing += (_, _) =>
             {
                 State = PlayerState.Playing;
-                if (_pendingSeekMs is long seek && _mediaPlayer is not null)
+                if (_pendingSeekMs is long seek && seek > 0)
                 {
                     _mediaPlayer.Time = seek;
                     _pendingSeekMs = null;
                 }
             };
             _mediaPlayer.Paused += (_, _) => State = PlayerState.Paused;
-            _mediaPlayer.Stopped += (_, _) =>
-            {
-                if (State != PlayerState.Ended)
-                    State = PlayerState.Stopped;
-            };
+            _mediaPlayer.Stopped += (_, _) => State = PlayerState.Stopped;
             _mediaPlayer.EndReached += (_, _) => State = PlayerState.Ended;
             _mediaPlayer.EncounteredError += (_, _) =>
             {
@@ -324,23 +380,14 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             };
             _mediaPlayer.Buffering += (_, e) =>
             {
-                if (e.Cache < 100f)
+                if (e.Cache < 100)
                     State = PlayerState.Buffering;
-            };
-            _mediaPlayer.TimeChanged += (_, e) =>
-            {
-                _positionMs = e.Time;
-                RaiseOnUi(() => PositionChanged?.Invoke(this, EventArgs.Empty));
-            };
-            _mediaPlayer.LengthChanged += (_, e) =>
-            {
-                if (e.Length > 0)
-                    _durationMs = e.Length;
-                RaiseOnUi(() => PositionChanged?.Invoke(this, EventArgs.Empty));
+                else if (State == PlayerState.Buffering)
+                    State = PlayerState.Playing;
             };
         }
 
-        if (_videoView is not null && !ReferenceEquals(_videoView.MediaPlayer, _mediaPlayer))
+        if (_videoView is not null)
             _videoView.MediaPlayer = _mediaPlayer;
     }
 #endif
@@ -358,7 +405,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             _audioTracks.Add(new TrackInfo
             {
                 Id = s.Id,
-                Title = s.ExtendedDisplayTitle ?? s.DisplayTitle ?? s.Language ?? $"Audio {s.Id}",
+                Title = s.ExtendedDisplayTitle ?? s.DisplayTitle ?? s.Title ?? s.Language ?? $"Audio {s.Id}",
                 Language = s.LanguageCode ?? s.Language,
                 Codec = s.Codec,
                 Channels = s.Channels,
@@ -371,7 +418,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             _subtitleTracks.Add(new TrackInfo
             {
                 Id = s.Id,
-                Title = s.ExtendedDisplayTitle ?? s.DisplayTitle ?? s.Language ?? $"Subtitle {s.Id}",
+                Title = s.ExtendedDisplayTitle ?? s.DisplayTitle ?? s.Title ?? s.Language ?? $"Subtitle {s.Id}",
                 Language = s.LanguageCode ?? s.Language,
                 Codec = s.Codec ?? s.Format,
                 IsSelected = decision.SelectedSubtitleStreamId == s.Id

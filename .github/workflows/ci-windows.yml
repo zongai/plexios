@@ -59,6 +59,10 @@ jobs:
         run: |
           Get-ChildItem publish/win-x64 -Filter *.exe | Format-Table Name,Length
           if (-not (Test-Path publish/win-x64/PlexWindows.exe)) { throw "PlexWindows.exe missing" }
+          # Native LibVLC must ship with unpackaged publish
+          $libvlc = Get-ChildItem publish/win-x64 -Recurse -Filter libvlc.dll -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $libvlc) { throw "libvlc.dll missing from publish output — VideoLAN.LibVLC.Windows not copied" }
+          Write-Host "Found $($libvlc.FullName)"
       - name: Upload exe folder
         uses: actions/upload-artifact@v4
         with:

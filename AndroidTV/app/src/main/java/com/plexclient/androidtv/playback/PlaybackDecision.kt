@@ -5,6 +5,9 @@ import com.plexclient.androidtv.plex.model.PlexStream
 
 enum class PlaybackMode { DirectPlay, DirectStream, Transcode }
 
+/** Contract: system (ExoPlayer) vs vlc fallback. */
+enum class PlaybackBackend { System, Vlc }
+
 enum class NetworkClass { Local, Remote, Relay }
 
 data class ClientCapabilities(
@@ -51,6 +54,8 @@ data class ClientCapabilities(
 data class PlaybackDecision(
     val mode: PlaybackMode,
     val reason: String,
+    /** Contract: system (ExoPlayer) vs vlc fallback. */
+    val backend: PlaybackBackend = PlaybackBackend.System,
     val mediaIndex: Int = 0,
     val partIndex: Int = 0,
     val selectedAudioStreamId: Int? = null,

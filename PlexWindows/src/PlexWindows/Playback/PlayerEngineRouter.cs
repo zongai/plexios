@@ -44,6 +44,8 @@ public sealed class PlayerEngineRouter : IPlayerEngine
     public long DurationMs => _active.DurationMs;
     public long BufferedMs => _active.BufferedMs;
 
+    public double Rate => _active.Rate;
+
     public double Volume
     {
         get => _active.Volume;
@@ -181,6 +183,13 @@ public sealed class PlayerEngineRouter : IPlayerEngine
         SetActive(_vlc);
         _vlc.AttachSurfaces(null, _vlcSurface);
         await _vlc.PrepareAsync(request, ct).ConfigureAwait(true);
+    }
+
+    public void SetRate(double rate)
+    {
+        _mf.SetRate(rate);
+        _vlc?.SetRate(rate);
+        _active.SetRate(rate);
     }
 
     public void Play() => _active.Play();

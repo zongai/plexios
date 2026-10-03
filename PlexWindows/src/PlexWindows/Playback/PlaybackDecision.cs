@@ -1,6 +1,13 @@
 using PlexWindows.Services;
 namespace PlexWindows.Playback;
 
+/// <summary>Contract: system (MF/AV/Exo) vs vlc fallback.</summary>
+public enum PlaybackBackend
+{
+    System,
+    Vlc
+}
+
 public enum PlaybackMode
 {
     DirectPlay,
@@ -19,6 +26,7 @@ public enum NetworkClass
 public sealed record PlaybackDecision(
     PlaybackMode Mode,
     string Reason,
+    PlaybackBackend Backend,
     int MediaIndex,
     int PartIndex,
     int? SelectedAudioStreamId,
@@ -217,6 +225,7 @@ public sealed class PlaybackDecisionEngine
             return new PlaybackDecision(
                 PlaybackMode.DirectPlay,
                 $"Direct Play: container={container}, video={videoCodec}, audio={audioCodec}",
+                PlaybackBackend.System,
                 mi, pi, audioId, subtitleId, false, _prefs.MaxVideoBitrateKbps);
         }
 
@@ -226,6 +235,7 @@ public sealed class PlaybackDecisionEngine
             return new PlaybackDecision(
                 PlaybackMode.DirectStream,
                 $"Direct Stream: video={videoCodec}, audio={audioCodec}, container remap",
+                PlaybackBackend.System,
                 mi, pi, audioId, subtitleId, false, _prefs.MaxVideoBitrateKbps);
         }
 
@@ -315,7 +325,7 @@ public sealed class PlaybackDecisionEngine
 
     private PlaybackDecision Transcode(
         string reason, int mi, int pi, int? audioId, int? subId, bool burnIn, int? maxBr = null)
-        => new(PlaybackMode.Transcode, reason, mi, pi, audioId, subId, burnIn, maxBr);
+        => new(PlaybackMode.Transcode, reason, PlaybackBackend.System, mi, pi, audioId, subId, burnIn, maxBr);
 }
 
 

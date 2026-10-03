@@ -46,6 +46,9 @@ public interface IPlayerEngine : IAsyncDisposable
     long BufferedMs { get; }
     double Volume { get; set; }
     bool IsMuted { get; set; }
+    /// <summary>Playback rate (1.0 = normal). Contract §3.1.</summary>
+    double Rate { get; }
+
 
     IReadOnlyList<TrackInfo> AudioTracks { get; }
     IReadOnlyList<TrackInfo> SubtitleTracks { get; }
@@ -66,6 +69,7 @@ public interface IPlayerEngine : IAsyncDisposable
     void Pause();
     Task StopAsync();
     Task SeekAsync(long positionMs, CancellationToken ct = default);
+    void SetRate(double rate);
     Task SelectAudioTrackAsync(int streamId, int listIndex = -1, CancellationToken ct = default);
     Task SelectSubtitleAsync(int? streamId, CancellationToken ct = default);
 }

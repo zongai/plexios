@@ -6,9 +6,17 @@ enum PlaybackMode: String, Sendable, Equatable {
     case transcode
 }
 
+/// Contract: system (AVPlayer/Exo/MF) vs vlc fallback.
+enum PlaybackBackend: String, Sendable, Equatable {
+    case system
+    case vlc
+}
+
 struct PlaybackDecision: Sendable, Equatable {
     let mode: PlaybackMode
     let reason: String
+    /// Contract: system (AVPlayer) vs vlc fallback. Actual final backend may still switch at runtime.
+    let backend: PlaybackBackend
     let mediaIndex: Int
     let partIndex: Int
     let selectedAudioStreamId: Int?
@@ -23,6 +31,14 @@ struct PlaybackDecision: Sendable, Equatable {
 struct PlaybackDecisionEngine: Sendable {
     let capabilities: IOSCapabilities
     let preferences: PlaybackPreferences
+
+    /// Primary system player unless user/capability matrix prefers VLC.
+    private var preferredBackend: PlaybackBackend {
+        // Prefer system (AVPlayer) when user forces it; otherwise VLC when allowed.
+        if preferences.preferSystemPlayer { return .system }
+        if preferences.allowVLCPlayer { return .vlc }
+        return .system
+    }
 
     init(
         capabilities: IOSCapabilities = .current,
@@ -52,6 +68,7 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .transcode,
                 reason: "No media versions available",
+                backend: preferredBackend,
                 mediaIndex: 0,
                 partIndex: 0,
                 selectedAudioStreamId: nil,
@@ -68,6 +85,7 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .transcode,
                 reason: "Media has no parts",
+                backend: preferredBackend,
                 mediaIndex: mi,
                 partIndex: 0,
                 selectedAudioStreamId: nil,
@@ -99,6 +117,7 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .transcode,
                 reason: "Quality limited to \(maxBr) kbps (source \(sourceBr) kbps)",
+                backend: preferredBackend,
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,
@@ -149,6 +168,7 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .directPlay,
                 reason: "Direct Play via \(via): \(container ?? "?") / \(normalizedVideo ?? videoCodec ?? "?") / \(audioCodec ?? "?")",
+                backend: preferredBackend,
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,
@@ -171,6 +191,7 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .directStream,
                 reason: reasons.joined(separator: "; "),
+                backend: preferredBackend,
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,
@@ -190,6 +211,7 @@ struct PlaybackDecisionEngine: Sendable {
         return PlaybackDecision(
             mode: .transcode,
             reason: reasons.joined(separator: "; "),
+            backend: preferredBackend,
             mediaIndex: mi,
             partIndex: pi,
             selectedAudioStreamId: audioId,

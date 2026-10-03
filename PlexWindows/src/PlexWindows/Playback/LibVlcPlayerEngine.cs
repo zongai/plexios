@@ -140,6 +140,8 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     }
 
     public long PositionMs => _positionMs;
+    public double Rate => _rate;
+    private double _rate = 1.0;
     public long DurationMs => _durationMs;
     public long BufferedMs => _positionMs;
 
@@ -273,6 +275,16 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 
         await Task.CompletedTask;
 #endif
+    }
+
+    public void SetRate(double rate)
+    {
+        _rate = Math.Clamp(rate, 0.25, 2.0);
+        if (_mediaPlayer is not null)
+        {
+            try { _mediaPlayer.SetRate((float)_rate); }
+            catch { /* ignore */ }
+        }
     }
 
     public void Play()

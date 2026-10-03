@@ -46,6 +46,8 @@ public sealed class MediaFoundationPlayerEngine : IPlayerEngine
     }
 
     public long PositionMs => _positionMs;
+    public double Rate => _rate;
+    private double _rate = 1.0;
     public long DurationMs => _durationMs;
     public long BufferedMs => _bufferedMs;
 
@@ -167,6 +169,16 @@ public sealed class MediaFoundationPlayerEngine : IPlayerEngine
         {
             State = PlayerState.Error;
             ErrorOccurred?.Invoke(this, ex.Message);
+        }
+    }
+
+    public void SetRate(double rate)
+    {
+        _rate = Math.Clamp(rate, 0.25, 2.0);
+        if (_mediaPlayer?.PlaybackSession is { } session)
+        {
+            try { session.PlaybackRate = _rate; }
+            catch { /* some sources reject rate changes */ }
         }
     }
 
@@ -427,7 +439,9 @@ public sealed class MediaFoundationPlayerEngine : IPlayerEngine
     }
 }
 
-/// <summary>UI-friendly track descriptor sourced from Plex streams.</summary>
+/// <summary>
+/// Contract-aligned track descriptor (docs/cross-platform-playback-contract.md §6).
+/// </summary>
 public sealed class TrackInfo : IEquatable<TrackInfo>
 {
     public int Id { get; init; }
@@ -436,6 +450,10 @@ public sealed class TrackInfo : IEquatable<TrackInfo>
     public string? Codec { get; init; }
     public int? Channels { get; init; }
     public bool IsSelected { get; set; }
+    public bool IsDefault { get; init; }
+    public bool IsForced { get; init; }
+    public bool IsExternal { get; init; }
+    public string Type { get; init; } = "audio"; // audio | subtitle | video
 
     public string DisplayLabel
     {

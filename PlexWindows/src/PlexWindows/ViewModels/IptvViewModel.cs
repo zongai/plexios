@@ -164,6 +164,7 @@ public partial class IptvViewModel : ObservableObject
         var decision = new PlaybackDecision(
             PlaybackMode.DirectPlay,
             "IPTV direct stream",
+            PlaybackBackend.System,
             0, 0, null, null, false, null);
 
         return new PlaybackRequest

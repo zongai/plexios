@@ -12,17 +12,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.net.URI
 
+/**
+ * Contract-aligned track descriptor (docs/cross-platform-playback-contract.md §6).
+ * Maps to MediaTrack: id, type, language, title, codec, flags.
+ */
 data class PlayerTrack(
     val id: String,
     val groupIndex: Int,
     val trackIndex: Int,
     val label: String,
-    val language: String?,
+    val language: String? = null,
+    val codec: String? = null,
     val type: Type,
-    val selected: Boolean
+    val selected: Boolean = false,
+    val isDefault: Boolean = false,
+    val isForced: Boolean = false,
+    val isExternal: Boolean = false,
+    val plexStreamId: Int? = null
 ) {
-    enum class Type { Audio, Text }
+    enum class Type { Audio, Text, Video }
+
+    val title: String get() = label
 }
+
 
 /**
  * Media3 / ExoPlayer shell with track enumeration and selection.

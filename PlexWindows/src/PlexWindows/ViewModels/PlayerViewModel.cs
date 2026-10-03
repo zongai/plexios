@@ -278,22 +278,25 @@ public partial class PlayerViewModel : ObservableObject
         if (SelectedAudio?.Id == track.Id) return;
         SelectedAudio = track;
 
-        // Resolve index from current list if caller didn't pass one
         if (listIndex < 0)
             listIndex = AudioTracks.ToList().FindIndex(t => t.Id == track.Id);
 
-        var mode = Request?.Decision.Mode ?? PlaybackMode.DirectPlay;
-        var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
-
-        // Always try in-player switch first (works for Direct Play file sources on LibVLC)
-        await _player.SelectAudioTrackAsync(track.Id, listIndex);
-        StatusMessage = "";
-
-        // For remux/transcode sessions, also rebuild URL with audioStreamID
-        if (mode is PlaybackMode.DirectStream or PlaybackMode.Transcode)
+        // 1) Best-effort in-player switch (LibVLC multi-audio containers)
+        try
         {
-            await ReloadWithTracksAsync(forcedAudioId: track.Id, forcedSubtitleId: CurrentForcedSubtitleId());
+            await _player.SelectAudioTrackAsync(track.Id, listIndex);
         }
+        catch
+        {
+            // non-fatal — session rebuild below is the reliable path
+        }
+
+        // 2) Always rebuild Plex session with audioStreamID.
+        // Direct Play URLs cannot carry audioStreamID; Reload promotes to Direct Stream.
+        await ReloadWithTracksAsync(
+            forcedAudioId: track.Id,
+            forcedSubtitleId: CurrentForcedSubtitleId(),
+            forceAudioRemux: true);
 
         BumpControls();
     }
@@ -326,7 +329,10 @@ public partial class PlayerViewModel : ObservableObject
     /// Rebuild decision + media URL with forced audio/subtitle and resume at current position.
     /// Required for Plex: subtitleStreamID / audioStreamID are part of the play session URL.
     /// </summary>
-    private async Task ReloadWithTracksAsync(int? forcedAudioId, int? forcedSubtitleId)
+    private async Task ReloadWithTracksAsync(
+        int? forcedAudioId,
+        int? forcedSubtitleId,
+        bool forceAudioRemux = false)
     {
         if (Request is null || _reloadingTracks) return;
         _reloadingTracks = true;
@@ -342,8 +348,21 @@ public partial class PlayerViewModel : ObservableObject
                 Request.Decision.PartIndex,
                 forcedAudioId: forcedAudioId,
                 forcedSubtitleId: forcedSubtitleId);
-            // When LibVLC is active it can render soft subs; only force PMS transcode
-            // for Media Foundation (which cannot apply external SRT mid-stream reliably).
+
+            // Audio change on Direct Play cannot apply audioStreamID — promote to Direct Stream
+            // so PMS remuxes with the selected audio track.
+            if (forceAudioRemux && forcedAudioId is int aid
+                && decision.Mode == PlaybackMode.DirectPlay)
+            {
+                decision = decision with
+                {
+                    Mode = PlaybackMode.DirectStream,
+                    SelectedAudioStreamId = aid,
+                    Reason = "Audio track change — Direct Stream with selected audio"
+                };
+            }
+
+            // MF path needs burn-in for many sub formats
             var usingVlc = _player.Backend == PlayerBackendKind.LibVlc
                            || LibVlcPlayerEngine.IsAvailable;
             if (!usingVlc && forcedSubtitleId is int sid && sid > 0

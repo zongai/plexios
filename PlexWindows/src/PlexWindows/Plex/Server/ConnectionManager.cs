@@ -107,13 +107,15 @@ public partial class ConnectionManager : ObservableObject
     }
 
     /// <summary>
-    /// Prefer plain HTTP LAN connection for LibVLC (plex.direct HTTPS often fails TLS in VLC).
-    /// Falls back to PreferredConnection.
+    /// Prefer plain HTTP LAN for LibVLC (plex.direct HTTPS is unreliable in VLC/gnutls).
+    /// Order: explicit http local connection → synthesize http://IP from *.plex.direct → preferred.
     /// </summary>
     public Uri? PreferPlaybackBaseUrl(bool preferHttpLan = true)
     {
         var server = ActiveServer;
         if (server is null) return null;
+        var preferred = server.PreferredConnection?.BaseUrl;
+
         if (preferHttpLan)
         {
             var httpLan = server.Connections
@@ -122,10 +124,45 @@ public partial class ConnectionManager : ObservableObject
                             && !c.Relay
                             && c.BaseUrl.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(c => c.LatencyMs ?? double.MaxValue)
-                .Select(c => c.BaseUrl)
+                .Select(c => c.BaseUrl!)
                 .FirstOrDefault();
             if (httpLan is not null) return httpLan;
+
+            // 192-168-1-10.xxxxx.plex.direct:32400 → http://192.168.1.10:32400
+            foreach (var c in server.Connections.Select(x => x.BaseUrl).Where(u => u is not null))
+            {
+                var syn = TrySynthesizeLanHttp(c!);
+                if (syn is not null) return syn;
+            }
+            if (preferred is not null)
+            {
+                var syn = TrySynthesizeLanHttp(preferred);
+                if (syn is not null) return syn;
+            }
         }
-        return server.PreferredConnection?.BaseUrl;
+        return preferred;
+    }
+
+    /// <summary>
+    /// Plex private.plex.direct hosts encode LAN IPs as dashed labels.
+    /// </summary>
+    public static Uri? TrySynthesizeLanHttp(Uri plexUri)
+    {
+        try
+        {
+            var host = plexUri.Host;
+            if (!host.EndsWith(".plex.direct", StringComparison.OrdinalIgnoreCase))
+                return null;
+            var label = host.Split('.')[0]; // e.g. 192-168-1-10
+            if (label.Count(c => c == '-') < 3) return null;
+            var ip = label.Replace('-', '.');
+            if (!System.Net.IPAddress.TryParse(ip, out _)) return null;
+            var port = plexUri.IsDefaultPort ? 32400 : plexUri.Port;
+            return new UriBuilder("http", ip, port).Uri;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

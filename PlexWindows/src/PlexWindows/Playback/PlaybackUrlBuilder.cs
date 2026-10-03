@@ -1,4 +1,5 @@
 using PlexWindows.Helpers;
+using PlexWindows.Plex.Server;
 using PlexWindows.Models;
 
 namespace PlexWindows.Playback;
@@ -24,6 +25,14 @@ public sealed class PlaybackUrlBuilder
         long offsetMs = 0,
         string? sessionId = null)
     {
+        // Prefer LAN HTTP when context is plex.direct HTTPS (LibVLC gnutls is unreliable)
+        var syn = ConnectionManager.TrySynthesizeLanHttp(context.BaseUrl);
+        if (syn is not null && context.BaseUrl.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+        {
+            AppDebugLog.Info("UrlBuilder", $"plex.direct → LAN HTTP {context.BaseUrl} → {syn}");
+            context = context with { BaseUrl = syn };
+        }
+
         if (decision.Mode == PlaybackMode.DirectPlay &&
             TryGetPart(metadata, decision.MediaIndex, decision.PartIndex, out var part) &&
             !string.IsNullOrEmpty(part.Key))

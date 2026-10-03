@@ -308,16 +308,41 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 #if USE_LIBVLC
         if (_mediaPlayer is not null)
         {
-            // Prefer matching by description index from Plex-ordered tracks
-            var tracks = _mediaPlayer.AudioTrackDescription;
-            var idx = _audioTracks.FindIndex(a => a.Id == streamId);
-            // LibVLC track list often has a leading "Disable" entry
-            if (tracks is { Length: > 0 })
+            var plex = _audioTracks.FirstOrDefault(a => a.Id == streamId);
+            var vlcTracks = (_mediaPlayer.AudioTrackDescription ?? Array.Empty<TrackDescription>())
+                .Where(td => td.Id >= 0)
+                .ToArray();
+            if (vlcTracks.Length > 0)
             {
-                // Try by index into non-disable tracks
-                var mediaTracks = tracks.Where(t => t.Id >= 0).ToArray();
-                if (idx >= 0 && idx < mediaTracks.Length)
-                    _mediaPlayer.SetAudioTrack(mediaTracks[idx].Id);
+                // 1) Match by language code / title fragment in VLC description
+                TrackDescription? match = null;
+                if (plex is not null)
+                {
+                    var lang = plex.Language?.Trim();
+                    var title = plex.Title?.Trim();
+                    if (!string.IsNullOrEmpty(lang))
+                        match = vlcTracks.FirstOrDefault(v =>
+                            (!string.IsNullOrEmpty(v.Name) &&
+                             v.Name.Contains(lang, StringComparison.OrdinalIgnoreCase)));
+                    if (match is null && !string.IsNullOrEmpty(title))
+                    {
+                        // Try significant token from Plex display title
+                        var token = title.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                        if (!string.IsNullOrEmpty(token) && token.Length >= 2)
+                            match = vlcTracks.FirstOrDefault(v =>
+                                !string.IsNullOrEmpty(v.Name) &&
+                                v.Name.Contains(token, StringComparison.OrdinalIgnoreCase));
+                    }
+                }
+                // 2) Fall back to same index in Plex-ordered list
+                if (match is null)
+                {
+                    var idx = _audioTracks.FindIndex(a => a.Id == streamId);
+                    if (idx >= 0 && idx < vlcTracks.Length)
+                        match = vlcTracks[idx];
+                }
+                if (match is not null)
+                    _mediaPlayer.SetAudioTrack(match.Value.Id);
             }
         }
 #endif
@@ -338,15 +363,38 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             }
             else
             {
-                var tracks = _mediaPlayer.SpuDescription;
-                var idx = _subtitleTracks.FindIndex(s => s.Id == streamId);
-                if (tracks is { Length: > 0 })
+                var plex = _subtitleTracks.FirstOrDefault(s => s.Id == streamId);
+                var vlcTracks = (_mediaPlayer.SpuDescription ?? Array.Empty<TrackDescription>())
+                    .Where(td => td.Id >= 0)
+                    .ToArray();
+                if (vlcTracks.Length > 0)
                 {
-                    var mediaTracks = tracks.Where(t => t.Id >= 0).ToArray();
-                    if (idx >= 0 && idx < mediaTracks.Length)
-                        _mediaPlayer.SetSpu(mediaTracks[idx].Id);
-                    else if (mediaTracks.Length > 0)
-                        _mediaPlayer.SetSpu(mediaTracks[0].Id);
+                    TrackDescription? match = null;
+                    if (plex is not null)
+                    {
+                        var lang = plex.Language?.Trim();
+                        var title = plex.Title?.Trim();
+                        if (!string.IsNullOrEmpty(lang))
+                            match = vlcTracks.FirstOrDefault(v =>
+                                !string.IsNullOrEmpty(v.Name) &&
+                                v.Name.Contains(lang, StringComparison.OrdinalIgnoreCase));
+                        if (match is null && !string.IsNullOrEmpty(title))
+                        {
+                            var token = title.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                            if (!string.IsNullOrEmpty(token) && token.Length >= 2)
+                                match = vlcTracks.FirstOrDefault(v =>
+                                    !string.IsNullOrEmpty(v.Name) &&
+                                    v.Name.Contains(token, StringComparison.OrdinalIgnoreCase));
+                        }
+                    }
+                    if (match is null)
+                    {
+                        var idx = _subtitleTracks.FindIndex(s => s.Id == streamId);
+                        if (idx >= 0 && idx < vlcTracks.Length)
+                            match = vlcTracks[idx];
+                    }
+                    if (match is not null)
+                        _mediaPlayer.SetSpu(match.Value.Id);
                 }
             }
         }

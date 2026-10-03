@@ -105,4 +105,27 @@ public partial class ConnectionManager : ObservableObject
         ActiveServer = null;
         LastError = null;
     }
+
+    /// <summary>
+    /// Prefer plain HTTP LAN connection for LibVLC (plex.direct HTTPS often fails TLS in VLC).
+    /// Falls back to PreferredConnection.
+    /// </summary>
+    public Uri? PreferPlaybackBaseUrl(bool preferHttpLan = true)
+    {
+        var server = ActiveServer;
+        if (server is null) return null;
+        if (preferHttpLan)
+        {
+            var httpLan = server.Connections
+                .Where(c => c.BaseUrl is not null
+                            && c.Local
+                            && !c.Relay
+                            && c.BaseUrl.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => c.LatencyMs ?? double.MaxValue)
+                .Select(c => c.BaseUrl)
+                .FirstOrDefault();
+            if (httpLan is not null) return httpLan;
+        }
+        return server.PreferredConnection?.BaseUrl;
+    }
 }

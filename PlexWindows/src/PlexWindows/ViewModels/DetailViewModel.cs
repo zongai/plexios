@@ -237,11 +237,13 @@ public partial class DetailViewModel : ObservableObject
     {
         get
         {
-            if (_connections.ActiveBaseUrl is null || string.IsNullOrEmpty(_connections.ActiveToken) ||
+            var baseUrl = _connections.PreferPlaybackBaseUrl(preferHttpLan: true)
+                          ?? _connections.ActiveBaseUrl;
+            if (baseUrl is null || string.IsNullOrEmpty(_connections.ActiveToken) ||
                 _connections.ActiveServer is null)
                 return null;
             return new ServerContext(
-                _connections.ActiveBaseUrl,
+                baseUrl,
                 _connections.ActiveToken,
                 _connections.ActiveServer.MachineIdentifier);
         }

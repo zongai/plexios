@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PlexWindows.Models;
 using PlexWindows.Plex.Api;
+using PlexWindows.Plex.Server;
 using PlexWindows.Playback;
 using PlexWindows.Services;
 using PlexWindows.Helpers;
@@ -16,6 +17,7 @@ public partial class PlayerViewModel : ObservableObject
     private readonly PlaybackUrlBuilder _urlBuilder;
     private readonly TimelineReporter _timeline;
     private readonly AppSettings _settings;
+    private readonly ConnectionManager _connections;
     private PlaybackPreferences _prefs = PlaybackPreferences.Default;
     private CancellationTokenSource? _controlsCts;
     private bool _seeking;
@@ -65,7 +67,8 @@ public partial class PlayerViewModel : ObservableObject
         PlaybackDecisionEngine decisionEngine,
         PlaybackUrlBuilder urlBuilder,
         TimelineReporter timeline,
-        AppSettings settings)
+        AppSettings settings,
+        ConnectionManager connections)
     {
         _player = player;
         _api = api;
@@ -73,6 +76,7 @@ public partial class PlayerViewModel : ObservableObject
         _urlBuilder = urlBuilder;
         _timeline = timeline;
         _settings = settings;
+        _connections = connections;
         ApplySettings();
 
         _player.StateChanged += OnStateChanged;
@@ -81,6 +85,18 @@ public partial class PlayerViewModel : ObservableObject
         _player.TracksChanged += OnTracksChanged;
         _player.BackendChanged += OnBackendChanged;
         ApplyBackend(_player.Backend);
+    }
+
+
+    private ServerContext RewriteContextBase(ServerContext ctx)
+    {
+        var prefer = _connections.PreferPlaybackBaseUrl(preferHttpLan: true);
+        if (prefer is not null && prefer != ctx.BaseUrl)
+        {
+            AppDebugLog.Info("Playback", $"base {ctx.BaseUrl} → {prefer}");
+            return ctx with { BaseUrl = prefer };
+        }
+        return ctx;
     }
 
     private void ApplySettings()
@@ -285,18 +301,22 @@ public partial class PlayerViewModel : ObservableObject
         if (listIndex < 0)
             listIndex = AudioTracks.ToList().FindIndex(t => t.Id == track.Id);
 
-        // 1) Best-effort in-player switch (LibVLC multi-audio containers)
-        try
+        var mode = Request?.Decision.Mode ?? PlaybackMode.DirectPlay;
+        var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
+
+        // LibVLC + Direct Play: switch embedded audio in the open container.
+        // Avoid Direct Stream HLS — VLC often fails plex.direct HTTPS (HTTP connection failure).
+        if (usingVlc && mode == PlaybackMode.DirectPlay)
         {
+            AppDebugLog.Info("TrackSwitch", $"audio in-player only id={track.Id} index={listIndex}");
             await _player.SelectAudioTrackAsync(track.Id, listIndex);
-        }
-        catch
-        {
-            // non-fatal — session rebuild below is the reliable path
+            StatusMessage = "";
+            BumpControls();
+            return;
         }
 
-        // 2) Always rebuild Plex session with audioStreamID.
-        // Direct Play URLs cannot carry audioStreamID; Reload promotes to Direct Stream.
+        try { await _player.SelectAudioTrackAsync(track.Id, listIndex); } catch { /* non-fatal */ }
+
         await ReloadWithTracksAsync(
             forcedAudioId: track.Id,
             forcedSubtitleId: CurrentForcedSubtitleId(),
@@ -315,14 +335,21 @@ public partial class PlayerViewModel : ObservableObject
 
         SelectedSubtitle = wantOff ? SubtitleOff : track;
 
-        // Best-effort in-player (embedded soft subs on LibVLC)
-        try
-        {
-            await _player.SelectSubtitleAsync(wantOff ? null : newId);
-        }
-        catch { /* non-fatal */ }
+        var mode = Request?.Decision.Mode ?? PlaybackMode.DirectPlay;
+        var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
 
-        // Always rebuild Plex session with subtitleStreamID / burn / off
+        // LibVLC + Direct Play: SetSpu / AddSlave on current file — no HLS remux.
+        if (usingVlc && mode == PlaybackMode.DirectPlay)
+        {
+            AppDebugLog.Info("TrackSwitch", $"subtitle in-player only id={newId}");
+            try { await _player.SelectSubtitleAsync(wantOff ? null : newId); } catch { /* non-fatal */ }
+            StatusMessage = "";
+            BumpControls();
+            return;
+        }
+
+        try { await _player.SelectSubtitleAsync(wantOff ? null : newId); } catch { /* non-fatal */ }
+
         await ReloadWithTracksAsync(
             forcedAudioId: SelectedAudio?.Id,
             forcedSubtitleId: newId,
@@ -437,13 +464,14 @@ public partial class PlayerViewModel : ObservableObject
                     Reason = "Subtitle selected — transcode for reliable subtitle delivery (MF)"
                 };
             }
-            var url = _urlBuilder.Build(Request.Context, meta, decision, Request.Network, pos);
+            var ctx = RewriteContextBase(Request.Context);
+            var url = _urlBuilder.Build(ctx, meta, decision, Request.Network, pos);
             AppDebugLog.Info("TrackSwitch",
                 $"mode={decision.Mode} audio={decision.SelectedAudioStreamId} sub={decision.SelectedSubtitleStreamId} burn={decision.BurnInSubtitles} reason={decision.Reason} url={AppDebugLog.RedactUrl(url.AbsoluteUri)}");
             var newReq = new PlaybackRequest
             {
                 Metadata = meta,
-                Context = Request.Context,
+                Context = ctx,
                 Network = Request.Network,
                 Decision = decision,
                 MediaUrl = url,
@@ -644,7 +672,8 @@ public partial class PlayerViewModel : ObservableObject
             }
 
             var decision = _decisionEngine.Decide(next, Request.Network);
-            var url = _urlBuilder.Build(Request.Context, next, decision, Request.Network, 0);
+            var ctx = RewriteContextBase(Request.Context);
+            var url = _urlBuilder.Build(ctx, next, decision, Request.Network, 0);
             var nextReq = new PlaybackRequest
             {
                 Metadata = next,

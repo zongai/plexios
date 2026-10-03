@@ -6,10 +6,11 @@
     xmlns:vm="using:PlexWindows.ViewModels"
     xmlns:helpers="using:PlexWindows.Helpers"
     Background="{StaticResource PlexBackgroundBrush}">
+    <!-- Official-style home: stacked horizontal poster rows (Continue Watching, Recently Added…) -->
     <ScrollViewer Padding="{StaticResource PagePadding}"
                   HorizontalScrollMode="Disabled"
                   VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="20">
+        <StackPanel Spacing="8">
             <TextBlock Text="Home" Style="{StaticResource PageTitleStyle}" />
 
             <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
@@ -17,20 +18,21 @@
                           HorizontalAlignment="Left" />
 
             <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                       Style="{StaticResource BodySecondaryStyle}" />
+                       Style="{StaticResource BodySecondaryStyle}"
+                       Margin="0,0,0,8" />
 
             <ItemsControl ItemsSource="{x:Bind ViewModel.Hubs, Mode=OneWay}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:HubCards">
-                        <StackPanel Margin="0,0,0,8" Spacing="8">
+                        <StackPanel Margin="{StaticResource HubRowPadding}" Spacing="6">
                             <TextBlock Text="{x:Bind Title}" Style="{StaticResource SectionHeaderStyle}" />
                             <ScrollViewer HorizontalScrollMode="Enabled"
-                                          HorizontalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Hidden"
                                           VerticalScrollMode="Disabled"
                                           VerticalScrollBarVisibility="Disabled">
                                 <ItemsRepeater ItemsSource="{x:Bind Items}">
                                     <ItemsRepeater.Layout>
-                                        <StackLayout Orientation="Horizontal" Spacing="12" />
+                                        <StackLayout Orientation="Horizontal" Spacing="14" />
                                     </ItemsRepeater.Layout>
                                     <ItemsRepeater.ItemTemplate>
                                         <DataTemplate x:DataType="helpers:MediaCardItem">
@@ -38,24 +40,22 @@
                                                     Click="Item_Click" Tag="{x:Bind}"
                                                     AutomationProperties.Name="{x:Bind Title}"
                                                     ToolTipService.ToolTip="{x:Bind Title}">
-                                                <Border Style="{StaticResource MediaCardBorderStyle}" Width="148">
-                                                    <StackPanel>
-                                                        <Border Height="210" Background="{StaticResource PlexSurfaceElevatedBrush}"
-                                                                CornerRadius="8,8,0,0">
-                                                            <Image Source="{x:Bind Poster}"
-                                                                   Stretch="UniformToFill"
-                                                                   AutomationProperties.Name="{x:Bind Title}" />
-                                                        </Border>
-                                                        <StackPanel Padding="10,8" Spacing="2">
-                                                            <TextBlock Text="{x:Bind Title}" MaxLines="2"
-                                                                       TextWrapping="WrapWholeWords"
-                                                                       Style="{StaticResource BodyTextBlockStyle}"
-                                                                       Foreground="{StaticResource PlexPrimaryTextBrush}" />
-                                                            <TextBlock Text="{x:Bind Year}"
-                                                                       Style="{StaticResource CaptionSecondaryStyle}" />
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
+                                                <StackPanel Width="140" Spacing="6">
+                                                    <Border Height="210"
+                                                            Background="{StaticResource PlexSurfaceElevatedBrush}"
+                                                            CornerRadius="{StaticResource CardCornerRadius}">
+                                                        <Image Source="{x:Bind Poster}"
+                                                               Stretch="UniformToFill"
+                                                               AutomationProperties.Name="{x:Bind Title}" />
+                                                    </Border>
+                                                    <TextBlock Text="{x:Bind Title}" MaxLines="2"
+                                                               TextWrapping="WrapWholeWords"
+                                                               FontSize="13"
+                                                               Foreground="{StaticResource PlexPrimaryTextBrush}" />
+                                                    <TextBlock Text="{x:Bind Year}"
+                                                               FontSize="12"
+                                                               Foreground="{StaticResource PlexSecondaryTextBrush}" />
+                                                </StackPanel>
                                             </Button>
                                         </DataTemplate>
                                     </ItemsRepeater.ItemTemplate>

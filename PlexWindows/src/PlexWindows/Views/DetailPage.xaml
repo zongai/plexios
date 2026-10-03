@@ -5,36 +5,37 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:PlexWindows.Models"
     Background="{StaticResource PlexBackgroundBrush}">
+    <!-- Official-style detail: large poster + metadata column, gold Play CTA -->
     <ScrollViewer Padding="{StaticResource PagePadding}">
-        <StackPanel Spacing="16" MaxWidth="960">
+        <StackPanel Spacing="20" MaxWidth="1080">
             <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
                           Width="36" Height="36" HorizontalAlignment="Left" />
             <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
                        Style="{StaticResource BodySecondaryStyle}" />
 
-            <Grid ColumnSpacing="28">
+            <Grid ColumnSpacing="32">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="240" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Height="330"
+                <Border Grid.Column="0" Height="360"
                         Background="{StaticResource PlexSurfaceElevatedBrush}"
-                        BorderBrush="{StaticResource PlexStrokeBrush}"
-                        BorderThickness="1"
                         CornerRadius="{StaticResource CardCornerRadius}">
                     <Image Source="{x:Bind ViewModel.PosterImage, Mode=OneWay}"
                            Stretch="UniformToFill"
                            AutomationProperties.Name="Poster" />
                 </Border>
 
-                <StackPanel Grid.Column="1" Spacing="10">
+                <StackPanel Grid.Column="1" Spacing="12" VerticalAlignment="Center">
                     <TextBlock Text="{x:Bind ViewModel.Item.Title, Mode=OneWay}"
-                               Style="{StaticResource TitleTextBlockStyle}"
-                               Foreground="{StaticResource PlexPrimaryTextBrush}" />
+                               FontSize="32"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource PlexPrimaryTextBrush}"
+                               TextWrapping="WrapWholeWords" />
                     <TextBlock Style="{StaticResource BodySecondaryStyle}">
                         <Run Text="{x:Bind ViewModel.Item.Year, Mode=OneWay}" />
-                        <Run Text=" · " />
+                        <Run Text="  ·  " />
                         <Run Text="{x:Bind ViewModel.Item.ContentRating, Mode=OneWay}" />
                     </TextBlock>
                     <TextBlock Text="{x:Bind ViewModel.Item.Tagline, Mode=OneWay}"
@@ -42,16 +43,23 @@
                                Style="{StaticResource BodySecondaryStyle}" />
                     <TextBlock Text="{x:Bind ViewModel.Item.Summary, Mode=OneWay}"
                                TextWrapping="WrapWholeWords"
-                               Style="{StaticResource BodyTextBlockStyle}"
+                               LineHeight="22"
                                Foreground="{StaticResource PlexPrimaryTextBrush}"
-                               MaxWidth="720" />
+                               MaxWidth="680"
+                               Opacity="0.92" />
 
-                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
-                        <Button Content="Play" Click="Play_Click"
-                                Style="{StaticResource AccentButtonStyle}"
+                    <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0">
+                        <Button Content="▶  Play" Click="Play_Click"
+                                Style="{StaticResource PlexPlayButtonStyle}"
                                 AccessKey="P" />
-                        <Button Content="Favorite" Click="Favorite_Click" AccessKey="F" />
-                        <Button Content="Back" Click="Back_Click" AccessKey="B" />
+                        <Button Content="Favorite" Click="Favorite_Click" AccessKey="F"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource PlexStrokeBrush}"
+                                Foreground="{StaticResource PlexPrimaryTextBrush}" />
+                        <Button Content="Back" Click="Back_Click" AccessKey="B"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource PlexStrokeBrush}"
+                                Foreground="{StaticResource PlexSecondaryTextBrush}" />
                     </StackPanel>
 
                     <TextBlock Text="{x:Bind ViewModel.Item.Studio, Mode=OneWay}"
@@ -59,17 +67,19 @@
                 </StackPanel>
             </Grid>
 
-            <TextBlock Text="Contents" Style="{StaticResource SectionHeaderStyle}" Margin="0,12,0,0" />
+            <TextBlock Text="Contents" Style="{StaticResource SectionHeaderStyle}" Margin="0,8,0,0" />
             <ItemsRepeater ItemsSource="{x:Bind ViewModel.Children, Mode=OneWay}">
                 <ItemsRepeater.Layout>
-                    <StackLayout Orientation="Horizontal" Spacing="10" />
+                    <StackLayout Orientation="Horizontal" Spacing="12" />
                 </ItemsRepeater.Layout>
                 <ItemsRepeater.ItemTemplate>
                     <DataTemplate x:DataType="models:PlexMetadata">
                         <Button Style="{StaticResource CardButtonStyle}"
                                 Click="Child_Click" Tag="{x:Bind}"
                                 AutomationProperties.Name="{x:Bind Title}">
-                            <Border Style="{StaticResource MediaCardBorderStyle}" Width="140" Padding="12">
+                            <Border Background="{StaticResource PlexSurfaceElevatedBrush}"
+                                    CornerRadius="{StaticResource CardCornerRadius}"
+                                    Width="160" Padding="14,12">
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="{x:Bind Title}" MaxLines="2" TextWrapping="Wrap"
                                                Foreground="{StaticResource PlexPrimaryTextBrush}" />

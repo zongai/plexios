@@ -4,24 +4,34 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Background="{StaticResource PlexBackgroundBrush}">
+    <!-- Official desktop: left nav rail + content; libraries grouped like Plex "pinned sources" -->
     <NavigationView x:Name="NavView"
                     PaneDisplayMode="Left"
                     IsSettingsVisible="True"
                     IsBackButtonVisible="Collapsed"
-                    OpenPaneLength="240"
-                    CompactPaneLength="48"
+                    OpenPaneLength="220"
+                    CompactPaneLength="52"
                     IsPaneToggleButtonVisible="True"
                     PaneTitle="Plex"
                     Background="{StaticResource PlexBackgroundBrush}"
                     SelectionChanged="NavView_SelectionChanged">
+        <NavigationView.Resources>
+            <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{StaticResource PlexSidebarColor}" />
+            <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="{StaticResource PlexSidebarColor}" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="#33E5A00D" />
+            <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="#44E5A00D" />
+            <SolidColorBrush x:Key="NavigationViewItemForegroundSelected" Color="{StaticResource PlexAccentColor}" />
+        </NavigationView.Resources>
+
         <NavigationView.MenuItems>
             <NavigationViewItem Content="Home" Tag="home" Icon="Home" AccessKey="H" />
+            <NavigationViewItemHeader Content="Libraries" />
             <NavigationViewItem Content="Movies" Tag="movies" Icon="Video" AccessKey="M" />
             <NavigationViewItem Content="TV Shows" Tag="shows" Icon="Library" AccessKey="T" />
             <NavigationViewItem Content="Music" Tag="music" Icon="Audio" AccessKey="U" />
             <NavigationViewItemSeparator />
             <NavigationViewItem Content="Collections" Tag="collections" Icon="List" />
-            <NavigationViewItem Content="Playlists" Tag="playlists" Icon="Audio" />
+            <NavigationViewItem Content="Playlists" Tag="playlists" Icon="Bullets" />
             <NavigationViewItem Content="Favorites" Tag="favorites" Icon="Favorite" AccessKey="F" />
         </NavigationView.MenuItems>
         <NavigationView.FooterMenuItems>
@@ -33,14 +43,17 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
+            <!-- Top bar: server + search (official desktop header pattern) -->
             <Grid Grid.Row="0"
-                  Padding="16,10,16,10"
+                  Padding="20,12,20,12"
                   ColumnSpacing="12"
-                  Background="{StaticResource PlexSurfaceBrush}">
+                  Background="{StaticResource PlexSurfaceBrush}"
+                  BorderBrush="{StaticResource PlexStrokeBrush}"
+                  BorderThickness="0,0,0,1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="320" />
+                    <ColumnDefinition Width="340" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0"
                            Text="{x:Bind ViewModel.ActiveServerName, Mode=OneWay}"
@@ -51,13 +64,16 @@
                 <Button Grid.Column="1"
                         Content="Servers"
                         Click="Servers_Click"
+                        Background="Transparent"
+                        BorderBrush="{StaticResource PlexStrokeBrush}"
+                        Foreground="{StaticResource PlexSecondaryTextBrush}"
                         ToolTipService.ToolTip="Switch server or connection" />
                 <AutoSuggestBox Grid.Column="2"
-                                PlaceholderText="Search library (Ctrl+F)"
+                                PlaceholderText="Search"
                                 QueryIcon="Find"
                                 QuerySubmitted="Search_QuerySubmitted"
                                 AutomationProperties.Name="Search"
-                                MinWidth="180"
+                                MinWidth="200"
                                 HorizontalAlignment="Stretch" />
             </Grid>
             <Frame x:Name="ContentFrame" Grid.Row="1"

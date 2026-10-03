@@ -12,36 +12,51 @@
 
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
 
-            <!-- Brand tokens (dark, Fluent-aligned) -->
-            <Color x:Key="PlexBackgroundColor">#FF0F0F0F</Color>
-            <Color x:Key="PlexSurfaceColor">#FF1C1C1C</Color>
-            <Color x:Key="PlexSurfaceElevatedColor">#FF2A2A2A</Color>
+            <!--
+              Official Plex desktop visual language (dark):
+              near-black canvas, elevated panels, gold accent #E5A00D
+            -->
+            <Color x:Key="PlexBackgroundColor">#FF121212</Color>
+            <Color x:Key="PlexSurfaceColor">#FF1B1B1B</Color>
+            <Color x:Key="PlexSurfaceElevatedColor">#FF282828</Color>
+            <Color x:Key="PlexSidebarColor">#FF191919</Color>
             <Color x:Key="PlexAccentColor">#FFE5A00D</Color>
-            <Color x:Key="PlexPrimaryTextColor">#FFF3F3F3</Color>
-            <Color x:Key="PlexSecondaryTextColor">#FFC5C5C5</Color>
-            <Color x:Key="PlexStrokeColor">#33FFFFFF</Color>
+            <Color x:Key="PlexAccentHoverColor">#FFF0B429</Color>
+            <Color x:Key="PlexPrimaryTextColor">#FFF5F5F5</Color>
+            <Color x:Key="PlexSecondaryTextColor">#FFA3A3A3</Color>
+            <Color x:Key="PlexMutedTextColor">#FF6B6B6B</Color>
+            <Color x:Key="PlexStrokeColor">#22FFFFFF</Color>
+            <Color x:Key="PlexFocusColor">#FFE5A00D</Color>
 
             <SolidColorBrush x:Key="PlexBackgroundBrush" Color="{StaticResource PlexBackgroundColor}" />
             <SolidColorBrush x:Key="PlexSurfaceBrush" Color="{StaticResource PlexSurfaceColor}" />
             <SolidColorBrush x:Key="PlexSurfaceElevatedBrush" Color="{StaticResource PlexSurfaceElevatedColor}" />
+            <SolidColorBrush x:Key="PlexSidebarBrush" Color="{StaticResource PlexSidebarColor}" />
             <SolidColorBrush x:Key="PlexAccentBrush" Color="{StaticResource PlexAccentColor}" />
+            <SolidColorBrush x:Key="PlexAccentHoverBrush" Color="{StaticResource PlexAccentHoverColor}" />
             <SolidColorBrush x:Key="PlexPrimaryTextBrush" Color="{StaticResource PlexPrimaryTextColor}" />
             <SolidColorBrush x:Key="PlexSecondaryTextBrush" Color="{StaticResource PlexSecondaryTextColor}" />
+            <SolidColorBrush x:Key="PlexMutedTextBrush" Color="{StaticResource PlexMutedTextColor}" />
             <SolidColorBrush x:Key="PlexStrokeBrush" Color="{StaticResource PlexStrokeColor}" />
+            <SolidColorBrush x:Key="PlexFocusBrush" Color="{StaticResource PlexFocusColor}" />
 
-            <!-- Fluent spacing / radius -->
-            <Thickness x:Key="PagePadding">24</Thickness>
-            <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
+            <!-- Layout tokens aligned with dense media desktop clients -->
+            <Thickness x:Key="PagePadding">28,20,28,28</Thickness>
+            <Thickness x:Key="HubRowPadding">0,4,0,20</Thickness>
+            <CornerRadius x:Key="CardCornerRadius">4</CornerRadius>
             <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
+            <x:Double x:Key="PosterCardWidth">140</x:Double>
+            <x:Double x:Key="PosterCardHeight">210</x:Double>
 
-            <!-- Page title (Fluent TitleTextBlockStyle + brand color) -->
             <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
                 <Setter Property="Foreground" Value="{StaticResource PlexPrimaryTextBrush}" />
-                <Setter Property="Margin" Value="0,0,0,12" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,0,0,16" />
             </Style>
             <Style x:Key="SectionHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
                 <Setter Property="Foreground" Value="{StaticResource PlexPrimaryTextBrush}" />
-                <Setter Property="Margin" Value="0,0,0,8" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,0,0,10" />
             </Style>
             <Style x:Key="BodySecondaryStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
                 <Setter Property="Foreground" Value="{StaticResource PlexSecondaryTextBrush}" />
@@ -50,22 +65,28 @@
                 <Setter Property="Foreground" Value="{StaticResource PlexSecondaryTextBrush}" />
             </Style>
 
-            <!-- Poster card chrome -->
+            <!-- Clean poster chrome (official-like: minimal border, soft radius) -->
             <Style x:Key="MediaCardBorderStyle" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource PlexSurfaceBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PlexStrokeBrush}" />
-                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}" />
                 <Setter Property="Padding" Value="0" />
             </Style>
 
-            <!-- Transparent button used as card host (keyboard focus visible) -->
             <Style x:Key="CardButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="HorizontalAlignment" Value="Left" />
                 <Setter Property="VerticalAlignment" Value="Top" />
+            </Style>
+
+            <!-- Primary action = Plex gold -->
+            <Style x:Key="PlexPlayButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+                <Setter Property="Background" Value="{StaticResource PlexAccentBrush}" />
+                <Setter Property="Foreground" Value="Black" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="20,10" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>

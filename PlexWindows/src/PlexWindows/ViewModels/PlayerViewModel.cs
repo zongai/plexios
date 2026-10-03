@@ -399,27 +399,24 @@ public partial class PlayerViewModel : ObservableObject
                 }
                 else
                 {
-                    // Prefer segmented soft-subs on Direct Stream when not burn-in;
-                    // force Transcode when decision already requires burn-in (PGS etc.).
-                    if (decision.Mode == PlaybackMode.DirectPlay)
+                    // Soft subs → Direct Stream + subtitleStreamID (segmented).
+                    // Image-based (PGS etc.) → Transcode + burn-in.
+                    var needBurn = decision.BurnInSubtitles;
+                    var mode = decision.Mode;
+                    if (needBurn)
+                        mode = PlaybackMode.Transcode;
+                    else if (mode == PlaybackMode.DirectPlay)
+                        mode = PlaybackMode.DirectStream;
+
+                    decision = decision with
                     {
-                        decision = decision with
-                        {
-                            Mode = decision.BurnInSubtitles ? PlaybackMode.Transcode : PlaybackMode.DirectStream,
-                            SelectedSubtitleStreamId = subForced,
-                            Reason = decision.BurnInSubtitles
-                                ? "Subtitle selected — transcode (burn-in)"
-                                : "Subtitle selected — Direct Stream with subtitleStreamID"
-                        };
-                    }
-                    else
-                    {
-                        decision = decision with
-                        {
-                            SelectedSubtitleStreamId = subForced,
-                            Reason = decision.Reason + $" (subtitleStreamID={subForced})"
-                        };
-                    }
+                        Mode = mode,
+                        SelectedSubtitleStreamId = subForced,
+                        BurnInSubtitles = needBurn,
+                        Reason = needBurn
+                            ? "Subtitle selected — transcode (burn-in)"
+                            : $"Subtitle selected — {mode} with subtitleStreamID={subForced}"
+                    };
                 }
             }
 

@@ -382,9 +382,15 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         // External sidecar: load via AddSlave from PMS stream key
         var plexMeta = _lastRequest?.Metadata;
         var decision = _lastRequest?.Decision;
-        var part = plexMeta?.Media.ElementAtOrDefault(decision?.MediaIndex ?? 0)?.Parts
-            .ElementAtOrDefault(decision?.PartIndex ?? 0);
-        var plexStream = part?.Streams.FirstOrDefault(s =>
+        var mi = decision?.MediaIndex ?? 0;
+        var pi = decision?.PartIndex ?? 0;
+        var part = plexMeta?.Media is { Count: > 0 } mediaList
+            ? mediaList.ElementAtOrDefault(Math.Clamp(mi, 0, mediaList.Count - 1))
+            : null;
+        var partObj = part?.Parts is { Count: > 0 } parts
+            ? parts.ElementAtOrDefault(Math.Clamp(pi, 0, parts.Count - 1))
+            : null;
+        var plexStream = partObj?.Streams?.FirstOrDefault(s =>
             s.Type == PlexStream.StreamType.Subtitle && s.Id == streamId);
         if (plexStream?.IsExternal == true && !string.IsNullOrEmpty(plexStream.Key)
             && _lastRequest?.Context is { } ctx)

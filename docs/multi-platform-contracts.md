@@ -200,3 +200,7 @@ See:
 
 - `cross-platform-playback-contract.md` — adopted playback semantics, state, tracks, decision, backend policy
 - `cross-platform-playback-gap-analysis.md` — iOS / Android TV / Windows gap list vs that contract
+
+---
+
+**Status (2026-10-03):** Phase 8 playback contract adopted. See `cross-platform-playback-contract.md` and `cross-platform-playback-gap-analysis.md`.

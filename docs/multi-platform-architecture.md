@@ -181,20 +181,21 @@ Reference implementation already exists on iOS:
 - PIN auth (DPAPI), server discovery/ranking, Fluent sidebar shell, Home hubs.
 - PlaybackDecisionEngine + IPlayerEngine + Media Foundation stub + URL builder.
 
-### Phase 3 — Windows full playback & libraries (player polished)
+### Phase 3 — Windows full playback & libraries ✅
 - ✅ Libraries (Movies / TV / Music), Detail, Search, Favorites
 - ✅ PlaybackDecision + URL builder + next-episode
 - ✅ MediaFoundationPlayerEngine → MediaPlayer + MediaPlayerElement
+- ✅ LibVLC fallback via `PlayerEngineRouter` (Decision.Backend + auto MF→VLC)
 - ✅ Audio/Subtitle ComboBox, volume/mute, chrome auto-hide, timeline report
 - ✅ Keyboard: Space / J L / ↑↓ / M / Esc / Media keys
-- ⏳ Poster image binding polish; LibVLC fallback; MSIX CI
+- ✅ Poster/art via `PosterImageLoader` (sized decode + cache); Settings clear cache
+- ✅ MSIX script `scripts/pack-msix.ps1`; CI unpackaged publish on `workflow_dispatch`
 
-### Phase 4 — Android TV skeleton (done)
+### Phase 4 — Android TV skeleton ✅
 - ✅ `artifacts/AndroidTV/` — Kotlin + Compose for TV, Leanback launcher
 - ✅ PIN auth (EncryptedSharedPreferences), server discover/rank/probe
 - ✅ Home hubs, Libraries grid, Media3/ExoPlayer shell
 - ✅ PlaybackDecisionEngine + URL builder (DP / DS / Transcode)
-- ⏳ Phase 5: Detail/Search/Collections, tracks, next-episode, timeline
 
 ### Phase 5 — Android TV full playback (done)
 - ✅ Detail / Search / Collections / Playlists
@@ -214,6 +215,14 @@ Reference implementation already exists on iOS:
 - ✅ Tag/`release.yml` multi-platform release notes + Android artifact
 - 📄 `docs/phase7-release-parity.md`
 
+### Phase 8 — Cross-platform playback contract ✅ (2026-10)
+- ✅ `docs/cross-platform-playback-contract.md` + gap analysis
+- ✅ Dual capability matrix (system first, VLC on gap) — iOS / Windows / Android structure
+- ✅ `Decision.backend` wired to player routing (iOS Engine, Windows Router)
+- ✅ MediaTrack parity; Windows track-switch harden; Android `MediaPlayerContract`
+- ✅ Unified `PlaybackError` wire codes; debug logging guide (`docs/debug-logging.md`)
+- ⏸ Android LibVLC deferred until real Exo failure evidence
+
 ## 7. Build & CI Rules
 
 - iOS: continue `xcodegen generate` + unsigned IPA workflow. Never break existing path.
@@ -232,11 +241,12 @@ Reference implementation already exists on iOS:
 
 ## 9. Immediate Next Actions
 
-1. ✅ Phase 1 complete (contracts + PlexAPIProtocol).
-2. ✅ Windows skeleton scaffolded under `artifacts/PlexWindows/`.
-3. Next: Phase 3 — wire real MediaPlayerElement, library browsing, detail pages, search.
-4. Then Android TV (Phase 4).
+1. ✅ Phases 1–7 product delivery complete (iOS + Windows + Android TV).
+2. ✅ Phase 8 playback contract / Decision dual-matrix / error codes / debug logs.
+3. **Now:** field regression on Windows (MF vs LibVLC, track switch, posters) and Android TV playback.
+4. **Optional:** MSIX signed store package; Android LibVLC only after Exo failure samples; UI actions from `suggestedAction`.
+5. Keep CI default **no auto-build on push**; use `workflow_dispatch` for Windows/Android/iOS artifacts.
 
 ---
 
-*This document is the living plan. Update it when phase boundaries or technical choices change.*
+*This document is the living plan. Update it when phase boundaries or technical choices change. Last refresh: 2026-10-03.*

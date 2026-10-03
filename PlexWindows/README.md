@@ -19,7 +19,7 @@ dotnet build -c Debug -p:Platform=x64
 dotnet run --project src\PlexWindows\PlexWindows.csproj -p:Platform=x64
 ```
 
-## Features (Phase 3 progress)
+## Features (Phase 3 ✅ + Phase 8 playback contract)
 
 | Area | Status |
 |------|--------|
@@ -41,9 +41,9 @@ dotnet run --project src\PlexWindows\PlexWindows.csproj -p:Platform=x64
 | Timeline report to PMS | ✅ rate-limited `:/timeline` |
 | Collections page | ✅ global + per-section fallback |
 | Playlists page | ✅ list + items |
-| Poster image binding | ✅ PosterImageLoader on Home/Libraries/Search/Detail/Collections/Playlists |
-| LibVLC fallback | ✅ packages enabled; MF→VLC router; dual surface |
-| MSIX packaging | ✅ Release config + `scripts/pack-msix.ps1` |
+| Poster image binding | ✅ PosterImageLoader (request-sized decode + cache; Settings clear) |
+| LibVLC fallback | ✅ Decision.Backend + MF-first auto, VLC on gap/failure |
+| MSIX packaging | ✅ `scripts/pack-msix.ps1`; CI optional `package_msix` on workflow_dispatch |
 
 ## Architecture
 

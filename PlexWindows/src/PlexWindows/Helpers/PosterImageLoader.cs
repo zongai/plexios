@@ -5,7 +5,7 @@ namespace PlexWindows.Helpers;
 
 /// <summary>
 /// Builds BitmapImage sources for Plex posters/art with tokenized URLs.
-/// Keeps a small in-memory URI→BitmapImage cache to avoid re-decoding while scrolling.
+/// In-memory URI→BitmapImage cache; decode size matches request to avoid soft art.
 /// </summary>
 public static class PosterImageLoader
 {
@@ -16,32 +16,31 @@ public static class PosterImageLoader
     public static BitmapImage? GetThumb(ServerContext? ctx, string? path, int width = 300, int height = 450)
     {
         var uri = PlexImage.Thumb(ctx, path, width, height);
-        return FromUri(uri);
+        return FromUri(uri, decodeWidth: width);
     }
 
     public static BitmapImage? GetArt(ServerContext? ctx, string? path, int width = 1280, int height = 720)
     {
         var uri = PlexImage.Art(ctx, path, width, height);
-        return FromUri(uri);
+        return FromUri(uri, decodeWidth: width);
     }
 
-    public static BitmapImage? FromUri(Uri? uri)
+    public static BitmapImage? FromUri(Uri? uri, int decodeWidth = 300)
     {
         if (uri is null) return null;
-        var key = uri.AbsoluteUri;
+        var key = uri.AbsoluteUri + "#dw=" + decodeWidth;
         lock (Gate)
         {
             if (Cache.TryGetValue(key, out var hit)) return hit;
             if (Cache.Count >= MaxCache)
             {
-                // Simple eviction: clear half
                 foreach (var k in Cache.Keys.Take(MaxCache / 2).ToList())
                     Cache.Remove(k);
             }
             var bmp = new BitmapImage(uri)
             {
                 DecodePixelType = DecodePixelType.Logical,
-                DecodePixelWidth = 300
+                DecodePixelWidth = Math.Clamp(decodeWidth, 64, 1920)
             };
             Cache[key] = bmp;
             return bmp;

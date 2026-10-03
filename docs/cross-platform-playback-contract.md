@@ -240,13 +240,26 @@ VLC is selected only when primary cannot satisfy without harmful transcode, or w
 
 ```text
 PlaybackError
-  code          enum or stable string
-  message       localized or English technical
-  recoverable   bool
+  code             stable wire string (see table)
+  message          localized or English technical
+  recoverable      bool
   suggestedAction  retry | switchBackend | transcode | none
 ```
 
-Suggested stable codes: `network`, `mediaUnavailable`, `decode`, `unsupported`, `subtitle`, `cancelled`, `unknown`.
+| Wire code | Meaning | Typical action |
+|-----------|---------|----------------|
+| `network` | Connectivity / timeout | retry |
+| `mediaUnavailable` | 404 / missing item | none |
+| `decode` | Player/decoder failure | switchBackend |
+| `unsupported` | Codec/container not playable | transcode |
+| `subtitle` | Subtitle attach/select failure | retry |
+| `cancelled` | User or system cancel | none |
+| `session` | Open/prepare/session failure | retry |
+| `backend` | Engine init / switch failure | switchBackend |
+| `track` | Audio track switch failure | retry |
+| `unknown` | Unclassified | none |
+
+Platform types: iOS `PlaybackError` + `PlaybackErrorCode` · Android `PlaybackError` · Windows `PlaybackError`.
 
 ---
 

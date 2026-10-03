@@ -54,6 +54,7 @@ public partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _showMfSurface = true;
     [ObservableProperty] private bool _showVlcSurface;
     [ObservableProperty] private string _backendLabel = "MediaFoundation";
+    [ObservableProperty] private PlaybackError? _lastPlaybackError;
 
     public PlaybackRequest? Request { get; private set; }
     public IPlayerEngine Player => _player;
@@ -80,7 +81,12 @@ public partial class PlayerViewModel : ObservableObject
         ApplySettings();
 
         _player.StateChanged += OnStateChanged;
-        _player.ErrorOccurred += (_, msg) => StatusMessage = msg;
+        _player.ErrorOccurred += (_, msg) =>
+        {
+            var err = PlaybackError.FromMessage(msg);
+            LastPlaybackError = err;
+            StatusMessage = $"[{err.WireCode}] {err.Message}";
+        };
         _player.PositionChanged += OnPositionChanged;
         _player.TracksChanged += OnTracksChanged;
         _player.BackendChanged += OnBackendChanged;

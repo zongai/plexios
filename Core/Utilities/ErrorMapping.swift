@@ -71,6 +71,13 @@ enum ErrorMapping {
             return "Sign in again to refresh your session."
         case .authentication(.pinExpired):
             return "Request a new code and authorize it at plex.tv/link."
+        case .playback(let pe):
+            switch pe.suggestedAction {
+            case .retry: return "Try playing again."
+            case .switchBackend: return "Try a different player backend in Settings, or retry."
+            case .transcode: return "Try a lower quality or allow transcoding."
+            case .none: return nil
+            }
         default:
             return nil
         }

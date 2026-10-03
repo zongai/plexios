@@ -51,6 +51,9 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
     private val _subtitleTracks = MutableStateFlow<List<PlayerTrack>>(emptyList())
     override val subtitleTracks: StateFlow<List<PlayerTrack>> = _subtitleTracks.asStateFlow()
 
+    private val _lastError = MutableStateFlow<PlaybackError?>(null)
+    val lastError: StateFlow<PlaybackError?> = _lastError.asStateFlow()
+
     // PlayerState lives in MediaPlayerContract.kt (contract-aligned).
 
     /**
@@ -101,6 +104,7 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 _state.value = PlayerState.Error
+                _lastError.value = PlaybackError.fromThrowable(error, PlaybackErrorCode.Decode)
             }
 
             override fun onTracksChanged(tracks: Tracks) {

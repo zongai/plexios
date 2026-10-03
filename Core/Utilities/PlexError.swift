@@ -79,11 +79,72 @@ enum NetworkError: Error, LocalizedError, Sendable {
     }
 }
 
+/// Stable cross-platform playback error codes (docs/cross-platform-playback-contract.md §8).
+enum PlaybackErrorCode: String, Sendable, Codable, CaseIterable {
+    case network
+    case mediaUnavailable
+    case decode
+    case unsupported
+    case subtitle
+    case cancelled
+    case session
+    case backend
+    case track
+    case unknown
+}
+
+enum PlaybackSuggestedAction: String, Sendable, Codable {
+    case retry
+    case switchBackend
+    case transcode
+    case none
+}
+
 enum PlaybackError: Error, LocalizedError, Sendable {
     case assetLoadFailed(String)
     case unsupportedFormat(String)
     case sessionFailed
     case playerError(String)
+    case network(String)
+    case mediaUnavailable(String)
+    case decode(String)
+    case subtitle(String)
+    case backend(String)
+    case track(String)
+    case cancelled
+
+    /// Contract-stable code for UI / analytics / cross-platform parity.
+    var code: PlaybackErrorCode {
+        switch self {
+        case .network: return .network
+        case .mediaUnavailable: return .mediaUnavailable
+        case .decode, .playerError: return .decode
+        case .unsupportedFormat: return .unsupported
+        case .subtitle: return .subtitle
+        case .cancelled: return .cancelled
+        case .sessionFailed, .assetLoadFailed: return .session
+        case .backend: return .backend
+        case .track: return .track
+        }
+    }
+
+    var recoverable: Bool {
+        switch code {
+        case .cancelled: return false
+        case .unsupported, .mediaUnavailable: return false
+        default: return true
+        }
+    }
+
+    var suggestedAction: PlaybackSuggestedAction {
+        switch code {
+        case .network, .session: return .retry
+        case .decode, .backend: return .switchBackend
+        case .unsupported: return .transcode
+        case .subtitle, .track: return .retry
+        default: return .none
+        }
+    }
 
     var errorDescription: String? {
         switch self {
@@ -91,6 +152,13 @@ enum PlaybackError: Error, LocalizedError, Sendable {
         case .unsupportedFormat(let r): return "Unsupported format: \(r)"
         case .sessionFailed: return "Playback session failed"
         case .playerError(let r): return r
+        case .network(let r): return r
+        case .mediaUnavailable(let r): return r
+        case .decode(let r): return r
+        case .subtitle(let r): return r
+        case .backend(let r): return r
+        case .track(let r): return r
+        case .cancelled: return "Playback cancelled"
         }
     }
 }

@@ -13,6 +13,8 @@ on:
 
 jobs:
   test:
+    # User preference: no tests on build/release dispatch
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 40
     defaults:

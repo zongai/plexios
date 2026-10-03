@@ -1,0 +1,4 @@
+-keepattributes *Annotation*, InnerClasses, Signature
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class com.plexclient.androidtv.plex.model.** { *; }

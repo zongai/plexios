@@ -350,7 +350,6 @@ public partial class PlayerViewModel : ObservableObject
         var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
 
         // LibVLC + Direct Play: SetSpu / AddSlave on current file — no HLS remux.
-        // PMS returns HTTP 400 when LibVLC GETs start.m3u8 with Range: bytes=0-.
         if (usingVlc && mode == PlaybackMode.DirectPlay)
         {
             AppDebugLog.Info("TrackSwitch", $"subtitle in-player only id={newId}");
@@ -360,7 +359,21 @@ public partial class PlayerViewModel : ObservableObject
             return;
         }
 
-        // MF timed-metadata APIs cannot pick a specific stream — skip and rebuild session.
+        // MF + DirectPlay + LibVLC available: hop to VLC DP and select in-player.
+        // Avoids MF burn-in → start.m3u8 (PMS often returns HTTP 400).
+        if (!usingVlc
+            && mode == PlaybackMode.DirectPlay
+            && LibVlcPlayerEngine.IsAvailable
+            && Request is not null
+            && !Request.MediaUrl.AbsoluteUri.Contains("start.m3u8", StringComparison.OrdinalIgnoreCase))
+        {
+            AppDebugLog.Info("TrackSwitch",
+                $"subtitle hop MF→VLC DirectPlay id={newId}");
+            await HopToVlcDirectPlaySubtitleAsync(wantOff ? null : newId);
+            BumpControls();
+            return;
+        }
+
         if (usingVlc)
         {
             try { await _player.SelectSubtitleAsync(wantOff ? null : newId); } catch { /* non-fatal */ }
@@ -371,6 +384,68 @@ public partial class PlayerViewModel : ObservableObject
             forcedSubtitleId: newId,
             forceSubtitleRemux: true);
         BumpControls();
+    }
+
+    /// <summary>
+    /// Re-open the same Direct Play file on LibVLC and apply subtitle in-player.
+    /// </summary>
+    private async Task HopToVlcDirectPlaySubtitleAsync(int? subtitleStreamId)
+    {
+        if (Request is null) return;
+        _reloadingTracks = true;
+        StatusMessage = "Switching tracks…";
+        try
+        {
+            var pos = Math.Max(0, _player.PositionMs);
+            var decision = Request.Decision with
+            {
+                Mode = PlaybackMode.DirectPlay,
+                Backend = PlaybackBackend.Vlc,
+                BurnInSubtitles = false,
+                SelectedSubtitleStreamId = subtitleStreamId is > 0 ? subtitleStreamId : null,
+                Reason = "Subtitle via LibVLC in-player (avoid MF burn-in HLS)"
+            };
+            var ctx = RewriteContextBase(Request.Context);
+            var url = _urlBuilder.Build(ctx, Request.Metadata, decision, Request.Network, pos);
+            var newReq = new PlaybackRequest
+            {
+                Metadata = Request.Metadata,
+                Context = ctx,
+                Network = Request.Network,
+                Decision = decision,
+                MediaUrl = url,
+                StartPositionMs = pos,
+                Preferences = _prefs
+            };
+            Request = newReq;
+            DecisionReason = decision.Reason;
+            ModeLabel = "Direct Play";
+            AppDebugLog.Info("TrackSwitch",
+                $"hop VLC DP sub={subtitleStreamId} url={AppDebugLog.RedactUrl(url.AbsoluteUri)}");
+            await _player.PrepareAsync(newReq);
+            _player.Play();
+            IsPlaying = true;
+            PlayPauseLabel = "Pause";
+            if (subtitleStreamId is int sid)
+            {
+                try { await _player.SelectSubtitleAsync(sid); } catch { /* retry via tracks */ }
+            }
+            else
+            {
+                try { await _player.SelectSubtitleAsync(null); } catch { /* non-fatal */ }
+            }
+            StatusMessage = "";
+            RefreshTracks();
+        }
+        catch (Exception ex)
+        {
+            AppDebugLog.Error("TrackSwitch", ex, "MF→VLC subtitle hop failed");
+            StatusMessage = "Track switch failed: " + ex.Message;
+        }
+        finally
+        {
+            _reloadingTracks = false;
+        }
     }
 
     private int CurrentForcedSubtitleId()
@@ -466,36 +541,65 @@ public partial class PlayerViewModel : ObservableObject
                 }
             }
 
-            // MF cannot reliably render external/soft subs mid-stream — burn-in when active backend is MF.
-            // Only the *current* engine counts (IsAvailable must not skip burn-in while on MF).
+            // MF cannot soft-render subs mid-stream. Prefer LibVLC DirectPlay in-player;
+            // only force burn-in transcode when VLC is unavailable.
             var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
             if (!usingVlc && forcedSubtitleId is int sid && sid > 0
                 && decision.Mode is PlaybackMode.DirectPlay or PlaybackMode.DirectStream)
             {
-                decision = decision with
+                if (LibVlcPlayerEngine.IsAvailable && decision.Mode == PlaybackMode.DirectPlay)
                 {
-                    Mode = PlaybackMode.Transcode,
-                    SelectedSubtitleStreamId = sid,
-                    BurnInSubtitles = true,
-                    Reason = "Subtitle selected — transcode for reliable subtitle delivery (MF)"
-                };
+                    decision = decision with
+                    {
+                        Backend = PlaybackBackend.Vlc,
+                        Mode = PlaybackMode.DirectPlay,
+                        SelectedSubtitleStreamId = sid,
+                        BurnInSubtitles = false,
+                        Reason = "Subtitle selected — LibVLC DirectPlay in-player"
+                    };
+                }
+                else
+                {
+                    decision = decision with
+                    {
+                        Mode = PlaybackMode.Transcode,
+                        SelectedSubtitleStreamId = sid,
+                        BurnInSubtitles = true,
+                        Reason = "Subtitle selected — transcode for reliable subtitle delivery (MF)"
+                    };
+                }
             }
 
-            // Keep the same player backend across track reload to avoid mid-session engine swap.
-            decision = decision with { Backend = Request.Decision.Backend };
-
-            // Light capability guard: System (MF) cannot soft-render subs on DP/DS after rewrite.
+            // Capability guard before backend lock so we can promote System→Vlc for subs.
             if (decision.Backend == PlaybackBackend.System
                 && decision.SelectedSubtitleStreamId is int keepSub && keepSub > 0
                 && !decision.BurnInSubtitles
                 && decision.Mode is PlaybackMode.DirectPlay or PlaybackMode.DirectStream)
             {
-                decision = decision with
+                if (LibVlcPlayerEngine.IsAvailable && decision.Mode == PlaybackMode.DirectPlay)
                 {
-                    Mode = PlaybackMode.Transcode,
-                    BurnInSubtitles = true,
-                    Reason = decision.Reason + " · capability guard: MF subtitle burn-in"
-                };
+                    decision = decision with
+                    {
+                        Backend = PlaybackBackend.Vlc,
+                        Mode = PlaybackMode.DirectPlay,
+                        BurnInSubtitles = false,
+                        Reason = decision.Reason + " · capability: MF→VLC in-player subtitle"
+                    };
+                }
+                else
+                {
+                    decision = decision with
+                    {
+                        Mode = PlaybackMode.Transcode,
+                        BurnInSubtitles = true,
+                        Reason = decision.Reason + " · capability guard: MF subtitle burn-in"
+                    };
+                }
+            }
+            else
+            {
+                // Keep backend stable when we did not intentionally promote to VLC for subs.
+                decision = decision with { Backend = Request.Decision.Backend };
             }
             var ctx = RewriteContextBase(Request.Context);
             var url = _urlBuilder.Build(ctx, meta, decision, Request.Network, pos);

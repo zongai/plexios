@@ -18,11 +18,12 @@
                             VerticalAlignment="Stretch"
                             Visibility="{x:Bind ViewModel.ShowMfSurface, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
 
-        <!-- LibVLC surface (shown when Router falls back) -->
-        <vlc:VideoView x:Name="VlcView"
-                       HorizontalAlignment="Stretch"
-                       VerticalAlignment="Stretch"
-                       Visibility="{x:Bind ViewModel.ShowVlcSurface, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
+        <!-- LibVLC host placeholder (MF-only build; LibVLC can be re-enabled later) -->
+        <Border x:Name="VlcHost"
+                Background="Black"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Visibility="{x:Bind ViewModel.ShowVlcSurface, Mode=OneWay, Converter={StaticResource BoolToVisibility}}" />
 
         <ProgressRing IsActive="{x:Bind ViewModel.IsBuffering, Mode=OneWay}"
                       Width="56" Height="56"

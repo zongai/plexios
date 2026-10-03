@@ -162,7 +162,7 @@ public sealed class PlaybackDecisionEngine
         PlaybackPreferences? prefs = null)
     {
         _settings = settings;
-        _caps = caps ?? ClientCapabilities.WindowsDefault;
+        _caps = caps ?? ClientCapabilities.MediaFoundationDefault;
         _prefs = prefs ?? PlaybackPreferences.Default;
     }
 
@@ -190,18 +190,49 @@ public sealed class PlaybackDecisionEngine
         int? forcedSubtitleId = null)
     {
         RefreshPrefs();
+        // Contract: MF (system) first; LibVLC only when MF would transcode for capability gaps.
+        var system = Evaluate(
+            metadata, network, mediaIndex, partIndex, forcedAudioId, forcedSubtitleId,
+            ClientCapabilities.MediaFoundationDefault, PlaybackBackend.System);
+        if (system.Mode != PlaybackMode.Transcode)
+            return system;
+        if (system.Reason.Contains("bitrate", StringComparison.OrdinalIgnoreCase) ||
+            system.Reason.Contains("exceeds preference", StringComparison.OrdinalIgnoreCase))
+            return system;
+
+        if (LibVlcPlayerEngine.IsAvailable)
+        {
+            var vlc = Evaluate(
+                metadata, network, mediaIndex, partIndex, forcedAudioId, forcedSubtitleId,
+                ClientCapabilities.LibVlcDefault, PlaybackBackend.Vlc);
+            if (vlc.Mode is PlaybackMode.DirectPlay or PlaybackMode.DirectStream)
+                return vlc;
+        }
+        return system;
+    }
+
+    private PlaybackDecision Evaluate(
+        Models.PlexMetadata metadata,
+        NetworkClass network,
+        int mediaIndex,
+        int partIndex,
+        int? forcedAudioId,
+        int? forcedSubtitleId,
+        ClientCapabilities caps,
+        PlaybackBackend backend)
+    {
         var netBitrate = BitrateForNetwork(network);
 
         if (metadata.Media is null || metadata.Media.Count == 0)
         {
-            return Transcode("No media versions available", 0, 0, null, null, false, netBitrate);
+            return Transcode("No media versions available", 0, 0, null, null, false, netBitrate, backend);
         }
 
         var mi = Math.Clamp(mediaIndex, 0, metadata.Media.Count - 1);
         var media = metadata.Media[mi];
         if (media.Parts is null || media.Parts.Count == 0)
         {
-            return Transcode("Media has no parts", mi, 0, null, null, false, netBitrate);
+            return Transcode("Media has no parts", mi, 0, null, null, false, netBitrate, backend);
         }
 
         var pi = Math.Clamp(partIndex, 0, media.Parts.Count - 1);
@@ -225,32 +256,32 @@ public sealed class PlaybackDecisionEngine
         {
             return Transcode(
                 $"Source bitrate {sourceBr} kbps exceeds preference {maxBr} kbps",
-                mi, pi, audioId, subtitleId, burnIn, maxBr);
+                mi, pi, audioId, subtitleId, burnIn, maxBr, backend);
         }
 
         // Resolution cap
         if (media.Width is int w && media.Height is int h &&
-            (w > _caps.MaxVideoWidth || h > _caps.MaxVideoHeight))
+            (w > caps.MaxVideoWidth || h > caps.MaxVideoHeight))
         {
             return Transcode(
-                $"Resolution {w}x{h} exceeds client max {_caps.MaxVideoWidth}x{_caps.MaxVideoHeight}",
-                mi, pi, audioId, subtitleId, burnIn, netBitrate);
+                $"Resolution {w}x{h} exceeds client max {caps.MaxVideoWidth}x{caps.MaxVideoHeight}",
+                mi, pi, audioId, subtitleId, burnIn, netBitrate, backend);
         }
 
-        var containerOk = container is null || _caps.SupportedContainers.Contains(container);
-        var videoOk = videoCodec is null || _caps.SupportedVideoCodecs.Contains(videoCodec);
-        var audioOk = audioCodec is null || _caps.SupportedAudioCodecs.Contains(audioCodec);
+        var containerOk = container is null || caps.SupportedContainers.Contains(container);
+        var videoOk = videoCodec is null || caps.SupportedVideoCodecs.Contains(videoCodec);
+        var audioOk = audioCodec is null || caps.SupportedAudioCodecs.Contains(audioCodec);
 
         // Subtitle handling
         if (subtitleId is int sid)
         {
             var sub = subtitleStreams.FirstOrDefault(s => s.Id == sid);
             var subFormat = (sub?.Codec ?? sub?.Format)?.ToLowerInvariant();
-            if (subFormat is not null && _caps.RequiresBurnInFor.Contains(subFormat))
+            if (subFormat is not null && caps.RequiresBurnInFor.Contains(subFormat))
             {
                 burnIn = true;
             }
-            else if (subFormat is not null && !_caps.SupportedSubtitleFormats.Contains(subFormat))
+            else if (subFormat is not null && !caps.SupportedSubtitleFormats.Contains(subFormat))
             {
                 burnIn = true;
             }
@@ -261,31 +292,31 @@ public sealed class PlaybackDecisionEngine
             // Burn-in requires transcode
             return Transcode(
                 "Subtitle requires burn-in",
-                mi, pi, audioId, subtitleId, true, netBitrate);
+                mi, pi, audioId, subtitleId, true, netBitrate, backend);
         }
 
-        if (containerOk && videoOk && audioOk && _caps.SupportsDirectPlay && _prefs.PreferDirectPlay)
+        if (containerOk && videoOk && audioOk && caps.SupportsDirectPlay && _prefs.PreferDirectPlay)
         {
             return new PlaybackDecision(
                 PlaybackMode.DirectPlay,
                 $"Direct Play: container={container}, video={videoCodec}, audio={audioCodec}",
-                PlaybackBackend.System,
+                backend,
                 mi, pi, audioId, subtitleId, false, _prefs.MaxVideoBitrateKbps);
         }
 
         // Direct Stream: codecs OK, container may need remux
-        if (videoOk && audioOk && _caps.SupportsDirectStream)
+        if (videoOk && audioOk && caps.SupportsDirectStream)
         {
             return new PlaybackDecision(
                 PlaybackMode.DirectStream,
                 $"Direct Stream: video={videoCodec}, audio={audioCodec}, container remap",
-                PlaybackBackend.System,
+                backend,
                 mi, pi, audioId, subtitleId, false, _prefs.MaxVideoBitrateKbps);
         }
 
         return Transcode(
             $"Transcode required: containerOk={containerOk}, videoOk={videoOk}, audioOk={audioOk}",
-            mi, pi, audioId, subtitleId, burnIn, netBitrate);
+            mi, pi, audioId, subtitleId, burnIn, netBitrate, backend);
     }
 
     private int? SelectAudio(List<Models.PlexStream> streams, int? forced)
@@ -368,8 +399,9 @@ public sealed class PlaybackDecisionEngine
     }
 
     private PlaybackDecision Transcode(
-        string reason, int mi, int pi, int? audioId, int? subId, bool burnIn, int? maxBr = null)
-        => new(PlaybackMode.Transcode, reason, PlaybackBackend.System, mi, pi, audioId, subId, burnIn, maxBr);
+        string reason, int mi, int pi, int? audioId, int? subId, bool burnIn, int? maxBr = null,
+        PlaybackBackend backend = PlaybackBackend.System)
+        => new(PlaybackMode.Transcode, reason, backend, mi, pi, audioId, subId, burnIn, maxBr);
 }
 
 

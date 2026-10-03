@@ -116,10 +116,33 @@ class PlaybackDecisionEngine(
     private val prefs: PlaybackPreferences = PlaybackPreferences.Default
 ) {
     fun decide(metadata: PlexMetadata, network: NetworkClass = NetworkClass.Local): PlaybackDecision {
+        // System matrix first; VLC profile only if system would transcode and VLC is "available"
+        // (LibVLC backend not shipped yet — structure is ready; vlcAvailable stays false).
+        val system = evaluate(metadata, network, ClientCapabilities.SystemProfile, PlaybackBackend.System)
+        if (system.mode != PlaybackMode.Transcode) return system
+        if (system.reason.startsWith("Quality limited")) return system
+
+        val vlcAvailable = false // set true when LibVLC adapter ships
+        if (vlcAvailable) {
+            val vlc = evaluate(metadata, network, ClientCapabilities.VlcProfile, PlaybackBackend.Vlc)
+            if (vlc.mode == PlaybackMode.DirectPlay || vlc.mode == PlaybackMode.DirectStream) {
+                return vlc
+            }
+        }
+        return system
+    }
+
+    private fun evaluate(
+        metadata: PlexMetadata,
+        network: NetworkClass,
+        caps: ClientCapabilities,
+        backend: PlaybackBackend
+    ): PlaybackDecision {
+
         val media = metadata.media.firstOrNull()
-            ?: return PlaybackDecision(PlaybackMode.Transcode, "No media element")
+            ?: return PlaybackDecision(mode = PlaybackMode.Transcode, reason = "No media element", backend = backend)
         val part = media.parts.firstOrNull()
-            ?: return PlaybackDecision(PlaybackMode.Transcode, "No part")
+            ?: return PlaybackDecision(mode = PlaybackMode.Transcode, reason = "No part", backend = backend)
 
         val container = (media.container ?: part.container ?: "").lowercase()
         val videoCodec = (media.videoCodec ?: "").lowercase()
@@ -135,6 +158,7 @@ class PlaybackDecisionEngine(
             return PlaybackDecision(
                 mode = PlaybackMode.Transcode,
                 reason = "Subtitle requires burn-in",
+                backend = backend,
                 selectedAudioStreamId = audioId,
                 selectedSubtitleStreamId = subtitleId,
                 burnInSubtitles = true,
@@ -150,6 +174,7 @@ class PlaybackDecisionEngine(
             return PlaybackDecision(
                 mode = PlaybackMode.DirectPlay,
                 reason = "Container=$container video=$videoCodec audio=$audioCodec supported",
+                backend = backend,
                 selectedAudioStreamId = audioId,
                 selectedSubtitleStreamId = subtitleId
             )
@@ -159,6 +184,7 @@ class PlaybackDecisionEngine(
             return PlaybackDecision(
                 mode = PlaybackMode.DirectStream,
                 reason = "Remux: video ok ($videoCodec), container/audio needs remux",
+                backend = backend,
                 selectedAudioStreamId = audioId,
                 selectedSubtitleStreamId = subtitleId
             )
@@ -167,6 +193,7 @@ class PlaybackDecisionEngine(
         return PlaybackDecision(
             mode = PlaybackMode.Transcode,
             reason = "Unsupported: container=$container video=$videoCodec audio=$audioCodec",
+            backend = backend,
             selectedAudioStreamId = audioId,
             selectedSubtitleStreamId = subtitleId,
             burnInSubtitles = burnIn,

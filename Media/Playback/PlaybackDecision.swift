@@ -32,12 +32,11 @@ struct PlaybackDecisionEngine: Sendable {
     let capabilities: IOSCapabilities
     let preferences: PlaybackPreferences
 
-    /// Primary system player unless user/capability matrix prefers VLC.
-    private var preferredBackend: PlaybackBackend {
-        // Prefer system (AVPlayer) when user forces it; otherwise VLC when allowed.
-        if preferences.preferSystemPlayer { return .system }
-        if preferences.allowVLCPlayer { return .vlc }
-        return .system
+    /// Whether VLC may be chosen as capability-gap fallback.
+    private var vlcFallbackAvailable: Bool {
+        preferences.allowVLCPlayer
+            && !preferences.preferSystemPlayer
+            && VLCPlaybackBackend.isLinked
     }
 
     init(
@@ -48,10 +47,10 @@ struct PlaybackDecisionEngine: Sendable {
         self.preferences = preferences
     }
 
-    /// Builds an engine using the capability matrix matching user prefs (VLC vs AVPlayer).
+    /// Builds an engine; Decision selects system vs VLC matrix per media.
     static func make(preferences: PlaybackPreferences) -> PlaybackDecisionEngine {
         PlaybackDecisionEngine(
-            capabilities: IOSCapabilities.active(preferences: preferences),
+            capabilities: .avPlayerProfile,
             preferences: preferences
         )
     }
@@ -64,11 +63,62 @@ struct PlaybackDecisionEngine: Sendable {
         forcedAudioId: Int? = nil,
         forcedSubtitleId: Int? = nil
     ) -> PlaybackDecision {
+        // Contract: system matrix first; VLC only on capability gap (not bitrate caps).
+        let system = evaluate(
+            metadata: metadata,
+            network: network,
+            mediaIndex: mediaIndex,
+            partIndex: partIndex,
+            forcedAudioId: forcedAudioId,
+            forcedSubtitleId: forcedSubtitleId,
+            caps: .avPlayerProfile,
+            backend: .system
+        )
+        if preferences.preferSystemPlayer {
+            return system
+        }
+        // Bitrate-limited transcode cannot be fixed by switching backend
+        if system.mode == .transcode, system.reason.hasPrefix("Quality limited") {
+            return system
+        }
+        if system.mode != .transcode {
+            return system
+        }
+        guard vlcFallbackAvailable else { return system }
+
+        let vlc = evaluate(
+            metadata: metadata,
+            network: network,
+            mediaIndex: mediaIndex,
+            partIndex: partIndex,
+            forcedAudioId: forcedAudioId,
+            forcedSubtitleId: forcedSubtitleId,
+            caps: .vlcProfile,
+            backend: .vlc
+        )
+        if vlc.mode == .directPlay || vlc.mode == .directStream {
+            return vlc
+        }
+        // Keep system transcode decision (server-side) when VLC also cannot DP/DS
+        return system
+    }
+
+    /// Evaluate one capability matrix for a fixed backend.
+    private func evaluate(
+        metadata: PlexMetadata,
+        network: NetworkClass,
+        mediaIndex: Int,
+        partIndex: Int,
+        forcedAudioId: Int?,
+        forcedSubtitleId: Int?,
+        caps: IOSCapabilities,
+        backend: PlaybackBackend
+    ) -> PlaybackDecision {
         guard !metadata.media.isEmpty else {
             return PlaybackDecision(
                 mode: .transcode,
                 reason: "No media versions available",
-                backend: preferredBackend,
+                backend: backend,
                 mediaIndex: 0,
                 partIndex: 0,
                 selectedAudioStreamId: nil,
@@ -85,7 +135,7 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .transcode,
                 reason: "Media has no parts",
-                backend: preferredBackend,
+                backend: backend,
                 mediaIndex: mi,
                 partIndex: 0,
                 selectedAudioStreamId: nil,
@@ -104,7 +154,7 @@ struct PlaybackDecisionEngine: Sendable {
 
         let audioId = selectAudio(audioStreams, forced: forcedAudioId)
         let selectedAudio = audioStreams.first { $0.id == audioId }
-        let (subtitleId, burnIn) = selectSubtitle(subtitleStreams, forced: forcedSubtitleId)
+        let (subtitleId, burnIn) = selectSubtitle(subtitleStreams, forced: forcedSubtitleId, caps: caps)
 
         let container = (part.container ?? media.container)?.lowercased()
         let videoCodec = (video?.codec ?? media.videoCodec)?.lowercased()
@@ -117,12 +167,12 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .transcode,
                 reason: "Quality limited to \(maxBr) kbps (source \(sourceBr) kbps)",
-                backend: preferredBackend,
+                backend: backend,
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,
                 selectedSubtitleStreamId: subtitleId,
-                burnInSubtitles: burnIn || (subtitleId != nil && !canNativeSub(subtitleStreams, id: subtitleId)),
+                burnInSubtitles: burnIn || (subtitleId != nil && !canNativeSub(subtitleStreams, id: subtitleId, caps: caps)),
                 maxBitrateKbps: maxBr
             )
         }
@@ -136,13 +186,13 @@ struct PlaybackDecisionEngine: Sendable {
         }()
 
         let normalizedVideo = IOSCapabilities.normalizeVideoCodec(videoCodec)
-        let videoOK = capabilities.supportsVideoCodec(videoCodec)
-        let audioOK = capabilities.supportsAudioCodec(audioCodec)
-        let containerOK = capabilities.supportsContainer(container)
+        let videoOK = caps.supportsVideoCodec(videoCodec)
+        let audioOK = caps.supportsAudioCodec(audioCodec)
+        let containerOK = caps.supportsContainer(container)
 
         // Subtitle path
         var needBurnIn = burnIn
-        if let sid = subtitleId, !canNativeSub(subtitleStreams, id: sid) {
+        if let sid = subtitleId, !canNativeSub(subtitleStreams, id: sid, caps: caps) {
             needBurnIn = true
         }
         // External soft-subs cannot be attached on pure Direct Play file URLs — remux/HLS
@@ -161,14 +211,14 @@ struct PlaybackDecisionEngine: Sendable {
 
         // Direct Play (native container + codecs, no burn-in)
         // VLC profile can soft-render external/text subs without HLS remux.
-        let vlcSoftOK = capabilities.isVLCProfile && !needBurnIn
+        let vlcSoftOK = caps.isVLCProfile && !needBurnIn
         if containerOK && videoOK && audioOK && !needBurnIn
             && (vlcSoftOK || (!externalSoftSub && !softSubSelected)) {
-            let via = capabilities.isVLCProfile ? "VLC" : "AVPlayer"
+            let via = caps.isVLCProfile ? "VLC" : "AVPlayer"
             return PlaybackDecision(
                 mode: .directPlay,
                 reason: "Direct Play via \(via): \(container ?? "?") / \(normalizedVideo ?? videoCodec ?? "?") / \(audioCodec ?? "?")",
-                backend: preferredBackend,
+                backend: backend,
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,
@@ -191,7 +241,7 @@ struct PlaybackDecisionEngine: Sendable {
             return PlaybackDecision(
                 mode: .directStream,
                 reason: reasons.joined(separator: "; "),
-                backend: preferredBackend,
+                backend: backend,
                 mediaIndex: mi,
                 partIndex: pi,
                 selectedAudioStreamId: audioId,
@@ -211,7 +261,7 @@ struct PlaybackDecisionEngine: Sendable {
         return PlaybackDecision(
             mode: .transcode,
             reason: reasons.joined(separator: "; "),
-            backend: preferredBackend,
+            backend: backend,
             mediaIndex: mi,
             partIndex: pi,
             selectedAudioStreamId: audioId,
@@ -266,12 +316,12 @@ struct PlaybackDecisionEngine: Sendable {
         return streams.first?.id
     }
 
-    private func selectSubtitle(_ streams: [PlexStream], forced: Int?) -> (Int?, Bool) {
+    private func selectSubtitle(_ streams: [PlexStream], forced: Int?, caps: IOSCapabilities) -> (Int?, Bool) {
         // Explicit user pick (or off) always wins — even if global subtitles toggle is off.
         if let forced {
             if forced < 0 { return (nil, false) }
             if let stream = streams.first(where: { $0.id == forced }) {
-                return (forced, capabilities.requiresBurnIn(stream))
+                return (forced, caps.requiresBurnIn(stream))
             }
         }
         if !preferences.subtitlesEnabled {
@@ -280,23 +330,23 @@ struct PlaybackDecisionEngine: Sendable {
         // 1) User priority list
         for pref in preferences.preferredSubtitleLanguages where !pref.isEmpty {
             if let match = streams.first(where: { matchesLanguage($0, pref: pref) }) {
-                return (match.id, capabilities.requiresBurnIn(match))
+                return (match.id, caps.requiresBurnIn(match))
             }
         }
         // 2) Video / server default (selected or default flag from PMS)
         if let selected = streams.first(where: \.isSelected) {
-            return (selected.id, capabilities.requiresBurnIn(selected))
+            return (selected.id, caps.requiresBurnIn(selected))
         }
         if let def = streams.first(where: \.isDefault) {
-            return (def.id, capabilities.requiresBurnIn(def))
+            return (def.id, caps.requiresBurnIn(def))
         }
         // 3) Only when user did not set a language list: mild heuristics
         if preferences.preferredSubtitleLanguages.isEmpty {
             if let forcedTrack = streams.first(where: \.isForced) {
-                return (forcedTrack.id, capabilities.requiresBurnIn(forcedTrack))
+                return (forcedTrack.id, caps.requiresBurnIn(forcedTrack))
             }
             if let text = streams.first(where: {
-                capabilities.supportsSubtitleNatively($0) && !capabilities.requiresBurnIn($0)
+                caps.supportsSubtitleNatively($0) && !caps.requiresBurnIn($0)
             }) {
                 return (text.id, false)
             }
@@ -305,8 +355,8 @@ struct PlaybackDecisionEngine: Sendable {
         return (nil, false)
     }
 
-    private func canNativeSub(_ streams: [PlexStream], id: Int?) -> Bool {
+    private func canNativeSub(_ streams: [PlexStream], id: Int?, caps: IOSCapabilities) -> Bool {
         guard let id, let stream = streams.first(where: { $0.id == id }) else { return true }
-        return capabilities.supportsSubtitleNatively(stream) && !capabilities.requiresBurnIn(stream)
+        return caps.supportsSubtitleNatively(stream) && !caps.requiresBurnIn(stream)
     }
 }

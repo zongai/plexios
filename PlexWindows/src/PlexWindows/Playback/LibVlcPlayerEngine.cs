@@ -665,7 +665,11 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 Language = s.LanguageCode ?? s.Language,
                 Codec = s.Codec,
                 Channels = s.Channels,
-                IsSelected = decision.SelectedAudioStreamId == s.Id
+                IsSelected = decision.SelectedAudioStreamId == s.Id,
+                IsDefault = s.IsDefault,
+                IsForced = s.IsForced,
+                IsExternal = s.IsExternal,
+                Type = "audio"
             });
         }
 
@@ -677,7 +681,11 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 Title = s.ExtendedDisplayTitle ?? s.DisplayTitle ?? s.Title ?? s.Language ?? $"Subtitle {s.Id}",
                 Language = s.LanguageCode ?? s.Language,
                 Codec = s.Codec ?? s.Format,
-                IsSelected = decision.SelectedSubtitleStreamId == s.Id
+                IsSelected = decision.SelectedSubtitleStreamId == s.Id,
+                IsDefault = s.IsDefault,
+                IsForced = s.IsForced,
+                IsExternal = s.IsExternal,
+                Type = "subtitle"
             });
         }
     }

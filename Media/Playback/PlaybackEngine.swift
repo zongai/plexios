@@ -20,6 +20,14 @@ final class PlaybackEngine {
     private(set) var errorMessage: String?
     private(set) var audioStreams: [PlexStream] = []
     private(set) var subtitleStreams: [PlexStream] = []
+
+    /// Contract MediaTrack list for UI (from Plex streams).
+    var mediaAudioTracks: [MediaTrack] {
+        audioStreams.asMediaTracks(selectedId: selectedAudioId)
+    }
+    var mediaSubtitleTracks: [MediaTrack] {
+        subtitleStreams.asMediaTracks(selectedId: selectedSubtitleId)
+    }
     private(set) var selectedAudioId: Int?
     private(set) var selectedSubtitleId: Int?
     /// Playback rate (1.0 = normal). Applied to AVPlayer when playing.

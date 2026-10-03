@@ -121,6 +121,27 @@ public enum PlexMetadataType
     Collection, Playlist, Person, Clip, Photo, Trailer, Unknown
 }
 
+
+public enum PlexMarkerType
+{
+    Intro,
+    Credits,
+    Commercial,
+    Unknown
+}
+
+/// <summary>Plex chapter-style marker (intro / credits). Offsets in milliseconds.</summary>
+public sealed class PlexMarker
+{
+    public int Id { get; init; }
+    public PlexMarkerType Type { get; init; }
+    public long StartTimeOffset { get; init; }
+    public long EndTimeOffset { get; init; }
+
+    public bool Contains(long positionMs) =>
+        positionMs >= StartTimeOffset && positionMs < EndTimeOffset && EndTimeOffset > StartTimeOffset;
+}
+
 public sealed class PlexMetadata
 {
     public string RatingKey { get; init; } = "";
@@ -160,6 +181,7 @@ public sealed class PlexMetadata
     public List<string> Writers { get; init; } = [];
     public List<PlexRole> Actors { get; init; } = [];
     public List<PlexMedia> Media { get; init; } = [];
+    public List<PlexMarker> Markers { get; init; } = [];
 
     public string Id => RatingKey;
 

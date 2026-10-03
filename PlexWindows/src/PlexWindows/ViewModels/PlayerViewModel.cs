@@ -33,6 +33,10 @@ public partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private string _decisionReason = "";
     [ObservableProperty] private string _modeLabel = "";
     [ObservableProperty] private bool _showControls = true;
+    [ObservableProperty] private bool _showSkipMarker;
+    [ObservableProperty] private string _skipMarkerLabel = "Skip Intro";
+    private long _skipToMs;
+    private IReadOnlyList<PlexMarker> _markers = Array.Empty<PlexMarker>();
     [ObservableProperty] private bool _isBuffering;
     [ObservableProperty] private double _volume = 1.0;
     [ObservableProperty] private bool _isMuted;
@@ -106,6 +110,8 @@ public partial class PlayerViewModel : ObservableObject
         ApplySettings();
         Request = request;
         Title = request.Metadata.Title;
+        _markers = request.Metadata.Markers ?? [];
+        UpdateSkipMarkerVisibility();
         var show = request.Metadata.GrandparentTitle;
         var season = request.Metadata.ParentTitle;
         Subtitle = show is not null
@@ -215,6 +221,50 @@ public partial class PlayerViewModel : ObservableObject
             IsMuted = false;
             _player.IsMuted = false;
         }
+    }
+
+    
+
+    partial void OnPositionSecondsChanged(double value)
+    {
+        UpdateSkipMarkerVisibility();
+    }
+
+    private void UpdateSkipMarkerVisibility()
+    {
+        if (_markers.Count == 0)
+        {
+            ShowSkipMarker = false;
+            return;
+        }
+        var pos = (long)(PositionSeconds * 1000);
+        PlexMarker? active = null;
+        foreach (var m in _markers)
+        {
+            if (m.Type is not (PlexMarkerType.Intro or PlexMarkerType.Credits)) continue;
+            if (m.Contains(pos))
+            {
+                active = m;
+                break;
+            }
+        }
+        if (active is null)
+        {
+            ShowSkipMarker = false;
+            return;
+        }
+        SkipMarkerLabel = active.Type == PlexMarkerType.Intro ? "Skip Intro" : "Skip Credits";
+        _skipToMs = active.EndTimeOffset;
+        ShowSkipMarker = true;
+    }
+
+    [RelayCommand]
+    public void SkipMarker()
+    {
+        if (!ShowSkipMarker || _skipToMs <= 0) return;
+        _ = _player.SeekAsync(_skipToMs);
+        ShowSkipMarker = false;
+        BumpControls();
     }
 
     public async Task SelectAudioAsync(TrackInfo? track)

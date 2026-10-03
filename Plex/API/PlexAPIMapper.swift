@@ -195,7 +195,16 @@ enum PlexAPIMapper {
                 guard let tag = role.tag else { return nil }
                 return PlexRole(tag: tag, role: role.role, thumb: role.thumb)
             },
-            media: (dto.media ?? []).compactMap(media(from:))
+            media: (dto.media ?? []).compactMap(media(from:)),
+            markers: (dto.marker ?? []).compactMap { m in
+                guard let start = m.startTimeOffset, let end = m.endTimeOffset else { return nil }
+                return PlexMarker(
+                    id: m.id ?? 0,
+                    type: PlexMarkerType(raw: m.type),
+                    startTimeOffset: start,
+                    endTimeOffset: end
+                )
+            }
         )
     }
 

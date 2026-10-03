@@ -460,7 +460,26 @@ public sealed class PlexApiClient
             Tagline = m.Tagline,
             Genres = m.Genre?.Select(g => g.Tag ?? "").Where(s => s.Length > 0).ToList() ?? [],
             Directors = m.Director?.Select(d => d.Tag ?? "").Where(s => s.Length > 0).ToList() ?? [],
-            Media = (m.Media ?? []).Select(MapMedia).ToList()
+            Media = (m.Media ?? []).Select(MapMedia).ToList(),
+            Markers = (m.Marker ?? []).Select(MapMarker).ToList()
+        };
+    }
+
+    private static PlexMarker MapMarker(MarkerDto m)
+    {
+        var type = (m.Type ?? "").ToLowerInvariant() switch
+        {
+            "intro" => PlexMarkerType.Intro,
+            "credits" or "credit" => PlexMarkerType.Credits,
+            "commercial" => PlexMarkerType.Commercial,
+            _ => PlexMarkerType.Unknown
+        };
+        return new PlexMarker
+        {
+            Id = m.Id ?? 0,
+            Type = type,
+            StartTimeOffset = m.StartTimeOffset ?? 0,
+            EndTimeOffset = m.EndTimeOffset ?? 0
         };
     }
 
@@ -595,6 +614,14 @@ public sealed class PlexApiClient
         public List<MetadataDto>? Metadata { get; set; }
     }
 
+    private sealed class MarkerDto
+    {
+        public int? Id { get; set; }
+        public string? Type { get; set; }
+        public long? StartTimeOffset { get; set; }
+        public long? EndTimeOffset { get; set; }
+    }
+
     private sealed class MetadataDto
     {
         public string? RatingKey { get; set; }
@@ -638,6 +665,7 @@ public sealed class PlexApiClient
         public List<TagDto>? Genre { get; set; }
         public List<TagDto>? Director { get; set; }
         public List<MediaDto>? Media { get; set; }
+        public List<MarkerDto>? Marker { get; set; }
     }
 
     private sealed class TagDto

@@ -67,6 +67,20 @@
             </Border>
         </Grid>
 
+        
+        <!-- Skip Intro / Credits (Plex markers) -->
+        <Button Content="{x:Bind ViewModel.SkipMarkerLabel, Mode=OneWay}"
+                Command="{x:Bind ViewModel.SkipMarkerCommand}"
+                Visibility="{x:Bind ViewModel.ShowSkipMarker, Mode=OneWay, Converter={StaticResource BoolToVisibility}}"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Margin="0,0,28,120"
+                Background="#FFE5A00D"
+                Foreground="Black"
+                FontWeight="SemiBold"
+                Padding="20,10"
+                CornerRadius="4" />
+
         <!-- Bottom controls -->
         <Grid VerticalAlignment="Bottom"
               Visibility="{x:Bind ViewModel.ShowControls, Mode=OneWay, Converter={StaticResource BoolToVisibility}}">

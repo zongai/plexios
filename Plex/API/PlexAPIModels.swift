@@ -180,6 +180,7 @@ struct APIMetadata: Decodable {
     let writer: [APITag]?
     let role: [APIRole]?
     let media: [APIMedia]?
+    let marker: [APIMarker]?
     let librarySectionID: Int?
     let librarySectionTitle: String?
 
@@ -196,7 +197,15 @@ struct APIMetadata: Decodable {
         case writer = "Writer"
         case role = "Role"
         case media = "Media"
+        case marker = "Marker"
     }
+}
+
+struct APIMarker: Decodable {
+    let id: Int?
+    let type: String?
+    let startTimeOffset: Int64?
+    let endTimeOffset: Int64?
 }
 
 struct APITag: Decodable {

@@ -68,6 +68,36 @@ struct PlexConnection: Identifiable, Hashable, Sendable {
     }
 }
 
+
+// MARK: - Markers (intro / credits)
+
+enum PlexMarkerType: String, Sendable, Hashable, Codable {
+    case intro
+    case credits
+    case commercial
+    case unknown
+
+    init(raw: String?) {
+        switch (raw ?? "").lowercased() {
+        case "intro": self = .intro
+        case "credits", "credit": self = .credits
+        case "commercial": self = .commercial
+        default: self = .unknown
+        }
+    }
+}
+
+struct PlexMarker: Hashable, Sendable, Codable {
+    let id: Int
+    let type: PlexMarkerType
+    let startTimeOffset: Int64
+    let endTimeOffset: Int64
+
+    func contains(positionMs: Int64) -> Bool {
+        positionMs >= startTimeOffset && positionMs < endTimeOffset && endTimeOffset > startTimeOffset
+    }
+}
+
 // MARK: - Library
 
 enum PlexLibraryType: String, Sendable, Hashable, Codable {
@@ -181,6 +211,7 @@ struct PlexMetadata: Identifiable, Hashable, Sendable, Codable {
     let writers: [String]
     let actors: [PlexRole]
     let media: [PlexMedia]
+    var markers: [PlexMarker] = []
 
     var isInProgress: Bool {
         guard let offset = viewOffset, offset > 0,

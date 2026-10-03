@@ -25,6 +25,15 @@ struct PlayerView: View {
     /// Always prefer the engine's current item (updates on autoplay / track switch).
     private var activeItem: PlexMetadata { engine.currentItem ?? metadata }
 
+    /// Active intro/credits marker at current position, if any.
+    private var activeSkipMarker: PlexMarker? {
+        let pos = engine.positionMs
+        return activeItem.markers.first {
+            ($0.type == .intro || $0.type == .credits) && $0.contains(positionMs: pos)
+        }
+    }
+
+
     /// True when any backend is presenting video (controls may be shown).
     private var hasActiveVideoSurface: Bool {
         engine.player != nil
@@ -95,6 +104,27 @@ struct PlayerView: View {
                     }
                 }
                 .zIndex(5)
+
+            if let marker = activeSkipMarker, !isPiPActive, hasActiveVideoSurface {
+                Button {
+                    Task { await engine.seek(toMs: marker.endTimeOffset) }
+                    bumpControls()
+                } label: {
+                    Text(marker.type == .intro
+                          ? String(localized: "player.skip_intro")
+                          : String(localized: "player.skip_credits"))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(Color(red: 0.898, green: 0.627, blue: 0.051)))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 28)
+                .padding(.bottom, 120)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .zIndex(20)
+            }
 
             if showControls && !isPiPActive && hasActiveVideoSurface {
                 controlsOverlay

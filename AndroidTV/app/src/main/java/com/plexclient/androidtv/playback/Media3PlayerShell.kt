@@ -116,7 +116,7 @@ class Media3PlayerShell(context: Context) : MediaPlayerContract {
         })
     }
 
-    override fun prepare(url: URI, startPositionMs: Long = 0) {
+    override fun prepare(url: URI, startPositionMs: Long) {
         AppLog.i("Exo", "prepare startMs=$startPositionMs url=${AppLog.redact(url.toString())}")
         val item = MediaItem.fromUri(url.toString())
         _state.value = PlayerState.Loading

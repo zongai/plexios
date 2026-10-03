@@ -29,6 +29,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     private LibVLCSharp.Platforms.Windows.VideoView? _videoView;
     private long? _pendingSeekMs;
     private bool _coreReady;
+    private string? _lastLibVlcLog;
 #endif
 
 

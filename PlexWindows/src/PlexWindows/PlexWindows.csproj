@@ -15,7 +15,6 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <AssemblyName>PlexWindows</AssemblyName>
     <Version>0.1.0</Version>
-    <DefineConstants>$(DefineConstants);USE_LIBVLC</DefineConstants>
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
@@ -28,9 +27,6 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <!-- LibVLC fallback for VP9 / MKV / codecs MF cannot open -->
-    <PackageReference Include="LibVLCSharp" Version="3.9.3" />
-    <PackageReference Include="LibVLCSharp.WinUI" Version="3.9.3" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\**" />

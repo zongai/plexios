@@ -165,6 +165,55 @@ public partial class DetailViewModel : ObservableObject
     public PlaybackRequest? BuildPlaybackRequest(PlexMetadata? target = null)
         => BuildPlaybackRequestAsync(target).GetAwaiter().GetResult();
 
+
+    /// <summary>
+    /// Show → prefer in-progress episode across seasons, else first episode of first season.
+    /// Season → prefer in-progress episode, else first episode.
+    /// </summary>
+    private async Task<PlexMetadata?> ResolvePlayableEpisodeAsync(PlexMetadata container, ServerContext ctx)
+    {
+        try
+        {
+            if (container.Type == PlexMetadataType.Season)
+            {
+                var eps = await _api.FetchChildrenAsync(container.RatingKey, ctx.BaseUrl, ctx.Token);
+                var episodes = eps.Where(e => e.Type == PlexMetadataType.Episode).ToList();
+                return episodes.FirstOrDefault(e => e.IsInProgress) ?? episodes.FirstOrDefault();
+            }
+
+            // Show: Children are seasons
+            IReadOnlyList<PlexMetadata> seasons = Children;
+            if (seasons.Count == 0)
+                seasons = await _api.FetchChildrenAsync(container.RatingKey, ctx.BaseUrl, ctx.Token);
+
+            var orderedSeasons = seasons
+                .Where(s => s.Type == PlexMetadataType.Season)
+                .OrderBy(s => s.Index ?? int.MaxValue)
+                .ToList();
+
+            PlexMetadata? fallback = null;
+            foreach (var season in orderedSeasons)
+            {
+                var eps = await _api.FetchChildrenAsync(season.RatingKey, ctx.BaseUrl, ctx.Token);
+                var episodes = eps
+                    .Where(e => e.Type == PlexMetadataType.Episode)
+                    .OrderBy(e => e.Index ?? int.MaxValue)
+                    .ToList();
+                var progress = episodes.FirstOrDefault(e => e.IsInProgress);
+                if (progress is not null)
+                    return progress;
+                fallback ??= episodes.FirstOrDefault();
+            }
+
+            return fallback;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Failed to resolve episode: " + ex.Message;
+            return null;
+        }
+    }
+
     [RelayCommand]
     public async Task ToggleFavoriteAsync()
     {

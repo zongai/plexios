@@ -26,8 +26,8 @@ public partial class App : Application
 
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        // Keep process alive when possible so the user does not just see a black flash
         System.Diagnostics.Debug.WriteLine("Unhandled: " + e.Exception);
+        AppDebugLog.Error("App", e.Exception, "UnhandledException");
         try
         {
             var path = Path.Combine(
@@ -38,15 +38,13 @@ public partial class App : Application
             File.AppendAllText(path,
                 DateTimeOffset.Now + Environment.NewLine + e.Exception + Environment.NewLine + Environment.NewLine);
         }
-        catch
-        {
-            // ignore
-        }
+        catch { /* ignore */ }
         e.Handled = true;
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        AppDebugLog.Info("App", "OnLaunched — log=" + AppDebugLog.CurrentLogPath);
         _window = new MainWindow();
         _window.Activate();
     }

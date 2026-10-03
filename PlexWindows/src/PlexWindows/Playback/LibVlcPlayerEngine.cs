@@ -1,4 +1,5 @@
 using Microsoft.UI.Dispatching;
+using PlexWindows.Helpers;
 using PlexWindows.Models;
 #if USE_LIBVLC
 using LibVLCSharp.Shared;
@@ -217,15 +218,22 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 
             // Network / PMS URLs must use FromLocation
             var url = request.MediaUrl.AbsoluteUri;
+            AppDebugLog.Info("LibVLC.Prepare",
+                $"mode={request.Decision.Mode} reason={request.Decision.Reason} url={AppDebugLog.RedactUrl(url)}");
+
             _media = new Media(_libVlc, url, FromType.FromLocation);
-            _media.AddOption(":network-caching=2000");
+            _media.AddOption(":network-caching=3000");
             _media.AddOption(":http-reconnect=true");
             _media.AddOption(":http-continuous=true");
-            // Self-signed / local PMS certs
             _media.AddOption(":http-user-agent=PlexWindows/0.1");
-            // Prefer hardware decode when available
+            // Critical for plex.direct HTTPS / LAN certs
+            _media.AddOption(":http-tls-verify=0");
             _media.AddOption(":avcodec-hw=any");
-            // Live / HLS resilience
+            // HLS
+            // Prefer adaptive/HLS-friendly demux without hard-failing
+            _media.AddOption(":hls-segment-threads=2");
+            _media.AddOption(":file-caching=3000");
+            _media.AddOption(":live-caching=3000");
 
             _mediaPlayer.Media = _media;
             _mediaPlayer.Volume = (int)(_volume * 100);
@@ -510,11 +518,23 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 _mediaPlayer?.Dispose();
                 _mediaPlayer = null;
                 _libVlc?.Dispose();
-                _libVlc = new LibVLC(enableDebugLogs: false, opts.ToArray());
+                if (!opts.Any(o => o.Contains("http-tls-verify", StringComparison.OrdinalIgnoreCase)))
+                {
+                    opts.Add("--http-tls-verify=0");
+                    opts.Add("--no-gnutls-system-trust");
+                }
+                _libVlc = new LibVLC(enableDebugLogs: true, opts.ToArray());
                 _libVlc.Log += (_, e) =>
                 {
                     if (e.Level is LogLevel.Error or LogLevel.Warning)
+                    {
                         _lastLibVlcLog = $"[{e.Level}] {e.Module}: {e.Message}";
+                        AppDebugLog.Warn("LibVLC", $"{e.Module}: {e.Message}");
+                    }
+                    else if (e.Level == LogLevel.Debug)
+                    {
+                        AppDebugLog.Info("LibVLC", $"{e.Module}: {e.Message}");
+                    }
                 };
             }
             EnsurePlayer();
@@ -534,14 +554,24 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         {
             // Fallback without swapchain (may still work for audio / some builds)
             _libVlc = new LibVLC(
-                enableDebugLogs: false,
+                enableDebugLogs: true,
                 "--no-video-title-show",
                 "--network-caching=2000",
-                "--avcodec-hw=any");
+                "--avcodec-hw=any",
+                // plex.direct / LAN HTTPS often fails strict cert verify in LibVLC
+                "--http-tls-verify=0",
+                "--no-gnutls-system-trust");
             _libVlc.Log += (_, e) =>
             {
                 if (e.Level is LogLevel.Error or LogLevel.Warning)
+                {
                     _lastLibVlcLog = $"[{e.Level}] {e.Module}: {e.Message}";
+                    AppDebugLog.Warn("LibVLC", $"{e.Module}: {e.Message}");
+                }
+                else if (e.Level == LogLevel.Debug)
+                {
+                    AppDebugLog.Info("LibVLC", $"{e.Module}: {e.Message}");
+                }
             };
         }
 
@@ -573,6 +603,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             {
                 State = PlayerState.Error;
                 var detail = _lastLibVlcLog ?? "unknown";
+                AppDebugLog.Error("LibVLC", "EncounteredError: " + detail + " url=" + AppDebugLog.RedactUrl(_lastRequest?.MediaUrl?.AbsoluteUri));
                 RaiseOnUi(() => ErrorOccurred?.Invoke(this, "LibVLC playback error: " + detail));
             };
             _mediaPlayer.Buffering += (_, e) =>

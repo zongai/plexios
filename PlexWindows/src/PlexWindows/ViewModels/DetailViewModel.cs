@@ -140,9 +140,12 @@ public partial class DetailViewModel : ObservableObject
             if (meta.Duration is long d0 && startOffset > d0 * 0.95)
                 startOffset = 0;
             url = _urlBuilder.Build(ctx, meta, decision, network, startOffset);
+            AppDebugLog.Info("Detail.Play",
+                $"type={meta.Type} rk={meta.RatingKey} mode={decision.Mode} reason={decision.Reason} url={AppDebugLog.RedactUrl(url.AbsoluteUri)}");
         }
         catch (Exception ex)
         {
+            AppDebugLog.Error("Detail.Play", ex);
             StatusMessage = "Cannot start playback: " + ex.Message;
             return null;
         }

@@ -4,6 +4,7 @@ using PlexWindows.Models;
 using PlexWindows.Plex.Api;
 using PlexWindows.Playback;
 using PlexWindows.Services;
+using PlexWindows.Helpers;
 
 namespace PlexWindows.ViewModels;
 
@@ -136,6 +137,8 @@ public partial class PlayerViewModel : ObservableObject
 
         try
         {
+            AppDebugLog.Info("Playback",
+                $"Load mode={request.Decision.Mode} reason={request.Decision.Reason} url={AppDebugLog.RedactUrl(request.MediaUrl.AbsoluteUri)}");
             await _player.PrepareAsync(request);
             DurationSeconds = Math.Max(_player.DurationMs, request.Metadata.Duration ?? 0) / 1000.0;
             PositionSeconds = request.StartPositionMs / 1000.0;
@@ -435,6 +438,8 @@ public partial class PlayerViewModel : ObservableObject
                 };
             }
             var url = _urlBuilder.Build(Request.Context, meta, decision, Request.Network, pos);
+            AppDebugLog.Info("TrackSwitch",
+                $"mode={decision.Mode} audio={decision.SelectedAudioStreamId} sub={decision.SelectedSubtitleStreamId} burn={decision.BurnInSubtitles} reason={decision.Reason} url={AppDebugLog.RedactUrl(url.AbsoluteUri)}");
             var newReq = new PlaybackRequest
             {
                 Metadata = meta,
@@ -459,9 +464,11 @@ public partial class PlayerViewModel : ObservableObject
             PlayPauseLabel = "Pause";
             StatusMessage = "";
             RefreshTracks();
+            AppDebugLog.Info("TrackSwitch", "reload complete");
         }
         catch (Exception ex)
         {
+            AppDebugLog.Error("TrackSwitch", ex);
             StatusMessage = "Track switch failed: " + ex.Message;
         }
         finally

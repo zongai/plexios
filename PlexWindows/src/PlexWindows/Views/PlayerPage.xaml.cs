@@ -107,6 +107,7 @@ public sealed partial class PlayerPage : Page
 
     private async void Subtitle_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (ViewModel.IsTrackListUpdating) return;
         if (e.AddedItems.Count == 0) return;
         if (e.AddedItems.FirstOrDefault() is TrackInfo track)
             await ViewModel.SelectSubtitleAsync(track);

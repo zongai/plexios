@@ -30,6 +30,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     private long? _pendingSeekMs;
     private bool _coreReady;
     private string? _lastLibVlcLog;
+    private PlaybackRequest? _lastRequest;
 #endif
 
 
@@ -173,6 +174,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         State = PlayerState.Opening;
         _durationMs = request.Metadata.Duration ?? 0;
         _positionMs = request.StartPositionMs;
+        _lastRequest = request;
         BuildTracks(request.Metadata, request.Decision);
 
 #if !USE_LIBVLC
@@ -368,58 +370,95 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         foreach (var t in _subtitleTracks)
             t.IsSelected = streamId is int id && t.Id == id;
 #if USE_LIBVLC
-        if (_mediaPlayer is not null)
+        if (_mediaPlayer is null)
+            return Task.CompletedTask;
+
+        if (streamId is null)
         {
-            if (streamId is null)
+            _mediaPlayer.SetSpu(-1);
+            return Task.CompletedTask;
+        }
+
+        // External sidecar: load via AddSlave from PMS stream key
+        var plexMeta = _lastRequest?.Metadata;
+        var decision = _lastRequest?.Decision;
+        var part = plexMeta?.Media.ElementAtOrDefault(decision?.MediaIndex ?? 0)?.Parts
+            .ElementAtOrDefault(decision?.PartIndex ?? 0);
+        var plexStream = part?.Streams.FirstOrDefault(s =>
+            s.Type == PlexStream.StreamType.Subtitle && s.Id == streamId);
+        if (plexStream?.IsExternal == true && !string.IsNullOrEmpty(plexStream.Key)
+            && _lastRequest?.Context is { } ctx)
+        {
+            try
             {
-                _mediaPlayer.SetSpu(-1);
-            }
-            else
-            {
-                var plex = _subtitleTracks.FirstOrDefault(s => s.Id == streamId);
-                var rawSpu = _mediaPlayer.SpuDescription;
-                var vlcTracks = rawSpu is null
-                    ? Array.Empty<(int Id, string? Name)>()
-                    : rawSpu.Where(td => td.Id >= 0).Select(td => (td.Id, td.Name)).ToArray();
-                if (vlcTracks.Length > 0)
+                var path = plexStream.Key.TrimStart('/');
+                var subUri = new Uri(ctx.BaseUrl, path);
+                var ub = new UriBuilder(subUri)
                 {
-                    int? matchId = null;
-                    if (plex is not null)
-                    {
-                        var lang = plex.Language?.Trim();
-                        var title = plex.Title?.Trim();
-                        if (!string.IsNullOrEmpty(lang))
-                        {
-                            var m = vlcTracks.FirstOrDefault(v =>
-                                !string.IsNullOrEmpty(v.Name) &&
-                                v.Name.Contains(lang, StringComparison.OrdinalIgnoreCase));
-                            if (m.Name is not null) matchId = m.Id;
-                        }
-                        if (matchId is null && !string.IsNullOrEmpty(title))
-                        {
-                            var token = title.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                            if (!string.IsNullOrEmpty(token) && token.Length >= 2)
-                            {
-                                var m = vlcTracks.FirstOrDefault(v =>
-                                    !string.IsNullOrEmpty(v.Name) &&
-                                    v.Name.Contains(token, StringComparison.OrdinalIgnoreCase));
-                                if (m.Name is not null) matchId = m.Id;
-                            }
-                        }
-                    }
-                    if (matchId is null)
-                    {
-                        var idx = _subtitleTracks.FindIndex(s => s.Id == streamId);
-                        if (idx >= 0 && idx < vlcTracks.Length)
-                            matchId = vlcTracks[idx].Id;
-                    }
-                    if (matchId is int id)
-                        _mediaPlayer.SetSpu(id);
+                    Query = "X-Plex-Token=" + Uri.EscapeDataString(ctx.Token)
+                };
+                // select=true makes this the active subtitle
+                _mediaPlayer.AddSlave(MediaSlaveType.Subtitle, ub.Uri.AbsoluteUri, select: true);
+                return Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                RaiseOnUi(() => ErrorOccurred?.Invoke(this, "External subtitle failed: " + ex.Message));
+            }
+        }
+
+        // Embedded: map list index / language to VLC SPU id
+        var rawSpu = _mediaPlayer.SpuDescription;
+        var vlcTracks = rawSpu is null
+            ? Array.Empty<(int Id, string? Name)>()
+            : rawSpu.Where(td => td.Id >= 0).Select(td => (td.Id, td.Name)).ToArray();
+        if (vlcTracks.Length == 0)
+        {
+            RaiseOnUi(() => ErrorOccurred?.Invoke(this,
+                "Subtitle tracks not ready yet — wait for playback, or use session rebuild."));
+            return Task.CompletedTask;
+        }
+
+        int? matchId = null;
+        var plex = _subtitleTracks.FirstOrDefault(s => s.Id == streamId);
+        if (plex is not null)
+        {
+            var lang = plex.Language?.Trim();
+            var title = plex.Title?.Trim();
+            if (!string.IsNullOrEmpty(lang))
+            {
+                var m = vlcTracks.FirstOrDefault(v =>
+                    !string.IsNullOrEmpty(v.Name) &&
+                    v.Name.Contains(lang, StringComparison.OrdinalIgnoreCase));
+                if (m.Name is not null) matchId = m.Id;
+            }
+            if (matchId is null && !string.IsNullOrEmpty(title))
+            {
+                var token = title.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (!string.IsNullOrEmpty(token) && token.Length >= 2)
+                {
+                    var m = vlcTracks.FirstOrDefault(v =>
+                        !string.IsNullOrEmpty(v.Name) &&
+                        v.Name.Contains(token, StringComparison.OrdinalIgnoreCase));
+                    if (m.Name is not null) matchId = m.Id;
                 }
             }
         }
+        if (matchId is null)
+        {
+            var idx = _subtitleTracks.FindIndex(s => s.Id == streamId);
+            if (idx >= 0 && idx < vlcTracks.Length)
+                matchId = vlcTracks[idx].Id;
+        }
+        if (matchId is int spuId)
+        {
+            try { _mediaPlayer.SetSpu(spuId); }
+            catch (Exception ex)
+            {
+                RaiseOnUi(() => ErrorOccurred?.Invoke(this, "SetSpu failed: " + ex.Message));
+            }
+        }
 #endif
-        RaiseOnUi(() => TracksChanged?.Invoke(this, EventArgs.Empty));
         return Task.CompletedTask;
     }
 

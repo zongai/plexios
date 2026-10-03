@@ -257,10 +257,11 @@ public sealed class PlaybackDecisionEngine
         if (forced is int id)
         {
             if (id < 0) return (null, false); // explicit off
-            if (streams.Any(s => s.Id == id))
+            if (id > 0)
             {
-                var s = streams.First(x => x.Id == id);
-                return (id, RequiresBurnIn(s));
+                var s = streams.FirstOrDefault(x => x.Id == id);
+                // Honor user choice even if snapshot streams are incomplete
+                return (id, s is not null && RequiresBurnIn(s));
             }
         }
         if (!_prefs.SubtitlesEnabled)

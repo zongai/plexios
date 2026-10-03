@@ -311,12 +311,19 @@ public partial class PlayerViewModel : ObservableObject
         if (!wantOff && SelectedSubtitle?.Id == newId) return;
 
         SelectedSubtitle = wantOff ? SubtitleOff : track;
-        // In-player attempt (embedded soft subs on some backends)
-        await _player.SelectSubtitleAsync(wantOff ? null : newId);
-        // Always rebuild stream so transcode/burn-in and external subs actually apply
+
+        // Best-effort in-player (embedded soft subs on LibVLC)
+        try
+        {
+            await _player.SelectSubtitleAsync(wantOff ? null : newId);
+        }
+        catch { /* non-fatal */ }
+
+        // Always rebuild Plex session with subtitleStreamID / burn / off
         await ReloadWithTracksAsync(
             forcedAudioId: SelectedAudio?.Id,
-            forcedSubtitleId: newId);
+            forcedSubtitleId: newId,
+            forceSubtitleRemux: true);
         BumpControls();
     }
 
@@ -333,7 +340,8 @@ public partial class PlayerViewModel : ObservableObject
     private async Task ReloadWithTracksAsync(
         int? forcedAudioId,
         int? forcedSubtitleId,
-        bool forceAudioRemux = false)
+        bool forceAudioRemux = false,
+        bool forceSubtitleRemux = false)
     {
         if (Request is null || _reloadingTracks) return;
         _reloadingTracks = true;
@@ -373,7 +381,49 @@ public partial class PlayerViewModel : ObservableObject
                 }
             }
 
-            // MF path needs burn-in for many sub formats
+            // Subtitle change on Direct Play cannot carry subtitleStreamID in the file URL.
+            // Promote so PMS can serve/burn the chosen sub (embedded or external).
+            if (forceSubtitleRemux && forcedSubtitleId is int subForced)
+            {
+                if (subForced < 0)
+                {
+                    // explicit off
+                    decision = decision with
+                    {
+                        SelectedSubtitleStreamId = null,
+                        BurnInSubtitles = false,
+                        Reason = decision.Mode == PlaybackMode.DirectPlay
+                            ? decision.Reason
+                            : "Subtitles off"
+                    };
+                }
+                else
+                {
+                    // Prefer segmented soft-subs on Direct Stream when not burn-in;
+                    // force Transcode when decision already requires burn-in (PGS etc.).
+                    if (decision.Mode == PlaybackMode.DirectPlay)
+                    {
+                        decision = decision with
+                        {
+                            Mode = decision.BurnInSubtitles ? PlaybackMode.Transcode : PlaybackMode.DirectStream,
+                            SelectedSubtitleStreamId = subForced,
+                            Reason = decision.BurnInSubtitles
+                                ? "Subtitle selected — transcode (burn-in)"
+                                : "Subtitle selected — Direct Stream with subtitleStreamID"
+                        };
+                    }
+                    else
+                    {
+                        decision = decision with
+                        {
+                            SelectedSubtitleStreamId = subForced,
+                            Reason = decision.Reason + $" (subtitleStreamID={subForced})"
+                        };
+                    }
+                }
+            }
+
+            // MF cannot reliably render external/soft subs mid-stream — burn-in when not on LibVLC
             var usingVlc = _player.Backend == PlayerBackendKind.LibVlc
                            || LibVlcPlayerEngine.IsAvailable;
             if (!usingVlc && forcedSubtitleId is int sid && sid > 0
@@ -384,7 +434,7 @@ public partial class PlayerViewModel : ObservableObject
                     Mode = PlaybackMode.Transcode,
                     SelectedSubtitleStreamId = sid,
                     BurnInSubtitles = true,
-                    Reason = "Subtitle selected — transcode for reliable subtitle delivery"
+                    Reason = "Subtitle selected — transcode for reliable subtitle delivery (MF)"
                 };
             }
             var url = _urlBuilder.Build(Request.Context, meta, decision, Request.Network, pos);

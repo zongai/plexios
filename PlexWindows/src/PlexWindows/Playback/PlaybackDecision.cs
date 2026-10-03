@@ -236,7 +236,12 @@ public sealed class PlaybackDecisionEngine
 
     private int? SelectAudio(List<Models.PlexStream> streams, int? forced)
     {
-        if (forced is int id && streams.Any(s => s.Id == id)) return id;
+        // Honor explicit user choice even if stream list is incomplete in metadata snapshot
+        if (forced is int id && id > 0)
+        {
+            if (streams.Count == 0 || streams.Any(s => s.Id == id))
+                return id;
+        }
         foreach (var pref in _prefs.PreferredAudioLanguages.Where(s => !string.IsNullOrWhiteSpace(s)))
         {
             var match = streams.FirstOrDefault(s => MatchesLanguage(s, pref));

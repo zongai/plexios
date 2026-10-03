@@ -97,7 +97,8 @@ public sealed partial class PlayerPage : Page
 
     private async void Audio_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Ignore programmatic refresh of ItemsSource/SelectedItem
+        // Ignore programmatic refresh / mid-reload selection noise
+        if (ViewModel.IsTrackListUpdating) return;
         if (e.AddedItems.Count == 0) return;
         if (e.AddedItems.FirstOrDefault() is not TrackInfo track) return;
         var index = sender is ComboBox cb ? cb.SelectedIndex : -1;

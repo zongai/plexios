@@ -20,6 +20,7 @@ public partial class PlayerViewModel : ObservableObject
     private bool _seeking;
     private bool _updatingTracks;
     private bool _reloadingTracks;
+    public bool IsTrackListUpdating => _updatingTracks || _reloadingTracks;
 
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private string _subtitle = "";
@@ -349,17 +350,27 @@ public partial class PlayerViewModel : ObservableObject
                 forcedAudioId: forcedAudioId,
                 forcedSubtitleId: forcedSubtitleId);
 
-            // Audio change on Direct Play cannot apply audioStreamID — promote to Direct Stream
-            // so PMS remuxes with the selected audio track.
-            if (forceAudioRemux && forcedAudioId is int aid
-                && decision.Mode == PlaybackMode.DirectPlay)
+            // Audio change: always stamp SelectedAudioStreamId. Direct Play URLs cannot
+            // carry audioStreamID — promote to Direct Stream so PMS remuxes the chosen track.
+            if (forceAudioRemux && forcedAudioId is int aid)
             {
-                decision = decision with
+                if (decision.Mode == PlaybackMode.DirectPlay)
                 {
-                    Mode = PlaybackMode.DirectStream,
-                    SelectedAudioStreamId = aid,
-                    Reason = "Audio track change — Direct Stream with selected audio"
-                };
+                    decision = decision with
+                    {
+                        Mode = PlaybackMode.DirectStream,
+                        SelectedAudioStreamId = aid,
+                        Reason = "Audio track change — Direct Stream with selected audio"
+                    };
+                }
+                else if (decision.SelectedAudioStreamId != aid)
+                {
+                    decision = decision with
+                    {
+                        SelectedAudioStreamId = aid,
+                        Reason = decision.Reason + $" (audioStreamID={aid})"
+                    };
+                }
             }
 
             // MF path needs burn-in for many sub formats
@@ -502,7 +513,7 @@ public partial class PlayerViewModel : ObservableObject
             withOff.AddRange(subs);
             SubtitleTracks = withOff;
 
-            HasAudioTracks = AudioTracks.Count > 0;
+            HasAudioTracks = AudioTracks.Count > 1; // only show when user can switch
             HasSubtitleTracks = SubtitleTracks.Count > 1;
 
             var dec = Request?.Decision;

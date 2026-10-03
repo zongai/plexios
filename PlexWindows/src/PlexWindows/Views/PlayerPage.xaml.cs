@@ -99,8 +99,9 @@ public sealed partial class PlayerPage : Page
     {
         // Ignore programmatic refresh of ItemsSource/SelectedItem
         if (e.AddedItems.Count == 0) return;
-        if (e.AddedItems.FirstOrDefault() is TrackInfo track)
-            await ViewModel.SelectAudioAsync(track);
+        if (e.AddedItems.FirstOrDefault() is not TrackInfo track) return;
+        var index = sender is ComboBox cb ? cb.SelectedIndex : -1;
+        await ViewModel.SelectAudioAsync(track, index);
     }
 
     private async void Subtitle_SelectionChanged(object sender, SelectionChangedEventArgs e)

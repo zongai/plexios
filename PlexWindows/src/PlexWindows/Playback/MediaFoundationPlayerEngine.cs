@@ -199,7 +199,7 @@ public sealed class MediaFoundationPlayerEngine : IPlayerEngine
         return Task.CompletedTask;
     }
 
-    public Task SelectAudioTrackAsync(int streamId, CancellationToken ct = default)
+    public Task SelectAudioTrackAsync(int streamId, int listIndex = -1, CancellationToken ct = default)
     {
         // MediaPlayer track switching via MediaPlaybackItem when available.
         // For Direct Play of progressive files, track APIs depend on container support.

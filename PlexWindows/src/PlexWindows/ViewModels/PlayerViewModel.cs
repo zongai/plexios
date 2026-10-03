@@ -272,27 +272,29 @@ public partial class PlayerViewModel : ObservableObject
         BumpControls();
     }
 
-    public async Task SelectAudioAsync(TrackInfo? track)
+    public async Task SelectAudioAsync(TrackInfo? track, int listIndex = -1)
     {
         if (track is null || _updatingTracks || _reloadingTracks) return;
         if (SelectedAudio?.Id == track.Id) return;
         SelectedAudio = track;
 
+        // Resolve index from current list if caller didn't pass one
+        if (listIndex < 0)
+            listIndex = AudioTracks.ToList().FindIndex(t => t.Id == track.Id);
+
         var mode = Request?.Decision.Mode ?? PlaybackMode.DirectPlay;
         var usingVlc = _player.Backend == PlayerBackendKind.LibVlc;
 
-        // Direct Play + LibVLC: switch embedded audio in-player (URL has no audioStreamID).
-        // Direct Stream / Transcode: rebuild session with audioStreamID.
-        if (usingVlc && mode == PlaybackMode.DirectPlay)
+        // Always try in-player switch first (works for Direct Play file sources on LibVLC)
+        await _player.SelectAudioTrackAsync(track.Id, listIndex);
+        StatusMessage = "";
+
+        // For remux/transcode sessions, also rebuild URL with audioStreamID
+        if (mode is PlaybackMode.DirectStream or PlaybackMode.Transcode)
         {
-            await _player.SelectAudioTrackAsync(track.Id);
-            StatusMessage = "";
-            BumpControls();
-            return;
+            await ReloadWithTracksAsync(forcedAudioId: track.Id, forcedSubtitleId: CurrentForcedSubtitleId());
         }
 
-        await _player.SelectAudioTrackAsync(track.Id);
-        await ReloadWithTracksAsync(forcedAudioId: track.Id, forcedSubtitleId: CurrentForcedSubtitleId());
         BumpControls();
     }
 

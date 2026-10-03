@@ -177,8 +177,8 @@ public sealed class PlayerEngineRouter : IPlayerEngine
     public void Pause() => _active.Pause();
     public Task StopAsync() => _active.StopAsync();
     public Task SeekAsync(long positionMs, CancellationToken ct = default) => _active.SeekAsync(positionMs, ct);
-    public Task SelectAudioTrackAsync(int streamId, CancellationToken ct = default) =>
-        _active.SelectAudioTrackAsync(streamId, ct);
+    public Task SelectAudioTrackAsync(int streamId, int listIndex = -1, CancellationToken ct = default) =>
+        _active.SelectAudioTrackAsync(streamId, listIndex, ct);
     public Task SelectSubtitleAsync(int? streamId, CancellationToken ct = default) =>
         _active.SelectSubtitleAsync(streamId, ct);
 

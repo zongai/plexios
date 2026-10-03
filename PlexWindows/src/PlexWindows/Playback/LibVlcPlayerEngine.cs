@@ -302,55 +302,62 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         return Task.CompletedTask;
     }
 
-    public Task SelectAudioTrackAsync(int streamId, CancellationToken ct = default)
+    public Task SelectAudioTrackAsync(int streamId, int listIndex = -1, CancellationToken ct = default)
     {
         foreach (var t in _audioTracks) t.IsSelected = t.Id == streamId;
 #if USE_LIBVLC
-        if (_mediaPlayer is not null)
+        if (_mediaPlayer is null)
         {
-            var plex = _audioTracks.FirstOrDefault(a => a.Id == streamId);
-            var rawAudio = _mediaPlayer.AudioTrackDescription;
-            var vlcTracks = rawAudio is null
-                ? Array.Empty<(int Id, string? Name)>()
-                : rawAudio.Where(td => td.Id >= 0).Select(td => (td.Id, td.Name)).ToArray();
-            if (vlcTracks.Length > 0)
+            RaiseOnUi(() => ErrorOccurred?.Invoke(this, "Audio switch failed: player not ready."));
+            return Task.CompletedTask;
+        }
+
+        var raw = _mediaPlayer.AudioTrackDescription;
+        var vlcIds = new List<int>();
+        if (raw is not null)
+        {
+            foreach (var td in raw)
             {
-                int? matchId = null;
-                if (plex is not null)
-                {
-                    var lang = plex.Language?.Trim();
-                    var title = plex.Title?.Trim();
-                    if (!string.IsNullOrEmpty(lang))
-                    {
-                        var m = vlcTracks.FirstOrDefault(v =>
-                            !string.IsNullOrEmpty(v.Name) &&
-                            v.Name.Contains(lang, StringComparison.OrdinalIgnoreCase));
-                        if (m.Name is not null) matchId = m.Id;
-                    }
-                    if (matchId is null && !string.IsNullOrEmpty(title))
-                    {
-                        var token = title.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                        if (!string.IsNullOrEmpty(token) && token.Length >= 2)
-                        {
-                            var m = vlcTracks.FirstOrDefault(v =>
-                                !string.IsNullOrEmpty(v.Name) &&
-                                v.Name.Contains(token, StringComparison.OrdinalIgnoreCase));
-                            if (m.Name is not null) matchId = m.Id;
-                        }
-                    }
-                }
-                if (matchId is null)
-                {
-                    var idx = _audioTracks.FindIndex(a => a.Id == streamId);
-                    if (idx >= 0 && idx < vlcTracks.Length)
-                        matchId = vlcTracks[idx].Id;
-                }
-                if (matchId is int id)
-                    _mediaPlayer.SetAudioTrack(id);
+                if (td.Id >= 0)
+                    vlcIds.Add(td.Id);
             }
         }
+
+        if (vlcIds.Count == 0)
+        {
+            // Tracks not exposed yet — try after a brief moment is caller's job; report clearly
+            RaiseOnUi(() => ErrorOccurred?.Invoke(this,
+                "Audio tracks not ready yet — wait until playback starts, then switch again."));
+            return Task.CompletedTask;
+        }
+
+        int? target = null;
+        // Prefer ComboBox list index (same order as Plex streams we published)
+        if (listIndex >= 0 && listIndex < vlcIds.Count)
+            target = vlcIds[listIndex];
+        else
+        {
+            var idx = _audioTracks.FindIndex(a => a.Id == streamId);
+            if (idx >= 0 && idx < vlcIds.Count)
+                target = vlcIds[idx];
+        }
+
+        if (target is int vlcId)
+        {
+            var ok = _mediaPlayer.SetAudioTrack(vlcId);
+            if (!ok)
+            {
+                RaiseOnUi(() => ErrorOccurred?.Invoke(this,
+                    $"SetAudioTrack({vlcId}) failed (index={listIndex}, plexId={streamId})."));
+            }
+            // Do NOT raise TracksChanged — avoids SelectionChanged recursion / SelectedItem reset
+        }
+        else
+        {
+            RaiseOnUi(() => ErrorOccurred?.Invoke(this,
+                $"No VLC audio track for plexId={streamId} index={listIndex} (vlcCount={vlcIds.Count})."));
+        }
 #endif
-        RaiseOnUi(() => TracksChanged?.Invoke(this, EventArgs.Empty));
         return Task.CompletedTask;
     }
 

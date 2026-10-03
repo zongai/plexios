@@ -61,6 +61,6 @@ public interface IPlayerEngine : IAsyncDisposable
     void Pause();
     Task StopAsync();
     Task SeekAsync(long positionMs, CancellationToken ct = default);
-    Task SelectAudioTrackAsync(int streamId, CancellationToken ct = default);
+    Task SelectAudioTrackAsync(int streamId, int listIndex = -1, CancellationToken ct = default);
     Task SelectSubtitleAsync(int? streamId, CancellationToken ct = default);
 }

@@ -1,3 +1,4 @@
+using PlexWindows.Helpers;
 using PlexWindows.Services;
 namespace PlexWindows.Playback;
 

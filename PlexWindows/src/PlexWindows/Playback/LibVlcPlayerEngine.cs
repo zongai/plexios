@@ -57,7 +57,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         if (dir is not null)
             Core.Initialize(dir);
         else
-            EnsureCoreInitialized(); // last resort — may still find via PATH
+            Core.Initialize(); // last resort
     }
 #endif
 

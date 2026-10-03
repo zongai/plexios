@@ -7,7 +7,7 @@ enum PlaybackMode: String, Sendable, Equatable {
 }
 
 /// Contract: system (AVPlayer/Exo/MF) vs vlc fallback.
-enum PlaybackBackend: String, Sendable, Equatable {
+enum DecisionBackend: String, Sendable, Equatable {
     case system
     case vlc
 }
@@ -15,8 +15,8 @@ enum PlaybackBackend: String, Sendable, Equatable {
 struct PlaybackDecision: Sendable, Equatable {
     let mode: PlaybackMode
     let reason: String
-    /// Contract: system (AVPlayer) vs vlc fallback. Actual final backend may still switch at runtime.
-    let backend: PlaybackBackend
+    /// Contract: system (AVPlayer) vs vlc fallback. PlaybackEngine honors this for open path (prefs can still force system).
+    let backend: DecisionBackend
     let mediaIndex: Int
     let partIndex: Int
     let selectedAudioStreamId: Int?
@@ -112,7 +112,7 @@ struct PlaybackDecisionEngine: Sendable {
         forcedAudioId: Int?,
         forcedSubtitleId: Int?,
         caps: IOSCapabilities,
-        backend: PlaybackBackend
+        backend: DecisionBackend
     ) -> PlaybackDecision {
         guard !metadata.media.isEmpty else {
             return PlaybackDecision(

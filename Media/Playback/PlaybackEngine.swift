@@ -276,11 +276,12 @@ final class PlaybackEngine {
             height: 900
         )
 
-        // Prefer VLC Direct Play when enabled (broad codec/container support).
-        // Migration: `useSwiftVLC` routes to SwiftVLC (libVLC 4); default stays MobileVLCKit.
-        let wantVLCDirect = decision.mode == .directPlay
-            && effectivePrefs.allowVLCPlayer
-            && !effectivePrefs.preferSystemPlayer
+        // Contract: Decision.backend selects system vs VLC; prefs are safety valves.
+        // Engine PlaybackBackend (avPlayer/vlc/swiftVLC) is the implementation enum.
+        let decisionWantsVLC = decision.backend == .vlc
+            && (decision.mode == .directPlay || decision.mode == .directStream)
+        let allowVLC = effectivePrefs.allowVLCPlayer && !effectivePrefs.preferSystemPlayer
+        let wantVLCDirect = decisionWantsVLC && allowVLC
         let useSwiftVLC = wantVLCDirect
             && effectivePrefs.useSwiftVLC
             && SwiftVLCPlaybackBackend.isLinked

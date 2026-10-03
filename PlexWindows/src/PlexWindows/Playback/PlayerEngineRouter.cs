@@ -90,7 +90,7 @@ public sealed class PlayerEngineRouter : IPlayerEngine
 
     public async Task PrepareAsync(PlaybackRequest request, CancellationToken ct = default)
     {
-        // Forced LibVLC
+        // Forced LibVLC (settings)
         if (_preferredBackend == "libvlc")
         {
             if (_vlc is null)
@@ -106,14 +106,14 @@ public sealed class PlayerEngineRouter : IPlayerEngine
             return;
         }
 
-        // Auto: prefer LibVLC whenever available (DirectPlay MKV/HEVC + in-player
-        // audio/sub switch). MF cannot switch tracks mid-stream and often fails HEVC.
-        // iOS uses a single native player path; we mirror that with LibVLC on Windows.
-        var preferVlc =
-            _preferredBackend == "auto"
-            && _vlc is not null;
+        // Contract: Decision.Backend drives auto path — system (MF) first, VLC on gap/failure.
+        // decision.Backend == Vlc → try LibVLC first (capability-gap path from dual matrix).
+        // decision.Backend == System or settings mediaFoundation → MF first, VLC only if MF fails.
+        var decisionWantsVlc = request.Decision.Backend == PlaybackBackend.Vlc;
+        var allowVlcFallback = _preferredBackend == "auto" && _vlc is not null;
+        var tryVlcFirst = allowVlcFallback && decisionWantsVlc;
 
-        if (preferVlc)
+        if (tryVlcFirst)
         {
             await _mf.StopAsync().ConfigureAwait(true);
             SetActive(_vlc!);
@@ -130,9 +130,7 @@ public sealed class PlayerEngineRouter : IPlayerEngine
             }
         }
 
-        // MF path (forced mediaFoundation, or VLC unavailable/failed)
-        var allowFallback = _preferredBackend == "auto" && _vlc is not null;
-
+        // MF path (system decision, forced mediaFoundation, or VLC-first failed)
         SetActive(_mf);
         _mf.AttachSurfaces(_mfSurface, null);
 
@@ -170,7 +168,8 @@ public sealed class PlayerEngineRouter : IPlayerEngine
             _mf.StateChanged -= OnState;
         }
 
-        if (!allowFallback || _vlc is null)
+        // MF failed → LibVLC fallback when auto and available
+        if (!allowVlcFallback || _vlc is null)
         {
             ErrorOccurred?.Invoke(this,
                 _vlc is null

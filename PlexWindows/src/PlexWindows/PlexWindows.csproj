@@ -27,8 +27,12 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
-    <!-- LibVLCSharp 3.10+: VideoView lives in LibVLCSharp.Platforms.Windows via LibVLCSharp.WinUI -->
-    <PackageReference Include="LibVLCSharp" Version="3.10.1" />
+    <!--
+      IMPORTANT: Do NOT also reference LibVLCSharp (core).
+      LibVLCSharp.WinUI ships a Windows-specific LibVLCSharp.dll that contains
+      LibVLCSharp.Platforms.Windows.VideoView. Referencing both causes the
+      non-Windows assembly to win and TypeLoadException at runtime.
+    -->
     <PackageReference Include="LibVLCSharp.WinUI" Version="3.10.1" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
   </ItemGroup>

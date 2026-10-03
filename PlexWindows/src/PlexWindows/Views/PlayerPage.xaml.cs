@@ -23,14 +23,36 @@ public sealed partial class PlayerPage : Page
         DataContext = ViewModel;
     }
 
+    private LibVLCSharp.Platforms.Windows.VideoView? _vlcView;
+
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
+        EnsureVlcView();
         // Dual surfaces: MF → MediaPlayerElement, LibVLC → VideoView
-        ViewModel.Player.AttachSurfaces(MfElement, VlcView);
+        ViewModel.Player.AttachSurfaces(MfElement, _vlcView);
         if (e.Parameter is PlaybackRequest req)
             _ = ViewModel.LoadAsync(req);
         Focus(FocusState.Programmatic);
+    }
+
+    private void EnsureVlcView()
+    {
+        if (_vlcView is not null) return;
+        try
+        {
+            _vlcView = new LibVLCSharp.Platforms.Windows.VideoView
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+            _vlcView.Initialized += VlcView_Initialized;
+            VlcHost.Child = _vlcView;
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = "LibVLC VideoView unavailable: " + ex.Message;
+        }
     }
 
     protected override async void OnNavigatedFrom(NavigationEventArgs e)
@@ -92,7 +114,7 @@ public sealed partial class PlayerPage : Page
 
     private void Page_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (e.OriginalSource == MfElement || e.OriginalSource == VlcView)
+        if (e.OriginalSource == MfElement || e.OriginalSource == VlcHost || e.OriginalSource == _vlcView)
             ViewModel.ToggleControlsVisible();
         else
             ViewModel.BumpControls();

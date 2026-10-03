@@ -320,14 +320,21 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 _media = new Media(_libVlc, url, FromType.FromLocation);
             }
 
-            _media.AddOption(":network-caching=3000");
-            _media.AddOption(":file-caching=3000");
-            _media.AddOption(":live-caching=3000");
+            _media.AddOption(":network-caching=4000");
+            _media.AddOption(":file-caching=2000");
+            _media.AddOption(":live-caching=2000");
             _media.AddOption(":http-reconnect=true");
-            // Avoid Range probes that PMS rejects on transcoder endpoints
-            _media.AddOption(":http-continuous");
             _media.AddOption(":http-user-agent=PlexWindows/0.1");
             _media.AddOption(":avcodec-hw=any");
+            // HLS / universal transcoder: PMS returns 400 on Range probes for start.m3u8.
+            // Progressive Direct Play MP4 (moov-at-end) MUST keep Range seeks — do NOT set
+            // http-continuous there or demux fails with "no moov before mdat / not seekable".
+            var isHls = url.Contains(".m3u8", StringComparison.OrdinalIgnoreCase)
+                        || url.Contains("video/:/transcode/", StringComparison.OrdinalIgnoreCase);
+            if (isHls)
+                _media.AddOption(":http-continuous");
+            else
+                _media.AddOption(":prefetch-buffer-size=1048576");
 
             _mediaPlayer.Media = _media;
             _mediaPlayer.Volume = (int)(_volume * 100);
@@ -616,7 +623,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 var opts = new List<string>(swapChainOptions)
                 {
                     "--no-video-title-show",
-                    "--network-caching=1500"
+                    "--network-caching=4000"
                 };
                 _mediaPlayer?.Stop();
                 _mediaPlayer?.Dispose();
@@ -659,7 +666,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
                 _libVlc = new LibVLC(
                     enableDebugLogs: true,
                     "--no-video-title-show",
-                    "--network-caching=3000");
+                    "--network-caching=4000");
             }
             catch (Exception ex)
             {

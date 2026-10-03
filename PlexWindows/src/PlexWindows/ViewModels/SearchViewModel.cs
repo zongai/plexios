@@ -68,7 +68,7 @@ public partial class SearchViewModel : ObservableObject
                 Items = h.Items.Select(m => new MediaCardItem
                 {
                     Metadata = m,
-                    Poster = PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb)
+                    Poster = PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb, width: 420, height: 630)
                 }).ToList()
             }).ToList();
 

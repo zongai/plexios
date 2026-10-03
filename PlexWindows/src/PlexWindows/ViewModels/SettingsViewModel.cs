@@ -160,7 +160,8 @@ public partial class SettingsViewModel : ObservableObject
     public void ClearImageCache()
     {
         PosterImageLoader.Clear();
-        StatusMessage = "Image cache cleared.";
+        // Bound BitmapImages stay until pages reload cards from the network.
+        StatusMessage = "Image cache cleared. Re-open Home or Libraries to reload posters.";
     }
 
     [RelayCommand]

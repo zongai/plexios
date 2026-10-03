@@ -79,7 +79,7 @@ public partial class LibrariesViewModel : ObservableObject
             Items = page.Select(m => new MediaCardItem
             {
                 Metadata = m,
-                Poster = PosterImageLoader.GetThumb(ctx, m.Thumb)
+                Poster = PosterImageLoader.GetThumb(ctx, m.Thumb, width: 420, height: 630)
             }).ToList();
             StatusMessage = Items.Count == 0 ? "Library is empty." : "";
         }

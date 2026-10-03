@@ -113,7 +113,7 @@ public partial class CollectionsViewModel : ObservableObject
     private static MediaCardItem ToCard(PlexMetadata m, ServerContext ctx) => new()
     {
         Metadata = m,
-        Poster = PosterImageLoader.GetThumb(ctx, m.Thumb)
+        Poster = PosterImageLoader.GetThumb(ctx, m.Thumb, width: 420, height: 630)
     };
 
     private ServerContext? CurrentContext

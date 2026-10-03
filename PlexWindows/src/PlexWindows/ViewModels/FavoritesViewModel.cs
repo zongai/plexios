@@ -46,7 +46,7 @@ public partial class FavoritesViewModel : ObservableObject
                 list.Select(m => new MediaCardItem
                 {
                     Metadata = m,
-                    Poster = PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb)
+                    Poster = PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb, width: 420, height: 630)
                 }));
             StatusMessage = list.Count == 0 ? "No favorites yet" : "";
         }

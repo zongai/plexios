@@ -103,7 +103,7 @@ public partial class HomeViewModel : ObservableObject
                 Metadata = m,
                 Poster = ctx is null
                     ? null
-                    : PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb)
+                    : PosterImageLoader.GetThumb(ctx, m.Thumb ?? m.ParentThumb ?? m.GrandparentThumb, width: 420, height: 630)
             }).ToList()
         }).ToList();
     }

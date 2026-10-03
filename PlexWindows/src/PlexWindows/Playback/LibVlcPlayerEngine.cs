@@ -31,6 +31,36 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
     private bool _coreReady;
 #endif
 
+
+#if USE_LIBVLC
+    private static string? ResolveLibVlcDirectory()
+    {
+        var baseDir = AppContext.BaseDirectory;
+        var candidates = new[]
+        {
+            Path.Combine(baseDir, "libvlc", "win-x64"),
+            Path.Combine(baseDir, "libvlc", "x64"),
+            Path.Combine(baseDir, "libvlc"),
+            baseDir
+        };
+        foreach (var dir in candidates)
+        {
+            if (File.Exists(Path.Combine(dir, "libvlc.dll")))
+                return dir;
+        }
+        return null;
+    }
+
+    private static void EnsureCoreInitialized()
+    {
+        var dir = ResolveLibVlcDirectory();
+        if (dir is not null)
+            Core.Initialize(dir);
+        else
+            EnsureCoreInitialized(); // last resort — may still find via PATH
+    }
+#endif
+
     public static bool IsAvailable
     {
         get
@@ -39,7 +69,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
             try
             {
                 // Loads native libvlc from VideoLAN.LibVLC.Windows package output
-                Core.Initialize();
+                EnsureCoreInitialized();
                 return true;
             }
             catch
@@ -59,7 +89,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
 #if USE_LIBVLC
         try
         {
-            Core.Initialize();
+            EnsureCoreInitialized();
             _coreReady = true;
         }
         catch
@@ -154,7 +184,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         {
             try
             {
-                Core.Initialize();
+                EnsureCoreInitialized();
                 _coreReady = true;
             }
             catch (Exception ex)
@@ -349,7 +379,7 @@ public sealed class LibVlcPlayerEngine : IPlayerEngine
         {
             if (!_coreReady)
             {
-                Core.Initialize();
+                EnsureCoreInitialized();
                 _coreReady = true;
             }
             // Recreate LibVLC with swap chain options when the view becomes ready
